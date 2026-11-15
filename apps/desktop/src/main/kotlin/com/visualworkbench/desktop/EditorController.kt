@@ -1181,6 +1181,34 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
             finally{if(!adopted)withContext(NonCancellable){link.close()}}
         }
     }
+    private var automaticOwned:ProjectLink?=null
+    /** The live project connection, if [connectAutomatically] created it and nothing has replaced it since. */
+    internal fun automaticLink():ProjectLink?=automaticOwned?.takeIf{live.attachment()?.link===it}
+    /** Start the project connection without the owner choosing an address: listen on [endpoints] when this
+     * device hosts the project, otherwise dial the routes remembered for [peer] with [endpoints] as extra hints.
+     * It never replaces an existing connection and never reports to the owner; [finished] receives the failure,
+     * or null once the connection exists. The trust checks are those of [connectSession]. */
+    internal fun connectAutomatically(sessions:DesktopSessionController,peer:String,endpoints:List<SessionEndpoint>,tether:()->UInt?,finished:(Exception?)->Unit):Boolean{
+        if(streamDraftOnly||sessionWork?.isActive==true||mutable.value.sync!=null||mutable.value.busy)return false
+        sessionProvider=sessions;val epoch=generation
+        val work=task(epoch){
+            try{
+                val p=project?:return@task;val service=sessions.requireService();val role=service.projectRole(p)
+                if(!role.isHost&&peer!=role.hostDeviceId)throw SessionFailure(SessionFailureKind.Authentication)
+                if(live.attachment()!=null)return@task
+                require(endpoints.size<=16&&(!role.isHost||endpoints.isNotEmpty()));endpoints.forEach{checkedEndpoint(it.address)}
+                update{it.copy(sessionRole=role,routeWarnings=emptyList())}
+                val link=if(role.isHost)service.hostAutomatic(p,peer,endpoints)else service.connectAutomatic(p,peer,endpoints)
+                var adopted=false
+                try{if(project!==p||generation!=epoch)throw CancellationException("Project changed");live.install(link){tether()?.let{index->val findings=service.tetherRouteWarnings(index);if(project===p&&generation==epoch)update{it.copy(routeWarnings=findings)}}};adopted=true;automaticOwned=link;instructionFocus.attach(link);scheduleViewport()}
+                finally{if(!adopted)withContext(NonCancellable){link.close()}}
+                finished(null)
+            }catch(cancel:CancellationException){throw cancel}
+            catch(error:Exception){finished(error)}
+        }
+        if(work!=null)sessionWork=work
+        return work!=null
+    }
     fun receiveProject(sessions:DesktopSessionController,peer:String,endpoints:List<SessionEndpoint>,expectedProject:String?,tetherInterface:UInt?=null){
         if(sessionWork?.isActive==true){report("A connection request is already running. Finish or cancel it first.");return};sessionProvider=sessions
         val chosen=endpoints.map{SessionEndpoint(it.carrier,it.address)}.distinct().sortedBy{it.carrier.ordinal};val epoch=generation

@@ -79,6 +79,8 @@ fun main(args: Array<String>) {
         nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))}
     application {
         val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device,labelStore=PeerLabelStore(local.resolve("Visual Workbench/peer-labels.properties")))};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
+        // Pair once, then the phone connects by itself. App-level memory only: never part of a project.
+        val automatic=remember{DesktopAutomaticConnection(scope,sessions,EditorAutomaticPort(controller,sessions),AutomaticRouteKeeper(KnownRouteStore(local.resolve("Visual Workbench/known-routes.properties")),NativeRouteDiscovery(),::chosenTetherAdapter,::chosenAdapters)).also{it.start()}}
         val documentState by controller.documents.state.collectAsState()
         val streamRoot by controller.captureStream.collectAsState()
         var quitting by remember { mutableStateOf(false) }
@@ -311,6 +313,7 @@ fun main(args: Array<String>) {
                                 withRetiredVerificationAccess(mcpTasks::close,{mcp.close();mcpModal.close()}) {
                                     // Every verification borrow has joined before the
                                     // editor, links and native parents can retire.
+                                    automatic.close()
                                     controller.close();assertRemoteEditRetired();assertAndroidTunnelRetired();assertDesktopStreamsRetired()
                                     assistance.close();sessions.close()
                                     host.shutdown();host.destroy()
@@ -567,7 +570,7 @@ fun main(args: Array<String>) {
                 if(editor.exportOpen&&editor.document!=null&&documentState.descriptor!=null)AlertDialog(onDismissRequest=controller::dismissExport,title={Text("Document export")},text={Column(Modifier.heightIn(max=560.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(controller.documents,::saveDocument)}},confirmButton={TextButton(controller::dismissExport){Text("Close")}})
                 if(editor.exportOpen&&editor.document!=null&&documentState.descriptor==null)ExportDialog(controller,editor,::save)
                 if(editor.pasteOpen)PasteDialog(controller,editor)
-                if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
+                if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,automatic,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
                     importFile={pickerReturnsToConnection=true;instructionDialog(Command.Import)},
                     openProject={pickerReturnsToConnection=true;instructionDialog(Command.Open)}){instructionDialog(null)}
                 if(dialog==Command.Diagnostics){
