@@ -168,6 +168,9 @@ pub struct ProjectStore {
     beyond_checkpoint: bool,
     /// A lower limit on the size of a checkpoint than the one it has anyway.
     history_limit: usize,
+    /// This store mirrors a project another device owns; only that device
+    /// accepts transactions into it.
+    mirror: bool,
 }
 
 /// The advisory lock, given up explicitly. A lock belongs to the open file
@@ -254,6 +257,7 @@ impl ProjectStore {
             opened: OpenReport::default(),
             beyond_checkpoint: false,
             history_limit: usize::MAX,
+            mirror: local_device != authenticated_host,
         })
     }
 
@@ -319,6 +323,7 @@ impl ProjectStore {
             opened: OpenReport::default(),
             beyond_checkpoint: false,
             history_limit: usize::MAX,
+            mirror: false,
         })
     }
 
@@ -380,7 +385,9 @@ impl ProjectStore {
             },
             beyond_checkpoint: false,
             history_limit: usize::MAX,
+            mirror: false,
         };
+        store.mirror = store.local_device()? != *store.host.host_device();
         store.upkeep(&upkeep, &mut observer);
         observer(OpenStage::Compacted);
         Ok(store)
@@ -929,6 +936,12 @@ impl ProjectStore {
         accepted_at_ms: i64,
         mut observer: F,
     ) -> Result<Acceptance, StoreError> {
+        // A mirror's edits wait in its outbox for the host to accept them
+        // (`enqueue_pending`). Accepting one here would give it a log the
+        // host never sees.
+        if self.mirror {
+            return Err(StoreError::Invalid("a mirror cannot accept transactions"));
+        }
         let bytes = bounded_encode(txn)?;
         let stored = bytes.len();
         let Self {
