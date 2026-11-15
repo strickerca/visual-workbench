@@ -43,7 +43,7 @@ performance or daily-use acceptance.
    or Export on the phone. Choose Marked or Clean, the area, and PNG/JPEG/WebP.
    Review the revision and dimensions, then **Save file…**. For Claude Code,
    attach the saved image in your own terminal and review it before sending.
-   Windows also offers **Copy PNG + DIBV5** and **Prepare file drag**; after
+   Windows also offers **Copy PNG + bitmap** and **Prepare file drag**; after
    preparing a drag, use **Drag prepared PNG** on the transfer shelf. These
    actions transfer an image only when you choose them. Receiving applications
    can handle clipboard and file attachments differently.
