@@ -651,6 +651,7 @@ fun main(args: Array<String>) {
                 }
                 if(editor.document==null)Column(Modifier.align(Alignment.Center).widthIn(max=420.dp).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(18.dp)){
                     Text("Make the detail clear.",style=MaterialTheme.typography.h4,fontWeight=FontWeight.Medium);Text("Open an image to annotate, refine and export.",color=Color(0xffaebccb));Button(onClick={action(Command.Import)}){Text("Import image  ·  Ctrl+I")};TextButton(onClick={action(Command.Open)}){Text("Open a saved project")}
+                    GettingStartedGuide(onPhone=false)
                 };if(editor.busy||quitting)LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
             }
             Column(Modifier.width(390.dp).fillMaxHeight().background(Color(0xff141e29)).padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
