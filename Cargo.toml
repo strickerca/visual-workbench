@@ -34,6 +34,14 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 
+# Every ordinary build is optimised. The laptop's build.ps1, the phone build
+# (cargo ndk) and the checks all use this profile, and the apps load what it
+# produces from target/debug, so the app the owner runs is built from it.
+# Unoptimised, a save was about three times slower and the recovery checkpoint
+# about eight times slower (3.4 s instead of 0.45 s at 2,000 strokes). Checks
+# for arithmetic overflow and debug assertions stay on, as before. The cost is
+# build time.
 [profile.dev]
+opt-level = 3
 debug = 1
 incremental = false
