@@ -142,9 +142,11 @@ internal class CanvasRedrawHandshake(
     private val schedule: (Runnable, Long) -> Unit,
     private val unschedule: (Runnable) -> Unit,
     private val fallbackMs: Long,
+    /** Diagnostics only: the bounded fallback fired with this many redraws still held. */
+    private val fallbackFired: (Int) -> Unit = {},
 ) {
     private val pending = ArrayList<Runnable>()
-    private val fallback = Runnable { finish() }
+    private val fallback = Runnable { fallbackFired(pending.size); finish() }
     val waiting: Int get() = pending.size
 
     fun request(drawingFinished: Runnable, presented: Boolean) {
@@ -159,4 +161,19 @@ internal class CanvasRedrawHandshake(
         val ready = pending.toList(); pending.clear()
         for (callback in ready) callback.run()
     }
+}
+
+/** The newest lifecycle lines of the canvas, kept in memory only while that
+ * diagnostic is switched on, so an on-screen test can put them in its failure
+ * message after the device log has rolled over. Lines arrive from Main and from
+ * each generation's drawing thread. */
+internal class CanvasLifeHistory(private val capacity: Int) {
+    private val lines = ArrayDeque<String>()
+    init { require(capacity > 0) }
+
+    fun add(line: String) {
+        synchronized(lines) { if (lines.size == capacity) lines.removeFirst(); lines.addLast(line) }
+    }
+
+    fun snapshot(): List<String> = synchronized(lines) { lines.toList() }
 }

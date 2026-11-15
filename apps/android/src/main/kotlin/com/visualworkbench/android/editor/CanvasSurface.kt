@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.view.MotionEvent
+import android.view.SurfaceControl
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
@@ -28,6 +29,7 @@ import com.visualworkbench.shared.DocumentDrawLease
 import kotlinx.coroutines.CompletableDeferred
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** One immutable scene slot per renderer generation bounds queued render memory.
  *
@@ -53,9 +55,13 @@ import java.util.concurrent.TimeUnit
  *
  * A generation always starts from the scene for the surface's current size: while
  * the controller is being told a new size, the scenes it publishes on the way are
- * only remembered, and the generation is created after it returns. */
+ * only remembered, and the generation is created after it returns.
+ *
+ * Lifecycle diagnostics ([CanvasLife]) are written only when switched on, and a
+ * surface reads that switch once, when it is constructed. Pen-sample work (ink
+ * scenes and ink frames) is counted, never written line by line. */
 internal class CanvasSurface(context: Context, val controller: EditorController) : SurfaceView(context) {
-    private class RenderSession {
+    private class RenderSession(val number: Int) {
         var closed = false
         var latest: CanvasScene? = null
         var frontQueued = false
@@ -78,6 +84,15 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         /** Developer switch only: the kept picture an ink frame draws over. Made and
          * used on the drawing thread; discarded on Main once that thread has stopped. */
         @Volatile var wetInk: WetInkLayer? = null
+        /** Lifecycle diagnostics only, under [lock] and only while switched on: saved
+         * frames started and completed, ink frames since the last saved frame, and
+         * the viewport size of the scene last drawn into a saved frame. */
+        val createdMs = SystemClock.uptimeMillis()
+        var dryStarted = 0
+        var dryCompleted = 0
+        var inkFrames = 0
+        var drawnViewWidth = 0
+        var drawnViewHeight = 0
     }
     private class Generation(val renderer: CanvasFrontBufferedRenderer<Frame>, val session: RenderSession)
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
@@ -92,32 +107,52 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private var renderer: CanvasFrontBufferedRenderer<Frame>? = null
     private var session: RenderSession? = null
     private val replacement = CanvasReplacement<Generation>()
-    private val keptFallback = Runnable { replacement.fallback()?.let { release(it, CanvasRetirementReason.SurfaceChanged) } }
+    private val keptFallback = Runnable {
+        val waiting = replacement.kept
+        val retire = replacement.fallback()
+        if (lifeOn) life("kept_fallback gen=${waiting?.session?.number ?: 0} retired=${retire != null} " +
+            "resize_redraw_pending=${waiting?.let { synchronized(lock) { it.session.awaitingResizeRedraw } } == true}")
+        retire?.let { release(it, CanvasRetirementReason.SurfaceChanged) }
+    }
     private val generations = CanvasGenerations()
     private val retirementProgress=CanvasRetirementProgress()
-    private val redraws = CanvasRedrawHandshake({ task, delay -> main.postDelayed(task, delay) }, { main.removeCallbacks(it) }, REDRAW_FALLBACK_MS)
+    private val redraws = CanvasRedrawHandshake({ task, delay -> main.postDelayed(task, delay) }, { main.removeCallbacks(it) }, REDRAW_FALLBACK_MS,
+        { held -> if (lifeOn) life("redraw_fallback held=$held current=${session?.number ?: 0} current_presented=${session?.presented == true}") })
     private var surfaceWidth = 0
     private var surfaceHeight = 0
     private var latest: CanvasScene? = null
     private var lastInputMs = 0L
     private var attached = false
     private val longPress = Runnable { router.longPress(SystemClock.uptimeMillis()) }
+    /** Lifecycle diagnostics: the switch as it was when this surface was made, this
+     * surface's and its generations' ordinal numbers, and what was last written
+     * about a generation that could not be created or a scene nobody owned. */
+    private val lifeOn = CanvasLife.enabled()
+    private val surfaceNumber = if (lifeOn) CanvasLife.nextSurface() else 0
+    private var generationNumbers = 0
+    private var lifeWaitReason: String? = null
+    private var lifeUnownedScenes = 0
 
     init {
         contentDescription = "Document canvas. Pen draws; one finger pans; two fingers zoom and rotate."
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         isFocusable = true
         holder.addCallback(object : SurfaceHolder.Callback2 {
-            override fun surfaceCreated(holder: SurfaceHolder) { ensureRenderer() }
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                if (lifeOn) life("surface_created view=${this@CanvasSurface.width}x${this@CanvasSurface.height}")
+                ensureRenderer()
+            }
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
                 val changed = surfaceWidth != width || surfaceHeight != height
+                if (lifeOn) { life("surface_changed size=${width}x$height changed=$changed"); lifeWatchWindowFrame() }
                 surfaceWidth = width; surfaceHeight = height
                 if (changed) { cancelInput(); resize(width, height) }
                 ensureRenderer()
             }
             override fun surfaceDestroyed(holder: SurfaceHolder) {
+                if (lifeOn) life("surface_destroyed")
                 surfaceWidth = 0; surfaceHeight = 0; cancelInput(); retireRenderer(CanvasRetirementReason.SurfaceDestroyed)
-                redraws.finish()
+                finishRedraws("surface_destroyed")
             }
             override fun surfaceRedrawNeeded(holder: SurfaceHolder) {}
             // Finish SurfaceView's redraw only over a committed frame (bounded);
@@ -125,25 +160,41 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             // Giant frames stay hidden until their tiles are current, so giant mode
             // keeps the earlier immediate completion instead of waiting the fallback.
             override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
-                redraws.request(drawingFinished, !attached || controller.giantMode || session?.presented == true)
+                val presented = !attached || controller.giantMode || session?.presented == true
+                // Every generation alive now also holds this redraw until its own next frame.
+                if (lifeOn) life("redraw_request presented=$presented held=${redraws.waiting} " +
+                    "current=${session?.number ?: 0} kept=${replacement.kept?.session?.number ?: 0}")
+                redraws.request(drawingFinished, presented)
             }
         })
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow(); attached = true
+        if (lifeOn) life("attach")
         controller.attachCanvas(::publish,retirementHook,::ensureRenderer,{retirementProgress.current})
         ensureRenderer()
     }
     override fun onDetachedFromWindow() {
+        if (lifeOn) life("detach current=${session?.number ?: 0} kept=${replacement.kept?.session?.number ?: 0} releases=${generations.releaseCount}")
         attached = false; cancelInput(); controller.detachCanvas(retirementHook)
         // A retirement can complete exceptionally only after AndroidX released the
         // renderer pipeline (its document reader close failed, and that frame keeps
         // its own quarantine). Confirm either way: an unconfirmed hook gates every
         // successor canvas forever and leaves the recreated canvas black.
-        retireRenderer(CanvasRetirementReason.WindowDetached).invokeOnCompletion{main.post{if(!attached)controller.canvasRendererRetired(retirementHook)}}
-        redraws.finish()
+        val detachedMs = SystemClock.uptimeMillis()
+        retireRenderer(CanvasRetirementReason.WindowDetached).invokeOnCompletion{main.post{if(!attached){
+            if (lifeOn) life("retirement_confirmed after_detach_ms=${SystemClock.uptimeMillis() - detachedMs}")
+            controller.canvasRendererRetired(retirementHook)
+        }}}
+        finishRedraws("detached")
         super.onDetachedFromWindow()
+    }
+
+    /** Main: releases every held SurfaceView redraw completion. */
+    private fun finishRedraws(cause: String) {
+        if (lifeOn && redraws.waiting > 0) life("redraw_finish cause=$cause released=${redraws.waiting}")
+        redraws.finish()
     }
 
     fun cancelInput() {
@@ -162,20 +213,26 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun publish(scene: CanvasScene) {
         latest = scene
         if(session==null)ensureRenderer()
-        val target = session ?: return
+        val target = session ?: run { if (lifeOn) lifeUnownedScene(scene); return }
         if(target.latest?.documentFrame!==scene.documentFrame){retireRenderer(CanvasRetirementReason.DocumentFrameChanged);return}
         synchronized(lock) { if (!target.closed) target.latest = scene }
-        enqueue(target, !wet(scene))
+        enqueue(target, !wet(scene), "publish")
     }
 
-    private fun enqueue(target: RenderSession, dry: Boolean) {
+    /** [cause] is a fixed word for the lifecycle diagnostics only. */
+    private fun enqueue(target: RenderSession, dry: Boolean, cause: String) {
         val current = renderer ?: return
+        var note: String? = null
         val frame = synchronized(lock) {
-            if (target.closed || target !== session) null
-            else if (dry) target.dryFrames.request()?.let { Frame(target, true, lastInputMs, it) }
-            else if (target.frontQueued) null
-            else { target.frontQueued = true; Frame(target, false, lastInputMs) }
+            val made = if (target.closed || target !== session) null
+                else if (dry) target.dryFrames.request()?.let { Frame(target, true, lastInputMs, it) }
+                else if (target.frontQueued) null
+                else { target.frontQueued = true; Frame(target, false, lastInputMs) }
+            // Ink frames are pen-sample work: counted when drawn, never written here.
+            if (lifeOn && dry) note = lifeFrameRequest(target, made != null)
+            made
         }
+        if (note != null) life("frame_request gen=${target.number} cause=$cause $note")
         if (frame == null) return
         if (dry) current.renderMultiBufferedLayer(listOf(frame)) else current.renderFrontBufferedLayer(frame)
     }
@@ -190,7 +247,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun resize(width: Int, height: Int) {
         val density = resources.displayMetrics.density
         val current = renderer; val currentSession = session
-        when (replacement.resizeAction(current != null && currentSession != null, controller.giantMode, generations.releasing)) {
+        val action = replacement.resizeAction(current != null && currentSession != null, controller.giantMode, generations.releasing)
+        if (lifeOn) life("resize action=${action.name} size=${width}x$height current=${currentSession?.number ?: 0} " +
+            "current_presented=${currentSession?.presented == true} kept=${replacement.kept?.session?.number ?: 0} " +
+            "releases=${generations.releaseCount}")
+        when (action) {
             CanvasReplacement.ResizeAction.RetireAll -> {
                 retireRenderer(CanvasRetirementReason.SurfaceChanged); reportViewport(width, height, density)
             }
@@ -227,6 +288,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 val started = SystemClock.uptimeMillis()
                 val presented = successor.firstPresent.await(SUCCESSOR_PRESENT_WAIT_MS, TimeUnit.MILLISECONDS)
                 Log.i(LOG_TAG, "resize successor_wait_ms=${SystemClock.uptimeMillis() - started} presented=$presented")
+                if (lifeOn) life("resize_wait gen=${successor.number} kept=${keptGeneration.session.number} " +
+                    "waited_ms=${SystemClock.uptimeMillis() - started} presented=$presented")
             }
         }
     }
@@ -240,7 +303,9 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private fun resizeRedrawn(target: RenderSession) {
         val keptGeneration = replacement.kept ?: return
         if (keptGeneration.session !== target) return
-        replacement.keptRedrawn(keptGeneration)?.let(::retireKeptGeneration)
+        val retire = replacement.keptRedrawn(keptGeneration)
+        if (lifeOn) life("kept_redrawn gen=${target.number} retires=${retire != null}")
+        retire?.let(::retireKeptGeneration)
     }
 
     /** The kept generation's own AndroidX resize redraw paints the newest scene of the same document frame. */
@@ -257,6 +322,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         val target = replacement.restore() ?: return
         main.removeCallbacks(keptFallback)
         renderer = target.renderer; session = target.session
+        if (lifeOn) life("kept_restored gen=${target.session.number}")
         val scene = latest ?: return
         // Same rule as publish: a different document frame needs a renderer with its reader.
         if (target.session.latest?.documentFrame !== scene.documentFrame) { retireRenderer(CanvasRetirementReason.DocumentFrameChanged); return }
@@ -271,6 +337,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         // generation and covers it once its first frame commits. A redraw still
         // pending from an earlier in-place resize must finish before it leaves.
         replacement.keep(Generation(current, currentSession), awaitRedraw = synchronized(lock) { currentSession.awaitingResizeRedraw })
+        if (lifeOn) life("replace_after_settled kept=${currentSession.number}")
         renderer = null; session = null
         ensureRenderer()
         if (session == null) restoreKept()
@@ -282,13 +349,23 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
 
     private fun ensureRenderer() {
-        if (!attached || !controller.canCreateCanvas(retirementHook) || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || latest == null || !generations.canCreate(renderer != null)) return
-        val currentSession = RenderSession().also { it.latest = latest;it.documentReader=latest?.documentFrame?.acquire() }
+        if (!attached || !controller.canCreateCanvas(retirementHook) || !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 || latest == null || !generations.canCreate(renderer != null)) {
+            if (lifeOn) lifeGenerationWaits()
+            return
+        }
+        val currentSession = RenderSession(++generationNumbers).also { it.latest = latest;it.documentReader=latest?.documentFrame?.acquire() }
+        if (lifeOn) {
+            life("generation_created gen=${currentSession.number} size=${surfaceWidth}x$surfaceHeight view=${width}x$height " +
+                "rev=${latest?.revision ?: 0} scene_view=${lifeViewOf(latest)} kept=${replacement.kept?.session?.number ?: 0} " +
+                "scenes_without_generation=$lifeUnownedScenes")
+            lifeWaitReason = null; lifeUnownedScenes = 0
+        }
         session = currentSession
         renderer = try { CanvasFrontBufferedRenderer(this, object : CanvasFrontBufferedRenderer.Callback<Frame> {
             override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Frame) {
                 val snapshot = synchronized(lock) {
                     currentSession.frontQueued = false
+                    if (lifeOn) currentSession.inkFrames++
                     if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision;currentSession.giantFrontDrawn=it.giantFrame }
                 } ?: return
                 val drawStarted = System.nanoTime()
@@ -302,12 +379,16 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 if (param.inputMs > 0) main.post { if (!currentSession.closed) controller.drawCallback(param.inputMs) }
             }
             override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Frame>) {
+                var note: String? = null
                 val snapshot = synchronized(lock) {
-                    if (currentSession.closed) null else {
+                    val scene = if (currentSession.closed) null else {
                         currentSession.dryFrames.drawStarted(params.mapNotNull { it.dryRequest })
                         currentSession.latest?.also { currentSession.drawn = it.revision;currentSession.giantDrawn=it.giantFrame }
                     }
+                    if (lifeOn) note = lifeDrawStarted(currentSession, scene, bufferWidth, bufferHeight, params.count { it.dryRequest != null })
+                    scene
                 }
+                note?.let { life(it) }
                 // Developer switch only: the kept picture is held while ink is wet, never between strokes.
                 currentSession.wetInk?.forget()
                 if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
@@ -328,6 +409,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                                                             multiBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
                 var redrawnAfterResize = false
+                var note: String? = null; var completedFrame = 0
                 val visible = synchronized(lock) {
                     if (!currentSession.closed) currentSession.dryFrames.drawCompleted()
                     currentSession.frontDrawn = minOf(currentSession.frontDrawn, currentSession.drawn)
@@ -338,13 +420,31 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                         (currentSession.resizeFrom == null || multiBufferedLayerSurfaceControl !== currentSession.resizeFrom)) {
                         currentSession.awaitingResizeRedraw = false; redrawnAfterResize = true
                     }
+                    val layerChanged = currentSession.lastMultiLayer !== multiBufferedLayerSurfaceControl
                     currentSession.lastMultiLayer = multiBufferedLayerSurfaceControl
                     val hidden = currentSession.closed || currentSession.giantDrawn?.let{!controller.giantFrameCurrent(it)}==true
                     if (hidden) {
                         transaction.setVisibility(frontBufferedLayerSurfaceControl, false)
                         transaction.setVisibility(multiBufferedLayerSurfaceControl, false)
                     }
+                    if (lifeOn) { note = lifeDrawCompleted(currentSession, !hidden, layerChanged, redrawnAfterResize); completedFrame = currentSession.dryCompleted }
                     !hidden
+                }
+                val ready = note
+                if (ready != null) {
+                    life(ready)
+                    // Diagnostics only: when the compositor took this frame, to tell a
+                    // slow drawing thread from a frame held back after it was handed
+                    // over. Before API 33 a transaction keeps one such listener, and
+                    // that one belongs to the first-presentation check below.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val committedFrame = completedFrame; val handedOver = SystemClock.uptimeMillis()
+                        transaction.addTransactionCommittedListener({ it.run() }, object : SurfaceControlCompat.TransactionCommittedListener {
+                            override fun onTransactionCommitted() {
+                                life("frame_committed gen=${currentSession.number} frame=$committedFrame after_ms=${SystemClock.uptimeMillis() - handedOver}")
+                            }
+                        })
+                    }
                 }
                 // AndroidX runs SurfaceView's redraw completion right after this
                 // callback on this thread; a release posted from Main now queues
@@ -376,19 +476,25 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
             currentSession.documentReader?.close(); currentSession.documentReader = null
             throw error
         }
-        enqueue(currentSession, true)
+        enqueue(currentSession, true, "created")
     }
 
     /** Any thread: the generation's first visible frame has been committed. */
     private fun presented(target: RenderSession) {
         if (target.presented) return
         target.firstPresent.countDown()
+        if (lifeOn) life("presented gen=${target.number} after_created_ms=${SystemClock.uptimeMillis() - target.createdMs}")
         main.post {
-            if (target !== session || target.closed) return@post
+            if (target !== session || target.closed) {
+                if (lifeOn) life("presented_not_current gen=${target.number} current=${session?.number ?: 0}")
+                return@post
+            }
             val retire = replacement.successorPresented()
+            if (lifeOn && (retire != null || replacement.kept != null))
+                life("successor_presented gen=${target.number} kept=${(retire ?: replacement.kept)?.session?.number ?: 0} kept_retires=${retire != null}")
             if (retire != null) retireKeptGeneration(retire)
             else if (replacement.kept != null) { main.removeCallbacks(keptFallback); main.postDelayed(keptFallback, KEPT_REDRAW_FALLBACK_MS) }
-            redraws.finish()
+            finishRedraws("presented")
         }
     }
 
@@ -399,7 +505,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 if (it.revision > (if (dry) target.drawn else maxOf(target.drawn, target.frontDrawn))) dry else null
             }
         }
-        if (state != null) enqueue(target, state)
+        if (state != null) enqueue(target, state, "newer_scene")
     }
 
     private fun wet(scene: CanvasScene): Boolean {
@@ -428,6 +534,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private suspend fun retireForProject(){latest=null;retireRenderer(CanvasRetirementReason.ProjectRetirement).await()}
     /** Retires every generation, kept and current; completes after all releases settle. */
     private fun retireRenderer(reason:CanvasRetirementReason):CompletableDeferred<Unit> {
+        if (lifeOn && (session != null || replacement.kept != null))
+            life("retire reason=${reason.name} current=${session?.number ?: 0} kept=${replacement.kept?.session?.number ?: 0}")
         controller.canvasRendererRetiring()
         replacement.clearDeferred()
         main.removeCallbacks(keptFallback)
@@ -440,12 +548,19 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
     private fun release(target:Generation,reason:CanvasRetirementReason) {
         val owned=target.session
+        val requestedMs = SystemClock.uptimeMillis()
+        // A release while frames are in flight, or while the in-place resize redraw is
+        // still owed, also drops that generation's share of a held SurfaceView redraw.
+        if (lifeOn) life("release gen=${owned.number} reason=${reason.name} " + synchronized(lock) {
+            "presented=${owned.presented} in_flight=${owned.dryFrames.inFlight} request_pending=${owned.dryFrames.requestPending} " +
+                "resize_redraw_pending=${owned.awaitingResizeRedraw} started=${owned.dryStarted} completed=${owned.dryCompleted}" })
         synchronized(lock) { owned.closed = true; owned.dryFrames.close() }
         val joined=generations.beginRelease()
         val release=retirementProgress.begin(reason)
         try {
             target.renderer.release(true){
                 release.reached(CanvasRetirementMilestone.LibraryCallbackEntered)
+                if (lifeOn) life("release_callback gen=${owned.number} after_ms=${SystemClock.uptimeMillis() - requestedMs}")
                 val posted=main.post{
                     release.reached(CanvasRetirementMilestone.MainCallbackEntered)
                     var readerClosed=false
@@ -462,11 +577,115 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                         release.failed(if(readerClosed)CanvasRetirementMilestone.CompletionPublished else CanvasRetirementMilestone.ReaderCloseRunning)
                         joined.completeExceptionally(error)
                     }
-                    finally{generations.settled(joined);ensureRenderer();replaceAfterSettled()}
+                    finally{
+                        generations.settled(joined)
+                        if (lifeOn) life("release_settled gen=${owned.number} after_ms=${SystemClock.uptimeMillis() - requestedMs} " +
+                            "reader_closed=$readerClosed releases=${generations.releaseCount}")
+                        ensureRenderer();replaceAfterSettled()
+                    }
                 }
                 if(!posted)release.failed(CanvasRetirementMilestone.MainCallbackEntered)
             }
         }catch(error:Throwable){release.failed(CanvasRetirementMilestone.ReleaseRequested);throw error}
+    }
+
+    // Lifecycle diagnostics. Everything below runs only while [lifeOn] (the test
+    // hook [lifeState] aside) and writes fixed words and numbers, nothing else.
+
+    private fun life(text: String) { CanvasLife.line("surface=$surfaceNumber $text") }
+
+    /** The viewport size a scene was laid out for. */
+    private fun lifeViewOf(scene: CanvasScene?): String =
+        if (scene == null) "none" else "${scene.camera.viewportWidth.toInt()}x${scene.camera.viewportHeight.toInt()}"
+
+    /** Main, under [lock]: the outcome of asking for a saved frame of [target]'s newest scene. */
+    private fun lifeFrameRequest(target: RenderSession, granted: Boolean): String {
+        val result = when {
+            granted -> "granted"
+            target.closed -> "closed"
+            target !== session -> "not_current"
+            target.dryFrames.requestPending -> "request_pending"
+            else -> "draw_in_flight"
+        }
+        return "rev=${target.latest?.revision ?: 0} scene_view=${lifeViewOf(target.latest)} result=$result " +
+            "in_flight=${target.dryFrames.inFlight}"
+    }
+
+    /** Drawing thread, under [lock]: a saved frame of [scene] is being recorded. */
+    private fun lifeDrawStarted(target: RenderSession, scene: CanvasScene?, bufferWidth: Int, bufferHeight: Int, requests: Int): String {
+        target.dryStarted++
+        if (scene != null) {
+            target.drawnViewWidth = scene.camera.viewportWidth.toInt(); target.drawnViewHeight = scene.camera.viewportHeight.toInt()
+        }
+        val ink = target.inkFrames; target.inkFrames = 0
+        return "draw gen=${target.number} frame=${target.dryStarted} rev=${scene?.revision ?: 0} scene_view=${lifeViewOf(scene)} " +
+            "buffer=${bufferWidth}x$bufferHeight requests=$requests in_flight=${target.dryFrames.inFlight} " +
+            "newest_rev=${target.latest?.revision ?: 0} ink_frames_before=$ink closed=${target.closed}"
+    }
+
+    /** Drawing thread, under [lock]: a saved frame's buffer is ready and goes to the compositor. */
+    private fun lifeDrawCompleted(target: RenderSession, visible: Boolean, layerChanged: Boolean, resizeRedraw: Boolean): String {
+        target.dryCompleted++
+        return "frame_ready gen=${target.number} frame=${target.dryCompleted} started=${target.dryStarted} visible=$visible " +
+            "new_layer=$layerChanged resize_redraw=$resizeRedraw in_flight=${target.dryFrames.inFlight} " +
+            "request_pending=${target.dryFrames.requestPending} drawn_rev=${target.drawn} newest_rev=${target.latest?.revision ?: 0}"
+    }
+
+    /** Main: why no generation can be created just now; written when the reason changes. */
+    private fun lifeGenerationWaits() {
+        if (renderer != null) return // A current generation is not a wait.
+        val reason = when {
+            !attached -> "detached"
+            latest == null -> "no_scene"
+            !holder.surface.isValid || width <= 0 || height <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0 -> "no_surface"
+            generations.viewportChanging -> "viewport_changing"
+            generations.releasing -> "release_settling"
+            !controller.canCreateCanvas(retirementHook) -> "controller_gate"
+            else -> "other"
+        }
+        if (reason == lifeWaitReason) return
+        lifeWaitReason = reason
+        val awaited = controller.canvasRetirementProgress
+        life("generation_waits reason=$reason releases=${generations.releaseCount} " +
+            "awaited_retirement=${awaited?.reason?.name ?: "None"} awaited_milestone=${awaited?.milestone?.name ?: "None"}")
+    }
+
+    /** Main: a scene arrived while no generation exists. The first few of a run are written, the rest counted. */
+    private fun lifeUnownedScene(scene: CanvasScene) {
+        if (lifeUnownedScenes++ < 4) life("scene_without_generation rev=${scene.revision} scene_view=${lifeViewOf(scene)}")
+    }
+
+    /** Main: when the window's own next frame has been drawn, and when the compositor
+     * has taken it, to tell a late canvas from a late window. The second rides on
+     * the window's frame the way SurfaceView's own geometry change does. */
+    private fun lifeWatchWindowFrame() {
+        val asked = SystemClock.uptimeMillis()
+        try {
+            viewTreeObserver.registerFrameCommitCallback { life("window_frame_drawn after_surface_changed_ms=${SystemClock.uptimeMillis() - asked}") }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) rootSurfaceControl?.let { root ->
+                val shown = SurfaceControl.Transaction()
+                shown.addTransactionCommittedListener({ it.run() }) {
+                    life("window_frame_shown after_surface_changed_ms=${SystemClock.uptimeMillis() - asked}")
+                }
+                root.applyTransactionOnDraw(shown)
+            }
+        } catch (_: IllegalStateException) { /* The observer left with its window: nothing to watch. */ }
+    }
+
+    /** On-screen tests, Main: this canvas's own account of what it has drawn, in fixed
+     * words and numbers. Reads state only. Frame counts and the drawn viewport are
+     * kept only while the lifecycle diagnostics are switched on. */
+    internal fun lifeState(): String {
+        fun generation(name: String, target: RenderSession?): String = if (target == null) "$name=0" else synchronized(lock) {
+            "$name=${target.number} ${name}_presented=${target.presented} ${name}_drawn_rev=${target.drawn} " +
+                "${name}_drawn_view=${target.drawnViewWidth}x${target.drawnViewHeight} ${name}_newest_rev=${target.latest?.revision ?: 0} " +
+                "${name}_in_flight=${target.dryFrames.inFlight} ${name}_request_pending=${target.dryFrames.requestPending} " +
+                "${name}_resize_redraw_pending=${target.awaitingResizeRedraw} ${name}_frames=${target.dryCompleted}/${target.dryStarted}"
+        }
+        return "surface=$surfaceNumber attached=$attached size=${surfaceWidth}x$surfaceHeight view=${width}x$height " +
+            "newest_rev=${latest?.revision ?: 0} newest_view=${lifeViewOf(latest)} ${generation("current", session)} " +
+            "${generation("kept", replacement.kept?.session)} replace_deferred=${replacement.replaceDeferred} " +
+            "releases=${generations.releaseCount} redraws_held=${redraws.waiting} can_create=${controller.canCreateCanvas(retirementHook)}"
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -519,4 +738,35 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         const val KEPT_REDRAW_FALLBACK_MS = 500L
         const val LOG_TAG = "VW_CANVAS"
     }
+}
+
+/** Lifecycle diagnostics of the canvas surface, for telling a slow device from a
+ * redraw the canvas lost. One log tag; fixed words and numbers only (ordinal
+ * numbers of surfaces, generations, frames and scene revisions, pixel sizes,
+ * milliseconds, state names), never content, paths or identifiers.
+ *
+ * Off unless switched on for this process before the canvas is created: on a
+ * device with `adb shell setprop log.tag.VW_CANVAS_LIFE VERBOSE` (the setting
+ * lasts until the device restarts), or by an on-screen test through [forced].
+ * While off, no line is built and nothing is kept. While on, every saved frame
+ * writes four lines, so it is for a lifecycle check, not for everyday use. */
+internal object CanvasLife {
+    const val TAG = "VW_CANVAS_LIFE"
+    /** On-screen tests only. */
+    @Volatile var forced = false
+    private val surfaces = AtomicInteger()
+    private val history = CanvasLifeHistory(240)
+
+    fun enabled(): Boolean = forced || Log.isLoggable(TAG, Log.VERBOSE)
+    fun nextSurface(): Int = surfaces.incrementAndGet()
+
+    /** Any thread. `t` is the device's uptime clock in milliseconds. */
+    fun line(text: String) {
+        val stamped = "t=${SystemClock.uptimeMillis()} $text"
+        history.add(stamped)
+        Log.i(TAG, stamped)
+    }
+
+    /** The newest lines, oldest first. */
+    fun recent(): List<String> = history.snapshot()
 }
