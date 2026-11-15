@@ -121,11 +121,15 @@ pub(crate) enum RenderEntry {
         item: RenderItem,
         /// Strokes only, and only when the caller asked for changes.
         digest: Option<StrokeDigest>,
+        /// What the item counts toward the response size limit.
+        cost: usize,
     },
     /// A stroke the caller still holds unchanged: its geometry is not rebuilt.
     Kept {
         object_id: String,
         digest: StrokeDigest,
+        /// What the stroke counted when it was sent; it counts the same now.
+        cost: usize,
         layer_opacity: f64,
         layer_blend: String,
         locked: bool,
@@ -139,7 +143,7 @@ fn render_entries(
     document: &str,
     selected_page: Option<u32>,
     query: Option<QueryRect>,
-    known: Option<&std::collections::BTreeMap<String, StrokeDigest>>,
+    known: Option<&std::collections::BTreeMap<String, (StrokeDigest, usize)>>,
 ) -> Result<(ProjectInfo, Vec<RenderEntry>)> {
     let query = query.map(rect).transpose()?;
     let project = state.project()?;
@@ -230,14 +234,21 @@ fn render_entries(
                 let bytes = object.state.encode_to_vec();
                 let value: StrokeDigest = *blake3::hash(&bytes).as_bytes();
                 let object_id = id.to_string();
-                if known.get(&object_id) == Some(&value) {
+                if let Some((held, cost)) = known.get(&object_id)
+                    && held == &value
+                {
                     if items.len() >= 10_000 {
                         return Err(CoreError::Backpressure);
                     }
-                    crate::payload::accumulate(&mut bytes_total, 256)?;
+                    // A kept stroke is not sent, but the caller still holds it:
+                    // it counts toward the limit what it counted when it was
+                    // sent, so a document cannot grow past what a complete
+                    // read would be allowed to return.
+                    crate::payload::accumulate(&mut bytes_total, *cost)?;
                     items.push(RenderEntry::Kept {
                         object_id,
                         digest: value,
+                        cost: *cost,
                         layer_opacity: layer.opacity,
                         layer_blend: layer.blend.clone(),
                         locked: object.state.locked || layer.locked,
@@ -294,8 +305,9 @@ fn render_entries(
                 shape,
                 locked: object.state.locked || layer.locked,
             };
-            crate::payload::accumulate(&mut bytes_total, crate::payload::item_bytes(&item)?)?;
-            items.push(RenderEntry::Item { item, digest });
+            let cost = crate::payload::item_bytes(&item)?;
+            crate::payload::accumulate(&mut bytes_total, cost)?;
+            items.push(RenderEntry::Item { item, digest, cost });
         }
     }
     Ok((revision, items))
@@ -701,7 +713,11 @@ impl ProjectSession {
                 .as_slice()
                 .try_into()
                 .map_err(|_| CoreError::Invalid)?;
-            if held.insert(stroke.object_id, digest).is_some() {
+            // No item counts less than its fixed part or more than a whole response.
+            let cost = usize::try_from(stroke.cost).map_err(|_| CoreError::Invalid)?;
+            if !(crate::payload::MIN_ITEM..=crate::payload::MAX_RESPONSE).contains(&cost)
+                || held.insert(stroke.object_id, (digest, cost)).is_some()
+            {
                 return Err(CoreError::Invalid);
             }
         }
@@ -717,9 +733,10 @@ impl ProjectSession {
                     .map_err(|_| CoreError::Worker)?;
                 for entry in entries {
                     items.push(match entry {
-                        RenderEntry::Item { item, digest } => RenderItemChange {
+                        RenderEntry::Item { item, digest, cost } => RenderItemChange {
                             object_id: item.object_id.clone(),
                             digest: digest.map(|value| value.to_vec()),
+                            cost: cost as u64,
                             layer_opacity: item.layer_opacity,
                             layer_blend: item.layer_blend.clone(),
                             locked: item.locked,
@@ -728,12 +745,14 @@ impl ProjectSession {
                         RenderEntry::Kept {
                             object_id,
                             digest,
+                            cost,
                             layer_opacity,
                             layer_blend,
                             locked,
                         } => RenderItemChange {
                             object_id,
                             digest: Some(digest.to_vec()),
+                            cost: cost as u64,
                             layer_opacity,
                             layer_blend,
                             locked,

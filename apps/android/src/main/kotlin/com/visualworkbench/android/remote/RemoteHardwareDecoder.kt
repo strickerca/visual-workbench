@@ -194,18 +194,22 @@ internal interface DecoderEngine {
     fun release()
 }
 
-/** How long the decoder worker waits for a decoded frame and then for its
- * render callback in one pass, as (output microseconds, callback milliseconds).
+/** How long the decoder worker waits on the decoder for a decoded frame in
+ * one pass, in microseconds.
  *
- * Originally it never waits for the frame and always waits up to 4 ms for the
+ * Originally it never waits there and always waits up to 4 ms for the render
  * callback, so a frame that finishes decoding during that wait is picked up as
  * much as 4 ms late. With [quick], while a frame is being decoded the worker
  * waits on the decoder itself and is woken the moment the frame is ready; the
- * callback is then awaited in the next pass, exactly as before. Either way one
+ * callback is then awaited in the next pass, exactly as before. */
+internal fun remoteDecoderOutputWaitMicros(quick: Boolean, inputQueued: Boolean, outputReleased: Boolean): Long =
+    if (quick && inputQueued && !outputReleased) 4_000L else 0L
+
+/** How long the same pass then waits for the render callback, in milliseconds:
+ * the original 4 unless the pass already waited on the decoder. Either way one
  * pass takes at most 4 ms, so closing and the frame deadline are noticed as
  * promptly as before. */
-internal fun remoteDecoderWaits(quick: Boolean, inputQueued: Boolean, outputReleased: Boolean): Pair<Long, Long> =
-    if (quick && inputQueued && !outputReleased) Pair(4_000L, 0L) else Pair(0L, 4L)
+internal fun remoteDecoderCallbackWaitMillis(outputWaitMicros: Long): Long = if (outputWaitMicros > 0L) 0L else 4L
 
 /** Samples the phone-local request and actual return separately. Media PTS is
  * an identity in microseconds; it never chooses the Surface scheduling clock.
@@ -325,9 +329,9 @@ class RemoteHardwareDecoder private constructor(
                 if (System.nanoTime() - frame.enqueuedLocalNanos >= FRAME_DEADLINE_NANOS) {
                     recover("FrameDeadline"); break
                 }
-                val waits = remoteDecoderWaits(quick, inputQueued, outputReleased)
+                val outputWait = remoteDecoderOutputWaitMicros(quick, inputQueued, outputReleased)
                 if (inputQueued && !outputReleased) {
-                    when (val output = if (waits.first > 0L) engine.awaitOutput(waits.first) else engine.output()) {
+                    when (val output = if (outputWait > 0L) engine.awaitOutput(outputWait) else engine.output()) {
                         DecoderOutput.None -> Unit
                         DecoderOutput.FormatChanged -> {
                             if (engine.outputDimensions() != Pair(config.codedWidth, config.codedHeight)) recover("OutputGeometryChanged")
@@ -350,7 +354,7 @@ class RemoteHardwareDecoder private constructor(
                         }
                     }
                 }
-                val callback = rendered.poll(waits.second, TimeUnit.MILLISECONDS)
+                val callback = rendered.poll(remoteDecoderCallbackWaitMillis(outputWait), TimeUnit.MILLISECONDS)
                 if (callback != null && !closing.get()) {
                     if (System.nanoTime() - frame.enqueuedLocalNanos >= FRAME_DEADLINE_NANOS) {
                         recover("FrameDeadline"); break

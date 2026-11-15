@@ -47,13 +47,16 @@ public interface WorkbenchDocumentChanges {
  * project, so ink can be drawn while the project is saving or writing a
  * recovery checkpoint. */
 public interface WorkbenchDeferredStrokes {
-    /** Like [WorkbenchProject.beginStroke], but nothing is read from the
-     * project now: the layer, device and object checks are made, and the base
-     * revision taken, when the stroke is committed. A stroke that fails them is
-     * refused by [WorkbenchStroke.commit] and nothing of it is saved. Returns
-     * null for a stroke that needs the project at its start (highlighter); use
-     * [WorkbenchProject.beginStroke] for it. The caller owns the result and
-     * must [WorkbenchStroke.dispose] it. */
+    /** Like [WorkbenchProject.beginStroke], but the project's answer is not
+     * waited for: the layer, device and object checks and the base revision
+     * are asked for now, in the project's own order, and the stroke takes ink
+     * meanwhile. A stroke the project refuses takes no further ink once the
+     * refusal has arrived and is refused by [WorkbenchStroke.commit] with the
+     * failure [WorkbenchProject.beginStroke] would have reported; nothing of it
+     * is saved. Returns null for a stroke that needs the project before its
+     * first ink (highlighter) and when the project cannot take the request
+     * right now; use [WorkbenchProject.beginStroke] then. The caller owns the
+     * result and must [WorkbenchStroke.dispose] it. */
     public fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke?
 }
 public interface WorkbenchStroke {

@@ -22,14 +22,16 @@ internal class RemotePenIntake(val longBatches: Boolean, val typed: Boolean = fa
     /** Samples that may wait on the phone between the touch thread and the sender. */
     val queueCapacity: Int get() = if (!longBatches) GROUP else if (typed) TYPED_QUEUE else LONG_QUEUE
     /** Largest single reservation: 8 for the original call, a whole event for the typed one. */
-    private val reservation: Int get() = if (longBatches && typed) TYPED_SAMPLES else GROUP
+    val reservation: Int get() = if (longBatches && typed) TYPED_SAMPLES else GROUP
 
     /** [reserve] is the short native state-only reservation: false means an
      * editor command is refreshing and no sample of this event may be queued.
      * [enqueue] is false when the phone queue is full. Call under the input
      * fence. After [Result.Refused] the caller clears the queue and pauses,
-     * which also retires every reservation made here. */
-    fun <T> admit(batch: List<T>, reserve: (UInt) -> Boolean, enqueue: (T) -> Boolean): Result {
+     * which also retires every reservation made here. Inline: the two calls
+     * are made in place, as they were written in the controller before, and
+     * nothing is allocated per event. */
+    inline fun <T> admit(batch: List<T>, reserve: (UInt) -> Boolean, enqueue: (T) -> Boolean): Result {
         if (!longBatches) {
             if (!reserve(batch.size.toUInt())) return Result.CommandBusy
             return if (batch.all(enqueue)) Result.Admitted else Result.Refused
@@ -69,29 +71,68 @@ internal fun remoteUnbufferedPenRequest(enabled: Boolean, actionMasked: Int, too
  * after the main thread was held up. Either one switches the pacer on. */
 internal fun remoteSendPaced(longBatches: Boolean, unbufferedPen: Boolean): Boolean = longBatches || unbufferedPen
 
-/** Releases queued samples to the computer no faster than its eight-slot input
- * queue is known to take them today: eight at once, then one more per
- * millisecond. In ordinary drawing (a pen sample every two to four
- * milliseconds) it never waits. Used only when [remoteSendPaced]; one sender
- * owns it. */
-internal class RemoteSendPacer(private val burst: Int = RemotePenIntake.GROUP, private val refillNanos: Long = 1_000_000L) {
-    private var tokens = burst
-    private var updated = Long.MIN_VALUE
+/** One display frame in nanoseconds for a display that reports [refreshRate];
+ * a slow 60 Hz frame when the rate is missing or implausible. */
+internal fun remoteFrameNanos(refreshRate: Float): Long =
+    if (refreshRate.isFinite() && refreshRate >= 24f && refreshRate <= 240f) (1_000_000_000.0 / refreshRate).toLong()
+    else RemoteSendPacer.SLOW_FRAME_NANOS
+
+/** Typed batches: [first] and whatever else is already waiting, up to eight
+ * samples for one call. With paced sends each further sample needs its own
+ * send slot; a slot taken for a sample that is not there is given back. */
+internal inline fun <T> remotePenGroup(first: T, pacer: RemoteSendPacer?, now: () -> Long, next: () -> T?): List<T> {
+    val group = ArrayList<T>(RemotePenIntake.GROUP)
+    group.add(first)
+    while (group.size < RemotePenIntake.GROUP) {
+        if (pacer != null && pacer.acquire(now()) > 0L) break
+        val more = next()
+        if (more == null) { pacer?.giveBack(); break }
+        group.add(more)
+    }
+    return group
+}
+
+/** Releases queued samples to the computer no faster than it can get them
+ * today. Without the switches one pen event carries at most eight samples and
+ * events are a display frame apart, so the computer is never handed more than
+ * eight samples within one frame time. This lets a send go only while fewer
+ * than eight were sent within the last frame time, which is that same bound
+ * for whatever the switches queue: a longer event goes as eight at once and
+ * the rest a frame later, exactly as two events do today. In ordinary drawing
+ * (a pen sample every two to four milliseconds) it never waits. Used only
+ * when [remoteSendPaced]; one sender owns it, and the view reports the
+ * display's frame time through [windowNanos]. */
+internal class RemoteSendPacer(private val burst: Int = RemotePenIntake.GROUP, windowNanos: Long = SLOW_FRAME_NANOS) {
+    /** One display frame. Until the view has reported its display, a slow 60 Hz frame. */
+    @Volatile var windowNanos: Long = windowNanos
+    /** When each of the last [burst] samples was released, oldest at [next]. */
+    private val sent = LongArray(burst) { NEVER }
+    private var next = 0
+    private var replaced = NEVER
+    private var returnable = false
 
     /** Takes one send slot and returns 0, or returns the nanoseconds to wait
      * before asking again. [nowNanos] is a monotonic clock. */
     fun acquire(nowNanos: Long): Long {
-        if (updated == Long.MIN_VALUE || nowNanos < updated) updated = nowNanos
-        val earned = (nowNanos - updated) / refillNanos
-        if (earned > 0) {
-            // A full bucket carries no partial progress toward a ninth slot.
-            if (tokens + earned >= burst) { tokens = burst; updated = nowNanos }
-            else { tokens += earned.toInt(); updated += earned * refillNanos }
+        val oldest = sent[next]
+        if (oldest != NEVER) {
+            // A clock that steps backwards mints no slot and costs one frame, not the size of the step.
+            if (nowNanos < oldest) { sent.fill(nowNanos); returnable = false; return windowNanos }
+            val wait = windowNanos - (nowNanos - oldest)
+            if (wait > 0L) return wait
         }
-        if (tokens > 0) { tokens--; return 0L }
-        return refillNanos - (nowNanos - updated)
+        replaced = oldest; sent[next] = nowNanos; next = (next + 1) % burst; returnable = true
+        return 0L
     }
 
-    /** Returns a slot that [acquire] granted and that was not used for a send. */
-    fun giveBack() { if (tokens < burst) tokens++ }
+    /** Returns the slot granted last, which was not used for a send. Once per granted slot. */
+    fun giveBack() {
+        if (!returnable) return
+        returnable = false; next = (next + burst - 1) % burst; sent[next] = replaced
+    }
+
+    companion object {
+        private const val NEVER = Long.MIN_VALUE
+        const val SLOW_FRAME_NANOS = 16_666_667L
+    }
 }

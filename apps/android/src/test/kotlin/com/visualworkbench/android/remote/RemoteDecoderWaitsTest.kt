@@ -7,6 +7,11 @@ import org.junit.Test
 
 class RemoteDecoderWaitsTest {
     private val states = listOf(false to false, false to true, true to false, true to true)
+    /** One pass of the decoder worker: (wait on the decoder in microseconds, wait for the callback in milliseconds). */
+    private fun remoteDecoderWaits(quick: Boolean, inputQueued: Boolean, outputReleased: Boolean): Pair<Long, Long> {
+        val output = remoteDecoderOutputWaitMicros(quick, inputQueued, outputReleased)
+        return Pair(output, remoteDecoderCallbackWaitMillis(output))
+    }
 
     @Test fun switched_off_never_waits_on_the_decoder_and_always_waits_four_milliseconds_for_the_callback() {
         // Exactly the two waits the worker has always used, in every state.

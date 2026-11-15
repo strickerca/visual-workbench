@@ -83,47 +83,69 @@ internal class DryLayers(layers: List<String>, saved: List<RenderItem>, hidden: 
 internal fun wetInkOnTop(layers: List<String>, saved: List<RenderItem>, wet: List<RenderItem>, hidden: Set<String>): Boolean =
     DryLayers(layers, saved, hidden).inkOnTop(wet, hidden)
 
+/** Whether two saved-object lists are the same objects in the same order. */
+private fun sameObjects(a: List<DrawObject>, b: List<DrawObject>): Boolean {
+    if (a === b) return true
+    if (a.size != b.size) return false
+    for (index in a.indices) if (a[index] !== b[index]) return false
+    return true
+}
+
 /** Draws an ink frame without redrawing the document: everything except the
  * stroke in progress is recorded once and kept by the renderer as a finished
  * layer, then each frame draws that layer, the wet ink on top, the overlays
- * and the magnifier panes. Owned by one render session and used only on its
- * drawing thread. When a scene does not qualify, [draw] draws nothing and
- * returns false, and the caller draws the whole scene as before. */
+ * and the magnifier panes. When a scene does not qualify, [draw] draws nothing
+ * and returns false, and the caller draws the whole scene as before.
+ *
+ * Owned by one render session. [draw] and [forget] run on its drawing thread;
+ * [discard] runs on the main thread only after that thread has stopped drawing
+ * for the session, which is why the two references are volatile. The picture
+ * is kept only while ink is wet: [forget] drops it at every saved frame, so
+ * between strokes this holds no bitmap or document, and the renderer is free
+ * to release the finished layer once the front buffer no longer shows it. */
 internal class WetInkLayer {
     private val node = RenderNode("vw-dry-scene")
-    private var kept: Kept? = null
+    @Volatile private var kept: Kept? = null
+    @Volatile private var judged: Judged? = null
+
+    /** The layer order of one saved scene, worked out once whether or not a picture is kept for it. */
+    private class Judged(val document: Any, val objects: List<DrawObject>, val hidden: Set<String>, val layers: DryLayers) {
+        fun sameAs(scene: CanvasScene): Boolean =
+            document === scene.document && (hidden === scene.hidden || hidden == scene.hidden) && sameObjects(objects, scene.objects)
+    }
 
     /** What the kept picture was drawn from. Lists and bitmaps by identity. */
-    private class Kept(val scene: CanvasScene, val width: Int, val height: Int, val layers: DryLayers) {
+    private class Kept(val scene: CanvasScene, val width: Int, val height: Int) {
         fun sameAs(other: CanvasScene, w: Int, h: Int): Boolean {
             val s = scene
-            if (w != width || h != height || s.document !== other.document || s.background !== other.background ||
-                s.matrix != other.matrix || s.camera != other.camera || s.dark != other.dark ||
-                s.smoothBackground != other.smoothBackground || s.hidden != other.hidden) return false
-            val a = s.objects; val b = other.objects
-            if (a === b) return true
-            if (a.size != b.size) return false
-            for (index in a.indices) if (a[index] !== b[index]) return false
-            return true
+            return w == width && h == height && s.document === other.document && s.background === other.background &&
+                s.matrix == other.matrix && s.camera == other.camera && s.dark == other.dark &&
+                s.smoothBackground == other.smoothBackground && s.hidden == other.hidden && sameObjects(s.objects, other.objects)
         }
     }
 
     fun draw(canvas: Canvas, scene: CanvasScene): Boolean {
         if (!canvas.isHardwareAccelerated || scene.giantMode || scene.giantFrame != null || scene.documentFrame != null ||
             scene.documentDraft != null || !scene.resultDisplayReady || scene.aiResults.isNotEmpty() || scene.transformed.isNotEmpty() ||
-            scene.provisional.isEmpty()) return false
+            scene.provisional.isEmpty()) { forget(); return false }
         val width = scene.camera.viewportWidth.toInt(); val height = scene.camera.viewportHeight.toInt()
-        if (width <= 0 || height <= 0) return false
-        val current = kept?.takeIf { it.sameAs(scene, width, height) }
-        val layers = current?.layers ?: DryLayers(scene.document.layers.map { it.id }, scene.objects.map { it.item }, scene.hidden)
-        if (!layers.inkOnTop(scene.provisional.map { it.item }, scene.hidden)) return false
-        if (current == null) {
+        if (width <= 0 || height <= 0) { forget(); return false }
+        // The layer order is worked out once for a saved scene, also when the
+        // answer is no: a highlighter stroke or a stroke under another layer
+        // costs one small check per frame, not a pass over every object.
+        val layers = (judged?.takeIf { it.sameAs(scene) }
+            ?: Judged(scene.document, scene.objects, scene.hidden,
+                DryLayers(scene.document.layers.map { it.id }, scene.objects.map { it.item }, scene.hidden)).also { judged = it }).layers
+        if (!layers.inkOnTop(scene.provisional.map { it.item }, scene.hidden)) { forgetPicture(); return false }
+        if (kept?.sameAs(scene, width, height) != true) {
+            // A picture of an earlier document or view is dropped before the new one is recorded.
+            forgetPicture()
             node.setPosition(0, 0, width, height)
             val recording = node.beginRecording(width, height)
             try { EditorDrawing.drawDry(recording, scene) } finally { node.endRecording() }
             // Ask the renderer to keep the result as a finished layer instead of replaying it.
             node.setUseCompositingLayer(true, null)
-            kept = Kept(scene, width, height, layers)
+            kept = Kept(scene, width, height)
         }
         // The surround first, in case the frame is larger than the kept layer.
         canvas.drawColor(EditorDrawing.surroundArgb(scene.dark))
@@ -134,6 +156,12 @@ internal class WetInkLayer {
         return true
     }
 
-    /** Forget the kept picture; the next ink frame records it again. */
-    fun discard() { kept = null; node.discardDisplayList() }
+    private fun forgetPicture() { if (kept != null) { kept = null; node.discardDisplayList() } }
+
+    /** Drawing thread: a saved frame was drawn, or a frame this layer cannot
+     * draw. Nothing is kept until the next ink frame records it again. */
+    fun forget() { forgetPicture(); judged = null }
+
+    /** Main thread, after the drawing thread has stopped for this session. */
+    fun discard() { kept = null; judged = null; node.discardDisplayList() }
 }

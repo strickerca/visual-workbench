@@ -147,6 +147,8 @@ between the two captures, and one word for the switch: `leave_on`,
 either side (under 20 strokes, or under 100 ink frames or pen samples) is
 reported as `too_few_samples` and does not decide. The
 copied text holds only fixed timing names, counts and durations; the tool
-refuses anything else. These timings end when the frame is handed to the
-display, so the 240 fps camera or input-to-present measurement still decides
-PERF-001.
+refuses anything else. An ink frame is timed only when it shows a pen sample
+for the first time, so a stroke that stays on screen while it is saved adds
+nothing; captures from a build that timed every frame are not comparable.
+These timings end when the frame is handed to the display, so the 240 fps
+camera or input-to-present measurement still decides PERF-001.

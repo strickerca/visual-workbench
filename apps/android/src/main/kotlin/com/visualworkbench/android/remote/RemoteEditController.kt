@@ -87,6 +87,8 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     val palette=RemoteEditorPalette(remote,scope)
     private val segments=RemoteGhostSegments(ghost)
     private val echoLedger=RemoteEchoLedger()
+    /** Diagnostics: one object for the whole view, a plain number per sample. */
+    private val echoDelays:RemoteEchoDelaySink?=metrics?.let{m->RemoteEchoDelaySink{nanos->m.recordNanos(PenTiming.RemoteEcho,nanos)}}
     private val echoMutable=MutableStateFlow(RemoteEchoTiming(null,0uL,0uL,0,null,null,0uL,0uL))
     val echo:StateFlow<RemoteEchoTiming> = echoMutable.asStateFlow()
     private val mapping=AtomicReference<RemoteRenderMapping?>(null)
@@ -102,6 +104,9 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     private val quickFrames:Boolean=toggles[PenPathToggle.RemoteQuickFrames]
     /** Developer switch: the remote surface asks Android for unbatched pen samples during a contact. */
     val unbufferedPen:Boolean=toggles[PenPathToggle.RemoteUnbufferedPen]
+    /** Developer switches only: sends are paced, and the pacer wants the display's frame time. */
+    val sendsPaced:Boolean get()=pacer!=null
+    fun displayRefreshRate(hertz:Float){pacer?.windowNanos=remoteFrameNanos(hertz)}
     @Volatile private var borrowedSurface:Surface?=null
     @Volatile private var surfaceOwner:Any?=null
     private var decoder:RemoteHardwareDecoder?=null
@@ -141,22 +146,29 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         }
         scope.launch(Dispatchers.Default) {
             for(item in input){
-                // Long batches or unbuffered pen only: never hand the computer's eight-slot input queue more than it takes today.
+                // Long batches or unbuffered pen only: never hand the computer more within one display frame than it gets today.
                 if(pacer!=null)while(true){val wait=pacer.acquire(System.nanoTime());if(wait<=0L)break;delay((wait+999_999L)/1_000_000L)}
+                if(batches==null){
+                    // One sample, one call: the original loop, statement for statement.
+                    val age=System.nanoTime()-item.sample.sampledLocalNanos
+                    if(age !in 0 until 50_000_000L){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
+                    val allowed=synchronized(inputFence){enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
+                    if(!allowed)continue
+                    try{admitted(item,remote.pen(item.binding,item.sample))}
+                    catch(cancelled:CancellationException){throw cancelled}
+                    catch(_:Exception){physical.get()?.journal?.pause("pen_exception");deactivate("owner_pause")}
+                    continue
+                }
                 // Typed batches only: whatever else is already waiting goes in the same call,
                 // up to eight samples. A send slot taken for a sample that is not there is given back.
-                val group=if(batches==null)listOf(item)else buildList{add(item);while(size<RemotePenIntake.GROUP){
-                    if(pacer!=null&&pacer.acquire(System.nanoTime())>0L)break
-                    val more=input.tryReceive().getOrNull()
-                    if(more==null){pacer?.giveBack();break}
-                    add(more)}}
+                val group=remotePenGroup(item,pacer,System::nanoTime){input.tryReceive().getOrNull()}
                 val now=System.nanoTime()
                 if(group.any{(now-it.sample.sampledLocalNanos) !in 0 until 50_000_000L}){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
                 val allowed=synchronized(inputFence){enabled&&foregroundActive&&group.all{it.fence==admissionFence&&it.binding==item.binding}&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
                 if(!allowed)continue
                 try{
-                    val admissions=if(batches==null)listOf(remote.pen(item.binding,item.sample))else batches.penBatch(item.binding,group.map{it.sample})
-                    for((sent,admission) in group.zip(admissions))admitted(sent,admission)
+                    val admissions=batches.penBatch(item.binding,group.map{it.sample})
+                    for(index in group.indices)admitted(group[index],admissions[index])
                 }catch(cancelled:CancellationException){throw cancelled}
                 catch(_:Exception){physical.get()?.journal?.pause("pen_exception");deactivate("owner_pause")}
             }
@@ -349,7 +361,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                     frame.config.generation,frame.ticket,frame.frameId,frame.ptsUs,renderedNanos,callbackNanos,admission,ack)
                 val target=remote.target.value
                 if(target?.grantActive==true&&inputGrantFence.permits(target.binding)&&target.binding.scope()==frame.config.scope){enabled=true;ghost.activate(target.binding,callbackNanos)}
-                if(ack!=null&&target?.grantActive==true&&target.binding==ack.binding){ghost.acknowledge(ack.binding,ack.lastInputSequenceApplied,ack.frameId,ack.ticket,callbackNanos);echoLedger.acknowledge(ack,callbackNanos,metrics?.let{m->{nanos:Long->m.recordNanos(PenTiming.RemoteEcho,nanos)}})}
+                if(ack!=null&&target?.grantActive==true&&target.binding==ack.binding){ghost.acknowledge(ack.binding,ack.lastInputSequenceApplied,ack.frameId,ack.ticket,callbackNanos);echoLedger.acknowledge(ack,callbackNanos,echoDelays)}
                 echoMutable.value=echoLedger.snapshot(System.nanoTime())
             }
         }catch(_:Exception){active.requestRecovery("NativeTicketRefused");recoverInput();runCatching{remote.requestKeyframe()}}
@@ -398,8 +410,8 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             // Align to this phone's System.nanoTime without BOOTTIME. Uptime's
             // millisecond upper edge conservatively adds at most 1 ms of age;
             // the exact-time switch keeps the sample's own time instead.
-            val timed=sampleClock.sample(sampledUptime,now,uptime)
-            if(timed.ageNanos !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=timed.localNanos
+            val age=sampleClock.ageNanos(sampledUptime,now,uptime)
+            if(age !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=now-age
             val pressure=if(historical)event.getHistoricalPressure(0,index)else event.pressure
             if(!pressure.isFinite()||pressure<0)return rejectTouch("pressure")
             val normalized=pressure.coerceAtMost(1f)

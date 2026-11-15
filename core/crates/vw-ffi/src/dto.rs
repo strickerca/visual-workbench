@@ -332,6 +332,8 @@ pub struct KnownStroke {
     pub object_id: String,
     /// The 32-byte digest returned with that stroke.
     pub digest: Vec<u8>,
+    /// The `cost` returned with that stroke.
+    pub cost: u64,
 }
 /// One place in the display list.
 #[derive(Clone, Debug, uniffi::Record)]
@@ -339,6 +341,11 @@ pub struct RenderItemChange {
     pub object_id: String,
     /// Strokes only: pass it back as `KnownStroke::digest` next time.
     pub digest: Option<Vec<u8>>,
+    /// What this entry counts toward the size limit of a complete read of the
+    /// document, whether or not the item is sent this time. A kept stroke
+    /// still fills the caller's memory, so the limit is the same one
+    /// `document_snapshot` applies. Pass it back as `KnownStroke::cost`.
+    pub cost: u64,
     /// Absent when the stroke the caller holds under this digest is still
     /// exact; its layer fields below may nevertheless have changed.
     pub item: Option<RenderItem>,

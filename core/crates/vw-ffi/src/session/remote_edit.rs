@@ -1641,6 +1641,75 @@ mod retained_tests {
             annexb: vec![0, 0, 1, 38, 1],
         }
     }
+    /// The statements `remote_pen` built its input event with before the typed
+    /// calls existed, copied from that revision unchanged except that the
+    /// target's client rectangle is a parameter. The golden bytes below were
+    /// produced by these statements.
+    fn pen_event_as_built_before_typed_calls(
+        binding: &Binding,
+        client: vw_remote::Rect,
+        sample: &vw_remote::wire::PenSample,
+        sequence: u64,
+    ) -> SessionResult<pb::InputEvent> {
+        let phase = match sample.phase {
+            vw_remote::wire::Phase::Hover => pb::PenPhase::Hover,
+            vw_remote::wire::Phase::Down => pb::PenPhase::Down,
+            vw_remote::wire::Phase::Move => pb::PenPhase::Move,
+            vw_remote::wire::Phase::Up => pb::PenPhase::Up,
+            vw_remote::wire::Phase::Leave => pb::PenPhase::Cancel,
+        };
+        let event = pb::InputEvent {
+            input_session_id: Some(native_id(&binding.input_session_id)?.to_proto()),
+            capture_session_id: Some(native_id(&binding.scope.capture_session_id)?.to_proto()),
+            geometry_revision: binding.scope.geometry_revision,
+            input_seq: sequence,
+            remote_scope: Some(scope_pb(&binding.scope)?),
+            request_nonce: 0,
+            event: Some(pb::input_event::Event::Pen(pb::PenEvent {
+                phase: phase as i32,
+                x: f64::from(sample.x - client.x),
+                y: f64::from(sample.y - client.y),
+                pressure: sample.pressure as f32 / 1024.0,
+                tilt_x: sample.tilt_x as f32,
+                tilt_y: sample.tilt_y as f32,
+                rotation: sample.rotation as f32,
+                barrel: sample.pen_flags & 1 != 0,
+                eraser: sample.pen_flags & 4 != 0,
+                t_ns: 0,
+                native_pen_flags: Some(sample.pen_flags),
+                native_pen_mask: Some(sample.pen_mask),
+            })),
+        };
+        Ok(event)
+    }
+    /// Encoded input events for the twenty samples of the test below (five
+    /// phases, four pressure, tilt, rotation, flag and mask combinations each),
+    /// in its order.
+    const GOLDEN_PEN_EVENTS: [&str; 20] = [
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120012a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152180801110000000000606440190000000000f07a4058006001",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120022a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152300801110000000000606440190000000000f07a40250000803f2d0000b442350000b4c23d0080b343400148015805600f",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120032a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152290801110000000000606440190000000000f07a40250080ff3e2d000014c2350000404140015801600d",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120042a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152240801110000000000606440190000000000f07a40250000803a3d00003443480158046003",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120052a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152180802110000000000606440190000000000f07a4058006001",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120062a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152300802110000000000606440190000000000f07a40250000803f2d0000b442350000b4c23d0080b343400148015805600f",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120072a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152290802110000000000606440190000000000f07a40250080ff3e2d000014c2350000404140015801600d",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120082a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152240802110000000000606440190000000000f07a40250000803a3d00003443480158046003",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120092a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152180803110000000000606440190000000000f07a4058006001",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe56800700080000000000000011801200a2a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152300803110000000000606440190000000000f07a40250000803f2d0000b442350000b4c23d0080b343400148015805600f",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe56800700080000000000000011801200b2a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152290803110000000000606440190000000000f07a40250080ff3e2d000014c2350000404140015801600d",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe56800700080000000000000011801200c2a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152240803110000000000606440190000000000f07a40250000803a3d00003443480158046003",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe56800700080000000000000011801200d2a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152180804110000000000606440190000000000f07a4058006001",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe56800700080000000000000011801200e2a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152300804110000000000606440190000000000f07a40250000803f2d0000b442350000b4c23d0080b343400148015805600f",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe56800700080000000000000011801200f2a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152290804110000000000606440190000000000f07a40250080ff3e2d000014c2350000404140015801600d",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120102a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152240804110000000000606440190000000000f07a40250000803a3d00003443480158046003",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120112a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152180805110000000000606440190000000000f07a4058006001",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120122a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152300805110000000000606440190000000000f07a40250000803f2d0000b442350000b4c23d0080b343400148015805600f",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120132a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152290805110000000000606440190000000000f07a40250080ff3e2d000014c2350000404140015801600d",
+        "0a120a10018bcfe568007000800000000000000312120a10018bcfe5680070008000000000000001180120142a2e080112120a10018bcfe5680070008000000000000001180122120a10018bcfe5680070008000000000000002280152240805110000000000606440190000000000f07a40250000803a3d00003443480158046003",
+    ];
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
     /// The typed pen calls must put the same bytes on the wire as the JSON
     /// call: for every phase, flag and axis mask the event built from a typed
     /// point equals the event built from the JSON the phone sends today.
@@ -1705,6 +1774,15 @@ mod retained_tests {
                 let from_typed = pen_event(&typed_binding, client, &sample, sequence)?;
                 assert_eq!(from_typed, from_json);
                 assert_eq!(from_typed.encode_to_vec(), from_json.encode_to_vec());
+                let before =
+                    pen_event_as_built_before_typed_calls(&binding(), client, &parsed, sequence)?;
+                assert_eq!(from_typed, before);
+                // The bytes themselves are pinned, so neither construction can
+                // drift without this test noticing.
+                let golden = GOLDEN_PEN_EVENTS[sequence as usize - 1];
+                assert_eq!(hex(&before.encode_to_vec()), golden);
+                assert_eq!(hex(&from_typed.encode_to_vec()), golden);
+                assert_eq!(hex(&from_json.encode_to_vec()), golden);
                 // No clock travels with a pen sample: the wire's time field stays empty.
                 let Some(pb::input_event::Event::Pen(pen)) = &from_typed.event else {
                     return Err(SessionError::Invalid);
@@ -1726,6 +1804,110 @@ mod retained_tests {
             pen_mask: 1,
         };
         assert!(bad.sample().validate().is_err());
+        Ok(())
+    }
+    /// One pen sample at a time through the send path both pen calls share,
+    /// over a real carrier: an authenticated loopback connection whose other
+    /// end has granted input for this binding, as the computer does. What
+    /// arrives there is byte for byte the pinned event, and each sample takes
+    /// the next input sequence.
+    #[tokio::test]
+    async fn a_pen_sample_sent_over_a_carrier_arrives_as_the_pinned_bytes() -> SessionResult<()> {
+        use vw_net::carrier::{PinnedTls, TcpCarrier, TrustedPeer};
+        use vw_net::pairing::{DeviceIdentity, SERVER_NAME};
+        use vw_proto::Message;
+        let computer = DeviceIdentity::generate_for(vw_model::DeviceId::from_bytes([1; 16]))?;
+        let phone = DeviceIdentity::generate_for(vw_model::DeviceId::from_bytes([2; 16]))?;
+        let tls = |own: &DeviceIdentity, peer: &DeviceIdentity| -> SessionResult<PinnedTls> {
+            Ok(PinnedTls::new(
+                own.transport_identity()?,
+                TrustedPeer {
+                    device: peer.device().clone(),
+                    certificate: peer.transport_identity()?.certificate,
+                    server_name: SERVER_NAME.into(),
+                },
+            )?)
+        };
+        let (computer_tls, phone_tls) = (tls(&computer, &phone)?, tls(&phone, &computer)?);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|_| SessionError::Worker)?;
+        let address = listener.local_addr().map_err(|_| SessionError::Worker)?;
+        let (accepted, connected) = tokio::join!(
+            TcpCarrier::accept(&listener, &computer_tls),
+            TcpCarrier::connect(address, &phone_tls)
+        );
+        let hello = |identity: &DeviceIdentity| vw_net::LocalHello {
+            device: identity.device().clone(),
+            platform: pb::Platform::Windows,
+            app_version: "fixture".into(),
+            label: String::new(),
+            capabilities: std::collections::BTreeSet::from(["remote_edit_v1".to_string()]),
+        };
+        let (computer_hello, phone_hello) = (hello(&computer), hello(&phone));
+        let (served, joined) = tokio::join!(
+            vw_net::SecureConnection::server(vw_net::CarrierIo::Tcp(accepted?), &computer_hello),
+            vw_net::SecureConnection::client(vw_net::CarrierIo::Tcp(connected?), &phone_hello)
+        );
+        let (computer_send, mut computer_receive) = served?.into_duplex()?;
+        let (phone_send, _phone_receive) = joined?.into_duplex()?;
+        computer_send.grant_input(
+            native_id(&binding().input_session_id)?,
+            native_id(&binding().scope.capture_session_id)?,
+            binding().scope.geometry_revision,
+            0,
+        )?;
+        let hub = close_fixture(false)?;
+        hub.state.lock().map_err(|_| SessionError::Worker)?.sender = Some(phone_send.clone());
+        // The four hover samples of the pinned table, in its order. The
+        // fixture's client area starts at the origin, so the same point is
+        // given in its coordinates.
+        let hovers = [
+            (0, 0, 0, 0, 0, 1),
+            (1024, 90, -90, 359, 5, 15),
+            (511, -37, 12, 0, 1, 13),
+            (1, 0, 0, 180, 4, 3),
+        ];
+        for (index, (pressure, tilt_x, tilt_y, rotation, pen_flags, pen_mask)) in
+            hovers.into_iter().enumerate()
+        {
+            let sample = RemotePenPoint {
+                phase: RemotePenPointPhase::Hover,
+                x: 163,
+                y: 431,
+                pressure,
+                tilt_x,
+                tilt_y,
+                rotation,
+                pen_flags,
+                pen_mask,
+            }
+            .sample();
+            let sequence = {
+                let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+                hub.send_pen(&mut s, &binding(), &sample)?
+            };
+            assert_eq!(sequence, index as u64 + 1);
+            let arrived = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                computer_receive.receive(0),
+            )
+            .await
+            .map_err(|_| SessionError::Timeout)??;
+            let vw_net::Receive::Deliver(Body::InputEvent(event)) = arrived else {
+                return Err(SessionError::Invalid);
+            };
+            assert_eq!(hex(&event.encode_to_vec()), GOLDEN_PEN_EVENTS[index]);
+        }
+        assert_eq!(
+            hub.state
+                .lock()
+                .map_err(|_| SessionError::Worker)?
+                .input_seq,
+            4
+        );
+        phone_send.close();
+        computer_send.close();
         Ok(())
     }
     /// Both pen calls go through one admission. Without a carrier it sends

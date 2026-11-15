@@ -71,23 +71,27 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
     override fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke? {
         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
         if(options.family=="highlighter")return null
-        // One short native call that never touches the project worker. The
+        // One short native call that never waits for the project worker. The
         // handle goes straight to the caller, which owns and disposes it.
-        return try { NativeStroke(handle.beginStrokeDeferred(options.native())) } catch(error:CoreException) { throw mapFailure(error) }
+        return try { NativeStroke(handle.beginStrokeDeferred(options.native())) }
+            // The project's queue is full: the ordinary begin waits for it.
+            catch(_:CoreException.Backpressure) { null }
+            catch(error:CoreException) { throw mapFailure(error) }
     }
     /** The strokes of the snapshot last returned by [documentChanges], each with
      * the digest the core gave for it. Only an instance still held by the
      * caller's snapshot is ever named to the core as known. */
-    private class HeldStroke(val item: RenderItem, val digest: ByteArray)
+    private class HeldStroke(val item: RenderItem, val digest: ByteArray, val cost: ULong)
     private class HeldStrokes(val documentId: String, val strokes: Map<String, HeldStroke>)
     private val heldStrokes = java.util.concurrent.atomic.AtomicReference<HeldStrokes?>(null)
     override suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot? {
         if (documentDescriptor(documentId) != null) return null
-        val held = heldStrokes.get()?.takeIf { it.documentId == documentId }?.strokes.orEmpty()
-        val known = if (previous == null || previous.documentId != documentId) emptyMap()
-            else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
-        return call { cancel ->
-            val d = handle.documentSnapshotChanges(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest) }, cancel)
+        return try { call { cancel ->
+            // Off the caller's thread: one pass over the strokes it still holds.
+            val held = heldStrokes.get()?.takeIf { it.documentId == documentId }?.strokes.orEmpty()
+            val known = if (previous == null || previous.documentId != documentId) emptyMap()
+                else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
+            val d = handle.documentSnapshotChanges(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest, it.cost) }, cancel)
             val next = HashMap<String, HeldStroke>(d.items.size)
             val items = d.items.map { change ->
                 val sent = change.item
@@ -98,13 +102,18 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
                     if (old.layerOpacity == change.layerOpacity && old.layerBlend == change.layerBlend && old.locked == change.locked) old
                     else old.copy(layerOpacity = change.layerOpacity, layerBlend = change.layerBlend, locked = change.locked)
                 }
-                change.digest?.let { next[change.objectId] = HeldStroke(item, it) }
+                change.digest?.let { next[change.objectId] = HeldStroke(item, it, change.cost) }
                 item
             }
             heldStrokes.set(HeldStrokes(documentId, next))
             DocumentSnapshot(d.documentId, d.title, d.width, d.height, d.bitDepth,
                 d.layers.map { LayerInfo(it.id, it.name, it.visible, it.locked, it.opacity, it.blend) },
                 RenderList(d.revision.common(), items), hasToneAdjustments = d.hasToneAdjustments)
+        } } catch (error: CoreFailure) {
+            // The document, kept strokes included, is at the size limit of a
+            // complete read. That read decides, exactly as without this call.
+            if (error.kind != CoreFailureKind.Backpressure) throw error
+            null
         }
     }
     suspend fun <T> withGiantProject(block: suspend (ProjectSession) -> T): T = closeMutex.withLock {
