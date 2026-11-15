@@ -210,18 +210,59 @@ class AutomaticRouteKeeperTest {
         assertTrue(discovery.advertised.isEmpty()); assertEquals(0, discovery.stops)
     }
 
-    @Test fun theAddressFromAScannedPairingCodeBecomesTheFirstHint() = fixture(listOf(wifi, usb)) {
+    @Test fun theAddressFromAScannedPairingCodeIsOnlyAHintUntilItHasAuthenticated() = fixture(listOf(wifi, usb)) {
+        val keeper = keeper(); val link = Link()
+        keeper.change { it.withTetherAdapter("Phone USB adapter").withAdapter("Home network") }
+        val before = String(Files.readAllBytes(file), Charsets.ISO_8859_1)
+        // Not an address, or not a paired device: nothing is kept at all.
+        keeper.offerFromPairing(phone, "computer.example:44242")
+        keeper.offerFromPairing(revoked, "198.51.100.6:44242")
+        assertTrue(keeper.hints(sessions, phone.deviceId, keeper.plan(), look = false).isEmpty())
+        assertTrue(keeper.hints(sessions, revoked.deviceId, keeper.plan(), look = false).isEmpty())
+
+        keeper.offerFromPairing(phone, " 198.51.100.5:44242 ")
+        val hint = endpoint(SessionCarrier.QuicTether, "198.51.100.5:44242")
+        // It is offered to the core as a place to try, ahead of what discovery finds...
+        assertEquals(listOf(hint), keeper.hints(sessions, phone.deviceId, keeper.plan(), look = false))
+        discovery.nearby = listOf("192.0.2.30:44242")
+        keeper.keep(sessions, link, false, phone, status(null, SyncStatus.Reconnecting), keeper.plan())
+        assertEquals(listOf(hint, endpoint(SessionCarrier.QuicWifi, "192.0.2.30:44242")), link.offers.single())
+        // ...and it is neither saved nor handed to the core as a place where the device was authenticated.
+        assertTrue(sessions.restores.isEmpty() && sessions.known.isEmpty())
+        assertTrue(keeper.saved().peers.isEmpty())
+        assertEquals(before, String(Files.readAllBytes(file), Charsets.ISO_8859_1))
+        // Another run knows nothing of it.
+        assertTrue(keeper().hints(sessions, phone.deviceId, keeper.plan(), look = false).isEmpty())
+
+        // The core authenticated the device there: now it is a route, saved as one, and no longer a hint.
+        sessions.known[phone.deviceId] = listOf(hint)
+        keeper.keep(sessions, link, false, phone, status(SessionCarrier.QuicTether, SyncStatus.Synced), keeper.plan())
+        assertEquals(listOf(hint), keeper().saved().routesFor(keeper.key(phone)))
+        assertTrue(keeper.hints(sessions, phone.deviceId, keeper.plan(), look = false).isEmpty())
+    }
+
+    @Test fun aDeviceThatIsNoLongerPairedLosesEverythingKeptForIt() = fixture {
         val keeper = keeper()
-        keeper.change { it.withTetherAdapter("Phone USB adapter") }
-        sessions.known[phone.deviceId] = listOf(endpoint(SessionCarrier.QuicWifi, "192.0.2.40:44242"))
-        keeper.learned(sessions, phone, "198.51.100.5:44242")
-        val expected = listOf(endpoint(SessionCarrier.QuicTether, "198.51.100.5:44242"), endpoint(SessionCarrier.QuicWifi, "192.0.2.40:44242"))
-        assertEquals(expected, sessions.known[phone.deviceId])
-        assertEquals(expected, keeper().saved().routesFor(keeper.key(phone)))
-        // Not an address: nothing changes. A refusal by the core changes nothing either.
-        keeper.learned(sessions, phone, "computer.example:44242")
-        sessions.refuse = true
-        keeper.learned(sessions, phone, "192.0.2.41:44242")
-        assertEquals(expected, keeper().saved().routesFor(keeper.key(phone)))
+        val phoneKey = keeper.key(phone)!!
+        val route = endpoint(SessionCarrier.QuicWifi, "192.0.2.20:44242")
+        keeper.change { it.remember(phoneKey, listOf(route)) }
+        keeper.offerFromPairing(phone, "192.0.2.21:44242")
+        // Still paired: nothing goes.
+        keeper.prune(listOf(phone))
+        assertEquals(listOf(route), keeper.saved().routesFor(phoneKey))
+        assertEquals(1, keeper.hints(sessions, phone.deviceId, keeper.plan(), look = false).size)
+        // Revoked: its routes, the note that it was used last and its pairing hint go,
+        // without a session service and whatever the automatic switch says.
+        assertFalse(keeper.saved().automatic)
+        keeper.prune(listOf(phone.copy(revokedAtMs = 5uL)))
+        val after = keeper().saved()
+        assertTrue(after.peers.isEmpty()); assertFalse(after.isLastPeer(phoneKey))
+        assertFalse(String(Files.readAllBytes(file), Charsets.ISO_8859_1).contains(phoneKey))
+        assertTrue(keeper.hints(sessions, phone.deviceId, keeper.plan(), look = false).isEmpty())
+        // A key the pairing list has never heard of is dropped the same way.
+        keeper.change { it.remember(keeper.key(revoked)!!, listOf(route)) }
+        keeper.prune(emptyList())
+        assertTrue(keeper().saved().peers.isEmpty())
+        assertTrue(sessions.restores.isEmpty())
     }
 }

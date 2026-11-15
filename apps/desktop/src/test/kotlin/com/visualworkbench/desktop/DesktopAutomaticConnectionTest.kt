@@ -41,9 +41,14 @@ class DesktopAutomaticConnectionTest {
         override fun start(peer: String, endpoints: List<SessionEndpoint>, tether: () -> UInt?, finished: (Exception?) -> Unit): Boolean {
             starts += peer to endpoints; this.tether = tether
             if (startFails) { finished(SessionFailure(SessionFailureKind.Transport)); return true }
-            link = AutomaticLink(); status = sessionStatus(1u, SyncStatus.Offline); finished(null)
+            val finish = { link = AutomaticLink(); status = sessionStatus(1u, SyncStatus.Offline); finished(null) }
+            // Starting takes a moment in the real editor; a test can hold it there.
+            if (slowStart) underWay = finish else finish()
             return true
         }
+        var slowStart = false
+        var underWay: (() -> Unit)? = null
+        fun finishStart() { underWay?.also { underWay = null }?.invoke() }
         override fun automaticLink(): ProjectLink? = link
         val hints = ArrayList<String>()
         override fun hint(message: String) { hints += message }
@@ -174,6 +179,58 @@ class DesktopAutomaticConnectionTest {
         assertEquals(1, editor.stops); assertNull(editor.link)
         automatic.step()
         assertTrue(editor.starts.size == 1 && !automatic.state.value.active)
+    }
+
+    @Test fun switchedOffWhileAStartIsUnderWayItStopsThatConnectionToo() = fixture {
+        editor.project = "1:project"; editor.role = hostRole
+        editor.slowStart = true
+        automatic.step()
+        assertEquals(1, editor.starts.size); assertNull(editor.link)
+        // The owner switches it off before the listener exists: nothing to stop yet.
+        automatic.setEnabled(false)
+        assertEquals(0, editor.stops)
+        // The start finishes after all. A listener must not stay behind a switch that says off.
+        editor.finishStart()
+        assertEquals(1, editor.stops); assertNull(editor.link)
+        until { !automatic.state.value.enabled }
+
+        // The same when the connection turns up without the start reporting back:
+        // the next look, with the switch off, stops it.
+        automatic.setEnabled(true)
+        until { automatic.state.value.enabled }
+        editor.project = "2:project"
+        automatic.step()
+        assertEquals(2, editor.starts.size)
+        automatic.setEnabled(false)
+        until { !automatic.state.value.enabled }
+        editor.link = AutomaticLink(); editor.status = sessionStatus(1u, SyncStatus.Offline)
+        automatic.step()
+        assertEquals(2, editor.stops); assertNull(editor.link)
+        assertFalse(automatic.state.value.active)
+        // A connection that is live by then is the owner's to end.
+        editor.link = AutomaticLink(); editor.status = connected(SessionCarrier.QuicWifi)
+        automatic.step()
+        assertEquals(2, editor.stops); assertNotNull(editor.link)
+        assertTrue(nearby.advertised.isEmpty())
+    }
+
+    @Test fun aRevokedPhoneLosesWhatWasSavedForItEvenWhileSwitchedOff() = fixture {
+        val key = keeper.key(phone)!!
+        keeper.change { it.remember(key, listOf(SessionEndpoint(SessionCarrier.QuicWifi, "192.0.2.40:$AUTOMATIC_SESSION_PORT"))) }
+        assertTrue(keeper.saved().isLastPeer(key))
+        automatic.setEnabled(false)
+        until { !automatic.state.value.enabled }
+        automatic.step()
+        // Still paired: switching off forgets nothing.
+        assertEquals(1, keeper.saved().routesFor(key).size)
+        service.paired = listOf(phone.copy(revokedAtMs = 9uL))
+        sessions.refreshTrust()
+        until { sessions.state.value.paired.all { it.revokedAtMs != null } }
+        automatic.step()
+        val after = KnownRouteStore(file).load()
+        assertTrue(after.peers.isEmpty()); assertFalse(after.isLastPeer(key))
+        assertFalse(String(Files.readAllBytes(file), Charsets.ISO_8859_1).contains(key))
+        assertTrue(editor.starts.isEmpty() && service.restored.isEmpty())
     }
 
     @Test fun itLeavesTheOwnersDecisionsAlone() = fixture {

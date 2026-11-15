@@ -57,14 +57,13 @@ internal class PairingController(
 
     // Pair once, then no typing. What is remembered is app-level, beside the
     // peer names: never in a project, a log or a report.
-    private val routeDiscovery by lazy { AndroidRouteDiscovery(context.applicationContext) }
     private val automaticPairing by lazy {
         AutomaticPairing(AutomaticRouteKeeper(
-            KnownRouteStore(context.noBackupFilesDir.canonicalFile.toPath().resolve("known-routes.properties")), routeDiscovery,
+            KnownRouteStore(context.noBackupFilesDir.canonicalFile.toPath().resolve("known-routes.properties")),
+            AndroidRouteDiscovery(context.applicationContext),
             { _ -> { address -> isAndroidUsbTetherInterface(address.interfaceName) } },
             // Wi-Fi and the phone's own USB tethering only; never mobile data.
-            { _ -> { address -> isAndroidWifiInterface(address.interfaceName) || isAndroidUsbTetherInterface(address.interfaceName) } }),
-            routeDiscovery)
+            { _ -> { address -> isAndroidWifiInterface(address.interfaceName) || isAndroidUsbTetherInterface(address.interfaceName) } }))
     }
     private var realService: WorkbenchSessions? = null
     private var automaticOperation: Job? = null
@@ -100,7 +99,7 @@ internal class PairingController(
         val native = nativeService()
         if (!peersLoaded) {
             val paired = native.pairedDevices()
-            if (!peersLoaded && !closed) { updatePeers(paired); peersLoaded = true }
+            if (!peersLoaded && !closed) { peersChanged(paired); peersLoaded = true }
         }
         val target = automaticPairing.step(native, { peers }) { AutomaticView(project(), status(), busy() || working, manualAddresses()) }
         automatic = automaticPairing.enabled; automaticQuiet = automaticPairing.quiet
@@ -113,14 +112,28 @@ internal class PairingController(
     }
     fun chooseAutomatic(value: Boolean) {
         if (closed || automaticOperation?.isActive == true) return
+        // The choice counts at once; saving it follows.
+        automatic = value
         automaticOperation = scope.launch {
-            try { automaticPairing.setEnabled(value); automatic = automaticPairing.enabled; automaticQuiet = automaticPairing.quiet }
+            try { automaticPairing.setEnabled(value) }
             catch (cancel: CancellationException) { throw cancel }
-            catch (_: Exception) { /* The setting stays as it was. */ }
+            catch (_: Exception) { /* It holds for this run even if it could not be saved. */ }
+            finally { automatic = automaticPairing.enabled; automaticQuiet = automaticPairing.quiet }
         }
     }
     /** The connection automatic connection started is still only waiting or looking. */
     fun automaticWaiting(status: SessionStatus?): Boolean = automaticPairing.waiting(status)
+    /** Automatic connection is off, yet a connection whose start was under
+     * way when it was switched off is waiting or looking: end it. */
+    fun automaticShouldStop(status: SessionStatus?): Boolean = automaticPairing.shouldStop(status)
+    /** The list of paired computers was read or changed. What was saved for a
+     * computer that is no longer on it goes, with automatic connection on or off. */
+    private suspend fun peersChanged(paired: List<PairedDevice>) {
+        updatePeers(paired)
+        try { automaticPairing.prune(paired) }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { /* Tried again the next time the list is read. */ }
+    }
     fun automaticProjectClosed() { automaticPairing.projectClosed(); automaticQuiet = false }
     /** The editor was busy and did not start the connection [automaticStep] asked for. */
     fun automaticMissed() = automaticPairing.missed()
@@ -132,7 +145,7 @@ internal class PairingController(
         val paired = native.pairedDevices()
         currentCoroutineContext().ensureActive()
         if (token != secretEpoch || closed) return@launch
-        updatePeers(paired); peersLoaded = true
+        peersChanged(paired); peersLoaded = true
         loadNames(token)
         // Optional address enumeration cannot turn loaded trust into unknown-empty.
         val device = native.localDevice()
@@ -279,15 +292,17 @@ internal class PairingController(
     private suspend fun paired(peer: String, selectedEndpoint: String, expectedFingerprint: String, expectedPeer: String? = null) {
         val paired = service().pairedDevices()
         currentCoroutineContext().ensureActive()
-        updatePeers(paired); peersLoaded = true; selectedPeer = peer
+        peersChanged(paired); peersLoaded = true; selectedPeer = peer
         val authenticated = paired.singleOrNull { it.deviceId == peer && it.revokedAtMs == null && it.fingerprint == expectedFingerprint }
         connectionHint = authenticated?.takeIf { (expectedPeer == null || it.deviceId == expectedPeer) && validEndpoint(selectedEndpoint) }
             ?.let { PairingConnectionHint(it.deviceId, it.fingerprint, selectedEndpoint) }
-        // Pairing just authenticated the computer at this address; its project
-        // listener uses the same one. Kept as the first hint, never as trust.
+        // Pairing reached the computer's pairing listener at this address, and
+        // its project listener uses the same one. That makes the address a
+        // good place to try, no more: it is kept in memory as a hint, never
+        // saved and never trusted, until the computer has authenticated there.
         val hinted = connectionHint
         if (authenticated != null && hinted != null) {
-            try { automaticPairing.learned(nativeService(), authenticated, hinted.endpoint) }
+            try { automaticPairing.learned(authenticated, hinted.endpoint) }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { /* Discovery can still find the computer. */ }
         }
@@ -296,7 +311,7 @@ internal class PairingController(
             else "Computer paired. On the PC, start its project connection; then use the pairing connection here or enter its session address.")
     }
     fun revoke(peer: String, before: suspend () -> Unit) = launch {
-        before(); service().revoke(peer); updatePeers(service().pairedDevices())
+        before(); service().revoke(peer); peersChanged(service().pairedDevices())
         if (connectionHint?.peerDeviceId == peer) connectionHint = null
         if (selectedPeer == peer) selectedPeer = null
     }

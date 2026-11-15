@@ -52,6 +52,9 @@ internal fun AutomaticConnectionEffect(editor: EditorController) {
                     status = { editor.connection },
                     busy = { editor.busy || editor.pending != 0 },
                 )
+                // Switched off while a connection it had started was still on
+                // its way: that connection, only waiting or looking, ends too.
+                if (editor.pairing.automaticShouldStop(editor.connection)) editor.disconnect()
                 if (connect) {
                     editor.connectCurrent()
                     // Connecting marks the editor busy at once; if it did not, it

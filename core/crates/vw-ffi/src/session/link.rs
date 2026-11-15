@@ -1237,6 +1237,12 @@ async fn drive(mut driver: Driver) {
         }
         delay = (delay * 2).min(Duration::from_secs(2));
     }
+    // Nobody serves an arrival after this loop. An automatic host stops
+    // listening here, as a fixed host does when its listeners drop with the
+    // driver; otherwise the paired device would connect to a mute host.
+    if let Route::Standby(standby) = &driver.route {
+        standby.retire();
+    }
     driver.remote.stop();
     driver.focus.stop();
     publish(&driver.status, |s| {
@@ -1426,6 +1432,22 @@ async fn connected(
     } else {
         None
     };
+    // Beside this connection: the paired device arriving on another listener
+    // (automatic host), or the search for a better or a living route
+    // (automatic client). Never resolves for fixed routes. It outlives the
+    // loop below so that a replacement is not lost when the old route ends.
+    let pulse = routing::Pulse::default();
+    let successor = route.successor(routing::Watch {
+        manager,
+        peer,
+        local,
+        carrier,
+        address,
+        pulse: &pulse,
+        handoff: negotiated_handoff,
+        causes,
+    });
+    tokio::pin!(successor);
     let outcome = async {
     let start = Instant::now();
     let _remote_epoch = remote.activate(
@@ -1460,21 +1482,6 @@ async fn connected(
         sender.enqueue(Body::SyncRequest(sync::request(project).await?))?;
         waiting = true;
     }
-    // Beside this connection: the paired device arriving on another listener
-    // (automatic host), or the search for a better or a living route
-    // (automatic client). Never resolves for fixed routes.
-    let pulse = routing::Pulse::default();
-    let successor = route.successor(routing::Watch {
-        manager,
-        peer,
-        local,
-        carrier,
-        address,
-        pulse: &pulse,
-        handoff: negotiated_handoff,
-        causes,
-    });
-    tokio::pin!(successor);
     let mut turn = Instant::now();
     let mut silence = Duration::ZERO;
     loop {
@@ -1715,6 +1722,21 @@ async fn connected(
         });
     }
     }.await;
+    // The two ends do not move at the same instant: the one that moves first
+    // closes the old route while the other is still confirming the new one,
+    // or already holds it. That is the hand-over, not a lost link, so the
+    // replacement is taken instead of reconnecting from nothing.
+    let outcome = match outcome {
+        Err(error @ (SessionError::Transport | SessionError::Timeout)) => loop {
+            let ready = tokio::time::timeout(routing::HANDOVER_POLL, &mut successor).await;
+            match ready {
+                Ok(next) => break Ok(Some(next)),
+                Err(_) if pulse.confirming() => {}
+                Err(_) => break Err(error),
+            }
+        },
+        other => other,
+    };
     let cleanup = match stream.as_mut() {
         Some(value) => value.shutdown().await,
         None => Ok(()),
