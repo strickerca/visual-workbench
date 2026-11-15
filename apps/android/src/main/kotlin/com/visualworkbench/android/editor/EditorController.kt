@@ -279,8 +279,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             owner.page == doc.page && owner.binding == WorkflowBinding(revision.projectId, doc.documentId,
             revision.hostSeq, revision.stateHash) && background != null
     }
-    private suspend fun preparedDrawing(items: List<RenderItem>): List<DrawObject> =
-        prepareEditorObjects(core, items.filterNot { it.shape is Shape.Adjustment })
+    private suspend fun preparedDrawing(items: List<RenderItem>, reuse: List<DrawObject> = emptyList()): List<DrawObject> =
+        prepareEditorObjects(core, items.filterNot { it.shape is Shape.Adjustment }, reuse)
+    /** The document as it is now. With [quick] the core is told which strokes
+     * [held] already has and rebuilds only the others; it has no such path for
+     * paged documents and then answers null, which falls back to the full read. */
+    private suspend fun readDocument(current: WorkbenchProject, held: DocumentSnapshot, quick: Boolean): DocumentSnapshot =
+        (if (quick) (current as? WorkbenchDocumentChanges)?.documentChanges(held.documentId, held) else null)
+            ?: current.document(held.documentId)
     private var giantRenderReady=false
     private var updatingGiant=false
     private val canvasRetirement:suspend()->Unit = {giantRenderReady=false;canvasOwners.retireAll()}
@@ -2488,8 +2494,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val loaded = refreshAdmission.readLatest(REFRESH_READ_ATTEMPTS) {
             if (token != epoch || current !== project || disposing) return@readLatest null
             val doc = document ?: return@readLatest null
-            val fetched = documentRefresh.load(doc,{document}){current.document(doc.documentId)} ?: return@readLatest null
-            val prepared = preparedDrawing(fetched.snapshot.render.items)
+            // Developer switch: ask only for what changed and keep the paths
+            // already built for untouched strokes. Off: the full read, as before.
+            val quick = preferences.penPath[PenPathToggle.CanvasQuickRefresh]
+            val fetched = documentRefresh.load(doc,{document}){readDocument(current,doc,quick)} ?: return@readLatest null
+            val prepared = preparedDrawing(fetched.snapshot.render.items, if (quick) objects else emptyList())
             if (token != epoch || project !== current || disposing ||
                 !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
             else fetched.snapshot to prepared

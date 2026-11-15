@@ -97,6 +97,50 @@ fn render_list_for_page(
     selected_page: Option<u32>,
     query: Option<QueryRect>,
 ) -> Result<RenderList> {
+    let (revision, entries) = render_entries(state, document, selected_page, query, None)?;
+    let mut items = Vec::new();
+    items
+        .try_reserve_exact(entries.len())
+        .map_err(|_| CoreError::Worker)?;
+    for entry in entries {
+        match entry {
+            RenderEntry::Item { item, .. } => items.push(item),
+            // Without a set of known strokes every entry is a complete item.
+            RenderEntry::Kept { .. } => return Err(CoreError::Worker),
+        }
+    }
+    Ok(RenderList { revision, items })
+}
+/// Digest of everything a stroke's display item is built from except its
+/// layer's opacity, blend and lock, which travel with every entry.
+pub(crate) type StrokeDigest = [u8; 32];
+// Complete items dominate; boxing them would add one allocation per object.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum RenderEntry {
+    Item {
+        item: RenderItem,
+        /// Strokes only, and only when the caller asked for changes.
+        digest: Option<StrokeDigest>,
+    },
+    /// A stroke the caller still holds unchanged: its geometry is not rebuilt.
+    Kept {
+        object_id: String,
+        digest: StrokeDigest,
+        layer_opacity: f64,
+        layer_blend: String,
+        locked: bool,
+    },
+}
+/// The display list in drawing order. With `known`, a stroke whose stored
+/// state still has the digest the caller holds is reported as kept instead of
+/// being rebuilt; without it this is the complete list, built as before.
+fn render_entries(
+    state: &ProjectState,
+    document: &str,
+    selected_page: Option<u32>,
+    query: Option<QueryRect>,
+    known: Option<&std::collections::BTreeMap<String, StrokeDigest>>,
+) -> Result<(ProjectInfo, Vec<RenderEntry>)> {
     let query = query.map(rect).transpose()?;
     let project = state.project()?;
     let document = Id::try_from(document.to_owned())?;
@@ -156,7 +200,7 @@ fn render_list_for_page(
     });
     let revision = state.info()?;
     let mut items = Vec::new();
-    let mut bytes = crate::payload::info_bytes(&revision)?;
+    let mut bytes_total = crate::payload::info_bytes(&revision)?;
     for (layer_id, layer) in layers {
         let mut objects = project
             .objects
@@ -176,6 +220,33 @@ fn render_list_for_page(
             {
                 continue;
             }
+            // Asked for changes only: a stroke is identified by its stored
+            // bytes, which is far cheaper than rebuilding its outline.
+            let mut encoded = None;
+            let mut digest = None;
+            if let Some(known) = known
+                && matches!(object.state.shape, Some(Shape::Stroke(_)))
+            {
+                let bytes = object.state.encode_to_vec();
+                let value: StrokeDigest = *blake3::hash(&bytes).as_bytes();
+                let object_id = id.to_string();
+                if known.get(&object_id) == Some(&value) {
+                    if items.len() >= 10_000 {
+                        return Err(CoreError::Backpressure);
+                    }
+                    crate::payload::accumulate(&mut bytes_total, 256)?;
+                    items.push(RenderEntry::Kept {
+                        object_id,
+                        digest: value,
+                        layer_opacity: layer.opacity,
+                        layer_blend: layer.blend.clone(),
+                        locked: object.state.locked || layer.locked,
+                    });
+                    continue;
+                }
+                encoded = Some(bytes);
+                digest = Some(value);
+            }
             let shape = draw_shape(&object.state, project)?;
             let (local, contours) = local_bounds(&object.state, project, page, &shape)?;
             let a = object.state.transform.as_ref().ok_or(CoreError::Invalid)?;
@@ -189,7 +260,10 @@ fn render_list_for_page(
             if query.is_some_and(|q| !overlaps(q, bounds)) {
                 continue;
             }
-            let protobuf = object.state.encode_to_vec();
+            let protobuf = match encoded {
+                Some(bytes) => bytes,
+                None => object.state.encode_to_vec(),
+            };
             if items.len() >= 10_000 {
                 return Err(CoreError::Backpressure);
             }
@@ -220,11 +294,11 @@ fn render_list_for_page(
                 shape,
                 locked: object.state.locked || layer.locked,
             };
-            crate::payload::accumulate(&mut bytes, crate::payload::item_bytes(&item)?)?;
-            items.push(item);
+            crate::payload::accumulate(&mut bytes_total, crate::payload::item_bytes(&item)?)?;
+            items.push(RenderEntry::Item { item, digest });
         }
     }
-    Ok(RenderList { revision, items })
+    Ok((revision, items))
 }
 fn local_bounds(
     object: &pb::ObjectState,
@@ -509,6 +583,70 @@ fn draw_shape(object: &pb::ObjectState, project: &Project) -> Result<DrawShape> 
     })
 }
 
+/// What a document snapshot carries besides its display list.
+struct DocumentFrame {
+    id: Id,
+    title: String,
+    width: u32,
+    height: u32,
+    bit_depth: u32,
+    layers: Vec<LayerInfo>,
+    has_tone_adjustments: bool,
+}
+fn document_frame(state: &ProjectState, document_id: &str) -> Result<DocumentFrame> {
+    let project = state.project()?;
+    let id = Id::try_from(document_id.to_owned())?;
+    let doc = &project
+        .documents
+        .get(&id)
+        .ok_or(CoreError::Invalid)?
+        .definition;
+    let asset = project
+        .assets
+        .get(&AssetId::try_from(doc.primary_asset_id.clone())?)
+        .ok_or(CoreError::Invalid)?;
+    let (width, height) = if asset.orientation >= 5 {
+        (asset.height, asset.width)
+    } else {
+        (asset.width, asset.height)
+    };
+    let mut layers = project
+        .layers
+        .iter()
+        .filter(|(_, l)| l.definition.document_id.as_ref() == Some(&id.to_proto()))
+        .collect::<Vec<_>>();
+    layers.sort_by(|(a, l), (b, r)| {
+        l.definition
+            .order_key
+            .cmp(&r.definition.order_key)
+            .then(a.cmp(b))
+    });
+    let layers = layers
+        .into_iter()
+        .map(|(id, l)| LayerInfo {
+            id: id.to_string(),
+            name: l.definition.name.clone(),
+            visible: l.visible,
+            locked: l.locked,
+            opacity: l.opacity,
+            blend: l.blend.clone(),
+        })
+        .collect();
+    let has_tone_adjustments = project
+        .objects
+        .keys()
+        .any(|object| crate::tone_controls::is_editing_metadata(project, &id, object));
+    Ok(DocumentFrame {
+        title: doc.title.clone(),
+        width,
+        height,
+        bit_depth: asset.bit_depth,
+        layers,
+        has_tone_adjustments,
+        id,
+    })
+}
+
 #[uniffi::export]
 impl ProjectSession {
     pub async fn document_snapshot(
@@ -520,57 +658,101 @@ impl ProjectSession {
         self.worker
             .call(move |state| {
                 cancellation.check()?;
-                let project = state.project()?;
-                let id = Id::try_from(document_id.clone())?;
-                let doc = &project
-                    .documents
-                    .get(&id)
-                    .ok_or(CoreError::Invalid)?
-                    .definition;
-                let asset = project
-                    .assets
-                    .get(&AssetId::try_from(doc.primary_asset_id.clone())?)
-                    .ok_or(CoreError::Invalid)?;
-                let (width, height) = if asset.orientation >= 5 {
-                    (asset.height, asset.width)
-                } else {
-                    (asset.width, asset.height)
-                };
-                let mut layers = project
-                    .layers
-                    .iter()
-                    .filter(|(_, l)| l.definition.document_id.as_ref() == Some(&id.to_proto()))
-                    .collect::<Vec<_>>();
-                layers.sort_by(|(a, l), (b, r)| {
-                    l.definition
-                        .order_key
-                        .cmp(&r.definition.order_key)
-                        .then(a.cmp(b))
-                });
-                let layers = layers
-                    .into_iter()
-                    .map(|(id, l)| LayerInfo {
-                        id: id.to_string(),
-                        name: l.definition.name.clone(),
-                        visible: l.visible,
-                        locked: l.locked,
-                        opacity: l.opacity,
-                        blend: l.blend.clone(),
-                    })
-                    .collect();
+                let frame = document_frame(state, &document_id)?;
                 let result = DocumentSnapshot {
                     document_id,
-                    title: doc.title.clone(),
-                    width,
-                    height,
-                    bit_depth: asset.bit_depth,
-                    has_tone_adjustments: project.objects.keys().any(|object| {
-                        crate::tone_controls::is_editing_metadata(project, &id, object)
-                    }),
-                    layers,
-                    render: render_list(state, id.as_str(), None)?,
+                    title: frame.title,
+                    width: frame.width,
+                    height: frame.height,
+                    bit_depth: frame.bit_depth,
+                    has_tone_adjustments: frame.has_tone_adjustments,
+                    layers: frame.layers,
+                    render: render_list(state, frame.id.as_str(), None)?,
                 };
                 crate::payload::document_bytes(&result)?;
+                cancellation.check()?;
+                Ok(result)
+            })
+            .await
+    }
+    /// The same document as `document_snapshot`, without rebuilding or
+    /// resending the strokes the caller still holds. `known` names those
+    /// strokes by the digest this call returned for them earlier; each entry
+    /// of the answer is either a complete item or a kept stroke with its
+    /// current layer opacity, blend and lock. Entries are in drawing order.
+    /// A stroke is kept only while its whole stored state is byte-identical,
+    /// so a moved, restyled, re-ordered or erased stroke always comes back
+    /// complete. Image documents only; nothing is stored between calls.
+    pub async fn document_snapshot_changes(
+        &self,
+        document_id: String,
+        known: Vec<KnownStroke>,
+        cancellation: Arc<Cancellation>,
+    ) -> Result<DocumentSnapshotChanges> {
+        self.check_open()?;
+        if known.len() > 10_000 {
+            return Err(CoreError::Invalid);
+        }
+        let mut held = std::collections::BTreeMap::new();
+        for stroke in known {
+            Id::try_from(stroke.object_id.clone())?;
+            let digest: StrokeDigest = stroke
+                .digest
+                .as_slice()
+                .try_into()
+                .map_err(|_| CoreError::Invalid)?;
+            if held.insert(stroke.object_id, digest).is_some() {
+                return Err(CoreError::Invalid);
+            }
+        }
+        self.worker
+            .call(move |state| {
+                cancellation.check()?;
+                let frame = document_frame(state, &document_id)?;
+                let (revision, entries) =
+                    render_entries(state, frame.id.as_str(), None, None, Some(&held))?;
+                let mut items = Vec::new();
+                items
+                    .try_reserve_exact(entries.len())
+                    .map_err(|_| CoreError::Worker)?;
+                for entry in entries {
+                    items.push(match entry {
+                        RenderEntry::Item { item, digest } => RenderItemChange {
+                            object_id: item.object_id.clone(),
+                            digest: digest.map(|value| value.to_vec()),
+                            layer_opacity: item.layer_opacity,
+                            layer_blend: item.layer_blend.clone(),
+                            locked: item.locked,
+                            item: Some(item),
+                        },
+                        RenderEntry::Kept {
+                            object_id,
+                            digest,
+                            layer_opacity,
+                            layer_blend,
+                            locked,
+                        } => RenderItemChange {
+                            object_id,
+                            digest: Some(digest.to_vec()),
+                            layer_opacity,
+                            layer_blend,
+                            locked,
+                            item: None,
+                        },
+                    });
+                }
+                let result = DocumentSnapshotChanges {
+                    document_id,
+                    title: frame.title,
+                    width: frame.width,
+                    height: frame.height,
+                    bit_depth: frame.bit_depth,
+                    has_tone_adjustments: frame.has_tone_adjustments,
+                    layers: frame.layers,
+                    revision,
+                    items,
+                };
+                crate::payload::document_changes_bytes(&result)?;
                 cancellation.check()?;
                 Ok(result)
             })

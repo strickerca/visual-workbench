@@ -6,6 +6,8 @@ package com.visualworkbench.android.editor
  * the app behaves exactly as it did before the switch existed. [key] is the
  * stored name and never changes; [title] and [effect] are shown to the owner. */
 internal enum class PenPathToggle(val key: String, val title: String, val effect: String) {
+    CanvasQuickRefresh("canvasQuickRefresh", "Canvas: quick refresh after a save",
+        "After each saved stroke or edit only what changed is read back, instead of rebuilding every stroke in the document. The more strokes a document has, the more this saves between one stroke and the next."),
     RemoteLongBatches("remoteLongBatches", "Remote pen: keep drawing through a hitch",
         "A burst of more than 8 pen samples in one event is sent to the computer in paced groups of 8 instead of pausing input. Applies the next time the remote view opens."),
     RemoteUnbufferedPen("remoteUnbufferedPen", "Remote pen: samples at the pen's own rate",
