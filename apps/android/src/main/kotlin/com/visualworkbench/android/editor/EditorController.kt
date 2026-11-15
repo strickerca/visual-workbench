@@ -2482,13 +2482,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private suspend fun refresh(current: WorkbenchProject, revision: ProjectInfo, token: Long) {
         refreshMutex.withLock {
         if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return
-        val ticket = refreshAdmission.capture()
-        val doc = document ?: return
-        val fetched = documentRefresh.load(doc,{document}){current.document(doc.documentId)} ?: return
-        val next = fetched.snapshot
-        val drawing = preparedDrawing(next.render.items)
-        if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket) ||
-            !documentRefresh.accepts(fetched.ticket,document,next)) return
+        // A save's own change event can arrive while this read is in flight. The
+        // read is then repeated instead of dropped, so an idle editor
+        // (pending == 0) always shows the edit it just saved.
+        val loaded = refreshAdmission.readLatest(REFRESH_READ_ATTEMPTS) {
+            if (token != epoch || current !== project || disposing) return@readLatest null
+            val doc = document ?: return@readLatest null
+            val fetched = documentRefresh.load(doc,{document}){current.document(doc.documentId)} ?: return@readLatest null
+            val prepared = preparedDrawing(fetched.snapshot.render.items)
+            if (token != epoch || project !== current || disposing ||
+                !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
+            else fetched.snapshot to prepared
+        } ?: return
+        val next = loaded.first
+        val drawing = loaded.second
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
@@ -2886,3 +2893,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 }
 
 private fun PressureCurve.values() = listOf(0.0, 0.0, x1.toDouble(), y1.toDouble(), x2.toDouble(), y2.toDouble(), 1.0, 1.0)
+
+/** One read for the save itself, one for its own change event, one for a peer
+ * edit landing at the same moment. Past that the queued refresh takes over. */
+private const val REFRESH_READ_ATTEMPTS = 3
