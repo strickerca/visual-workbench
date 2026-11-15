@@ -138,6 +138,10 @@ impl ProjectState {
         if &self.store()?.local_device()? != device {
             return Err(CoreError::Invalid);
         }
+        // Saving an edit normally takes under a millisecond. Record the ones
+        // that take 50 ms or more (for example the periodic recovery
+        // checkpoint), so a stutter while drawing can be explained afterwards.
+        let _timer = crate::diagnostics::slow_timer("project", "slow save", 50_000);
         if self.replica.is_some() {
             return self.queue(txn);
         }

@@ -117,6 +117,7 @@ pub(crate) struct Timer {
     area: &'static str,
     name: &'static str,
     started: Instant,
+    at_least_micros: u64,
 }
 
 /// Start timing a named stage; the duration is recorded when the value drops.
@@ -125,12 +126,28 @@ pub(crate) fn timer(area: &'static str, name: &'static str) -> Timer {
         area,
         name,
         started: Instant::now(),
+        at_least_micros: 0,
+    }
+}
+
+/// Time a stage that runs very often (every pen stroke) and record it only
+/// when it took at least `at_least_micros`, so frequent fast runs do not push
+/// rarer events out of the ring.
+pub(crate) fn slow_timer(area: &'static str, name: &'static str, at_least_micros: u64) -> Timer {
+    Timer {
+        area,
+        name,
+        started: Instant::now(),
+        at_least_micros,
     }
 }
 
 impl Drop for Timer {
     fn drop(&mut self) {
         let micros = u64::try_from(self.started.elapsed().as_micros()).unwrap_or(u64::MAX);
+        if micros < self.at_least_micros {
+            return;
+        }
         push(
             CoreDiagnosticKind::DurationMicros,
             self.area,
@@ -279,6 +296,18 @@ mod tests {
                 .all(|pair| pair[0].sequence < pair[1].sequence)
         );
         assert!(core_diagnostics(snapshot.latest_sequence).events.is_empty());
+
+        // A frequent stage is recorded only when it is slow.
+        let before_fast = core_diagnostics(0).latest_sequence;
+        drop(slow_timer("test", "fast stage", u64::MAX));
+        assert_eq!(core_diagnostics(0).latest_sequence, before_fast);
+        drop(slow_timer("test", "slow stage", 0));
+        assert!(
+            core_diagnostics(before_fast)
+                .events
+                .iter()
+                .any(|event| event.name == "slow stage")
+        );
 
         for _ in 0..(CAPACITY + 10) {
             count("test", "flood", 1);
