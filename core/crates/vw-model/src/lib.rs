@@ -5,12 +5,14 @@ mod hasher;
 mod ids;
 mod image_output;
 mod order;
+mod replaced;
 mod state;
 mod validate;
 pub use hasher::StateHasher;
 pub use ids::{AssetId, DeviceId, Id, StateHash};
 pub use image_output::{DocumentImageOutput, IMAGE_OUTPUT_CAPABILITY, IMAGE_OUTPUT_LAYER_KIND};
 pub use order::OrderKey;
+pub use replaced::Replaced;
 pub use state::{
     Document, Group, Instruction, Layer, Object, PdfPage, Project, ResultCandidate,
     SemanticSnapshot,

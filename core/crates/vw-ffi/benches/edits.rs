@@ -269,9 +269,7 @@ impl Editor {
                 .map(|(index, kind)| pb::Op {
                     op_id: Some(pb::OpId {
                         device_id: device(),
-                        lamport: 1_000_000_000
-                            + u64::from(self.next) * 4096
-                            + index as u64,
+                        lamport: 1_000_000_000 + u64::from(self.next) * 4096 + index as u64,
                     }),
                     kind: Some(kind),
                 })
@@ -304,7 +302,10 @@ impl Editor {
         }
         let edit = ms(median(&mut edits));
         if undo {
-            println!("{name:<34} | {edit:>9.2} ms | {:>9.2} ms", ms(median(&mut undos)));
+            println!(
+                "{name:<34} | {edit:>9.2} ms | {:>9.2} ms",
+                ms(median(&mut undos))
+            );
         } else {
             println!("{name:<34} | {edit:>9.2} ms |            -");
         }
@@ -316,7 +317,10 @@ impl Editor {
 /// edits that touch a fixed handful of entities.
 fn store_rows(path: &Path, strokes: u32) -> f64 {
     let mut editor = Editor::open(path);
-    println!("\nsaved through the store, {strokes} strokes in the document");
+    println!(
+        "\nsaved through the store, {strokes} strokes in the document ({:.1} MB of canonical project bytes)",
+        editor.store.project().canonical_bytes().unwrap().len() as f64 / 1_000_000.0
+    );
     println!("{:<34} | {:>12} | {:>12}", "edit", "save", "undo");
     let mut slowest: f64 = 0.0;
     let mut order = OrderKey::try_from("zzzz".to_owned()).unwrap();
@@ -334,7 +338,9 @@ fn store_rows(path: &Path, strokes: u32) -> f64 {
             let mut state = object(uid(7, new), layer.clone(), &next_order());
             state.shape = Some(pb::object_state::Shape::Stroke(pb::Stroke {
                 x: (0..SAMPLES_PER_STROKE).map(|i| 20.0 + i as f64).collect(),
-                y: (0..SAMPLES_PER_STROKE).map(|i| 20.0 + i as f64 * 0.5).collect(),
+                y: (0..SAMPLES_PER_STROKE)
+                    .map(|i| 20.0 + i as f64 * 0.5)
+                    .collect(),
                 t_ms: (0..SAMPLES_PER_STROKE).map(|i| (i * 4) as u32).collect(),
                 pressure: vec![0.6; SAMPLES_PER_STROKE],
                 tilt: vec![],
@@ -423,7 +429,11 @@ fn store_rows(path: &Path, strokes: u32) -> f64 {
     ));
     slowest = slowest.max(editor.row(
         "reorder the layer",
-        |n| vec![layer_update(|u| u.order_key = Some(if n % 2 == 0 { "W" } else { "X" }.into()))],
+        |n| {
+            vec![layer_update(|u| {
+                u.order_key = Some(if n % 2 == 0 { "W" } else { "X" }.into())
+            })]
+        },
         true,
     ));
     slowest = slowest.max(editor.row(
@@ -584,8 +594,10 @@ async fn app_rows(project: &Arc<ProjectSession>, strokes: u32, source_asset: &st
         edits.push(stroke(project, 3_000_000 + n).await);
     }
     print("new stroke", &mut edits, &mut undos);
-    for (name, objects) in [("move the first stroke", 1u32), ("move 50 early strokes at once", 50)]
-    {
+    for (name, objects) in [
+        ("move the first stroke", 1u32),
+        ("move 50 early strokes at once", 50),
+    ] {
         let (mut edits, mut undos) = (Vec::new(), Vec::new());
         for n in 0..MEASURED as u32 {
             let info = project.info().await.unwrap();
@@ -619,7 +631,8 @@ async fn app_rows(project: &Arc<ProjectSession>, strokes: u32, source_asset: &st
     }
     let mut undos = Vec::new();
     let mut refused: Option<WorkflowError> = None;
-    let report = |name: &str, edits: &mut [Duration], refused: Option<WorkflowError>| match refused {
+    let report = |name: &str, edits: &mut [Duration], refused: Option<WorkflowError>| match refused
+    {
         Some(error) => println!("{name:<34} | refused: {error}"),
         None => println!("{name:<34} | {:>9.2} ms |            -", ms(median(edits))),
     };
@@ -857,7 +870,9 @@ fn upkeep(step: &Upkeeping) -> String {
     match step {
         Upkeeping::NotDue => "not due".into(),
         Upkeeping::Done(elapsed) => format!("written in {:.0} ms", ms(*elapsed)),
-        Upkeeping::Failed(elapsed, error) => format!("failed after {:.0} ms: {error}", ms(*elapsed)),
+        Upkeeping::Failed(elapsed, error) => {
+            format!("failed after {:.0} ms: {error}", ms(*elapsed))
+        }
         Upkeeping::Skipped => "skipped".into(),
     }
 }

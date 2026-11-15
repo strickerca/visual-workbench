@@ -135,7 +135,9 @@ async fn costly_history(project: &Arc<ProjectSession>) {
     for number in 0..6 {
         stroke_on_top(project, number).await;
     }
-    for number in 1..=50_u32 {
+    // Each move is a third of a millisecond of replay; a checkpoint is
+    // written for a tenth of a second of it.
+    for number in 1..=400_u32 {
         let moved = EditCommand::Transform {
             object_id: wide_id(0x50, 0),
             transform: Transform {

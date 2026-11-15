@@ -227,7 +227,7 @@ impl ProjectStore {
     /// replica/history owners before persistence, on the same single worker.
     /// After commit call submit_conflict_review to settle local metadata only.
     pub fn conflict_review_submission(
-        &self,
+        &mut self,
         conflict: &Id,
         now_ms: i64,
     ) -> Result<pb::Transaction, StoreError> {

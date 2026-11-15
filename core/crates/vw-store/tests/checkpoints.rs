@@ -888,9 +888,10 @@ fn cancellation_exit_worker() {
     panic!("requested cancellation boundary was not reached");
 }
 
-/// A project whose log is expensive to replay: many objects, then changes of
-/// the document title. A title is not an object, so the engine checks the
-/// whole project to accept the change, and again to replay it.
+/// A project whose log is expensive to replay: many objects, then edits that
+/// each change many of them (`expensive_edits`). A changed object is decided
+/// again when the edit is replayed, which costs far more than loading the
+/// few bytes the edit itself takes.
 const HEAVY_OBJECTS: u64 = 1000;
 fn heavy_project(path: &Path) -> ProjectStore {
     let mut store = ProjectStore::create(path, project(), device(1), 0).unwrap();
@@ -898,10 +899,32 @@ fn heavy_project(path: &Path) -> ProjectStore {
     store.commit(&txn, &device(1), 50).unwrap();
     store
 }
-/// Title changes numbered from `first`.
-fn retitle(store: &mut ProjectStore, first: u64, count: u64) {
+/// One transaction that puts the first `members` rectangles of a heavy
+/// project into a new group: small to store, and every member is changed.
+fn regroup(revision: pb::Revision, n: u64, members: u64) -> pb::Transaction {
+    let mut txn = title(revision, n, 0);
+    txn.ops[0].kind = Some(pb::op::Kind::Group(pb::Group {
+        group_id: Some(id(3_000_000 + n).to_proto()),
+        object_ids: (0..members)
+            .map(|index| id(1_000_000 + index).to_proto())
+            .collect(),
+    }));
+    txn
+}
+/// Edits that are expensive to replay, numbered from `first`: in a heavy
+/// project each regroups 120 rectangles; elsewhere each is a new title.
+fn expensive_edits(store: &mut ProjectStore, first: u64, count: u64) {
+    let heavy = store
+        .project()
+        .objects
+        .contains_key(&id(1_000_000 + HEAVY_OBJECTS - 1));
     for n in first..first + count {
-        let txn = title(store.revision().unwrap(), 2000 + n, 0);
+        let revision = store.revision().unwrap();
+        let txn = if heavy {
+            regroup(revision, 2000 + n, 120)
+        } else {
+            title(revision, 2000 + n, 0)
+        };
         store.commit(&txn, &device(1), 2000 + n as i64).unwrap();
     }
 }
@@ -936,7 +959,7 @@ fn a_checkpoint_is_written_once_replaying_costs_more_than_loading_one_and_never_
     let mut expensive = 0;
     while !store.checkpoint_if_due(901).unwrap() {
         assert_eq!(checkpoints(&path), [0]);
-        retitle(&mut store, expensive, 1);
+        expensive_edits(&mut store, expensive, 1);
         expensive += 1;
         assert!(expensive < 40, "a checkpoint never became due");
     }
@@ -1012,7 +1035,7 @@ fn an_open_that_had_to_replay_a_lot_writes_the_checkpoint_itself() {
         1,
     )
     .unwrap();
-    retitle(&mut store, 0, 14);
+    expensive_edits(&mut store, 0, 14);
     let state = store.checkpoint_bytes().unwrap();
     // The application was killed: nothing asked for a checkpoint.
     drop(store);
@@ -1056,7 +1079,7 @@ fn a_project_from_an_older_build_keeps_its_newest_checkpoint_when_its_log_is_exp
     let mut store = heavy_project(&path);
     let mut pile = Vec::new();
     for round in 0..3 {
-        retitle(&mut store, round * 5, 5);
+        expensive_edits(&mut store, round * 5, 5);
         pile.push(
             HostSequencer::from_checkpoint_bytes(&store.checkpoint_bytes().unwrap()).unwrap(),
         );
@@ -1192,7 +1215,7 @@ fn a_checkpoint_that_does_not_read_back_is_not_stored_and_the_one_before_it_stay
             )
             .unwrap()
         });
-        retitle(&mut host, 0, 3);
+        expensive_edits(&mut host, 0, 3);
         let state = host.checkpoint_bytes().unwrap();
         if let Some(mirror) = &mut mirror {
             mirror
@@ -1261,7 +1284,7 @@ fn process_exit_at_each_boundary_of_a_checkpoint_on_the_other_device_keeps_a_way
         let temp = temporary();
         let mut host =
             ProjectStore::create(&temp.path().join("host.vwb"), project(), device(1), 0).unwrap();
-        retitle(&mut host, 0, 2);
+        expensive_edits(&mut host, 0, 2);
         // The other device joins at revision two: that checkpoint is its
         // only one, and there is no revision-zero checkpoint beside it.
         let path = temp.path().join("mirror.vwb");
@@ -1273,7 +1296,7 @@ fn process_exit_at_each_boundary_of_a_checkpoint_on_the_other_device_keeps_a_way
             1,
         )
         .unwrap();
-        retitle(&mut host, 2, 3);
+        expensive_edits(&mut host, 2, 3);
         host.cancel_gesture(device(2), id(CANCELLED), 5).unwrap();
         let state = host.checkpoint_bytes().unwrap();
         mirror
@@ -1322,7 +1345,7 @@ fn cancellations_recorded_in_a_checkpoint_that_is_then_damaged_are_kept() {
     let path = temp.path().join("project.vwb");
     let mut store = heavy_project(&path);
     store.cancel_gesture(device(2), id(CANCELLED), 800).unwrap();
-    retitle(&mut store, 0, 25);
+    expensive_edits(&mut store, 0, 25);
     assert!(store.checkpoint_if_due(900).unwrap());
     let later = store.revision().unwrap().host_seq as i64;
     store
@@ -1403,7 +1426,7 @@ fn the_need_for_a_checkpoint_grows_with_the_replay_it_would_save() {
     // to replay, a checkpoint that is due is overdue as well.
     store.checkpoint_now(900).unwrap();
     let start = store.revision().unwrap().host_seq as i64;
-    let mut retitled = 0;
+    let mut edits = 0;
     let mut reached = Vec::new();
     for need in [
         CheckpointNeed::Due,
@@ -1411,11 +1434,14 @@ fn the_need_for_a_checkpoint_grows_with_the_replay_it_would_save() {
         CheckpointNeed::Urgent,
     ] {
         while store.checkpoint_need() < need {
-            retitle(&mut store, retitled, 1);
-            retitled += 1;
-            assert!(retitled < 4000, "{need:?} was never reached");
+            // Each changes 750 objects: about a twentieth of a second of
+            // replay, so that seconds of it are a hundred edits away.
+            let txn = regroup(store.revision().unwrap(), 2000 + edits, 750);
+            store.commit(&txn, &device(1), 2000 + edits as i64).unwrap();
+            edits += 1;
+            assert!(edits < 400, "{need:?} was never reached");
         }
-        reached.push(retitled);
+        reached.push(edits);
         if need < CheckpointNeed::Urgent {
             assert_eq!(store.checkpoint_need(), need);
             // Not written for a caller that asks for more than this.

@@ -354,7 +354,7 @@ impl ProjectSession {
                     }
                     let now = now_ms()?;
                     let transaction = state
-                        .store()?
+                        .store_mut()?
                         .conflict_review_submission(&conflict, now)
                         .map_err(error)?;
                     workflow::admit_transaction(

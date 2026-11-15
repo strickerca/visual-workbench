@@ -652,8 +652,10 @@ impl ProjectStore {
 
     /// Validate against the current authority without advancing it. Transport
     /// uses this before acquiring new originals; commit revalidates after I/O.
+    /// The transaction is decided in place and taken back out, so the store
+    /// is exactly as before and nothing is copied or written.
     pub fn validate_transaction(
-        &self,
+        &mut self,
         txn: &v1::Transaction,
         authenticated: &DeviceId,
         accepted_at_ms: i64,
@@ -1285,14 +1287,23 @@ fn cancelled(host: &HostSequencer) -> BTreeSet<(DeviceId, Id)> {
 /// machine the estimate was fitted on (a four-core Linux container); only its
 /// ratio to `LogSpan::load_micros`, fitted on the same machine, matters.
 ///
-/// Replaying a transaction costs what accepting it did. The engine keeps
-/// that small for one that changes objects at the end of the object order,
-/// which every new stroke is. For one that changes an earlier object it
-/// hashes every object from there on again, and for one that changes
-/// anything else (a layer, an instruction, a mask, a result, the document)
-/// it validates and hashes the whole project. Measured at 8,000 objects:
-/// 0.06 ms for a new stroke, 45 ms for a change to the first object, and for
-/// a new document title 62 ms with small shapes and 170 ms with strokes.
+/// Replaying a transaction costs what accepting it did: the entities it
+/// touched are decided, journaled and serialized again, and the project's
+/// canonical bytes are hashed from the first one it changed to the end. A new
+/// stroke is the last object and has next to nothing behind it. An earlier
+/// object has every later object behind it, and a layer, an instruction, a
+/// document, a mask history, a group or an asset is written in front of all
+/// objects. Nothing behind the change is serialized or checked again, only
+/// hashed, at about 2.5 GB a second.
+///
+/// Measured on that machine. A new entity: 0.06 ms for a stroke of 48
+/// samples, less for a small shape, and always less than loading it from a
+/// checkpoint costs. A changed one: 0.07 ms for a small shape, 0.13 ms for
+/// such a stroke. The hash, at 8,000 strokes and 20 MB of canonical bytes:
+/// 7 ms for a change to the first object or to a layer or a title (the whole
+/// edit was 45 to 170 ms while the engine went over the whole project for
+/// it), nothing to speak of for a result, which is written behind the
+/// objects.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct ReplayCost {
     micros: u64,
@@ -1302,6 +1313,7 @@ impl ReplayCost {
     /// One transaction, given the state it left and what it touched.
     fn add(&mut self, host: &HostSequencer, touched: &Touched, stored: usize) {
         let project = host.project();
+        let canonical = host.canonical_len() as u64;
         let entities = (project.documents.len()
             + project.assets.len()
             + project.layers.len()
@@ -1311,19 +1323,41 @@ impl ReplayCost {
             + project.semantic_snapshots.len()
             + project.results.len()
             + project.mask_versions.len()) as u64;
-        let read_again = if touched.only_objects() {
-            touched
-                .objects
-                .first()
-                .map_or(0, |first| project.objects.range(first..).count()) as u64
+        // What one entity takes of the canonical bytes, on average.
+        let size = canonical / entities.max(1);
+        let all = (touched.documents.len()
+            + touched.assets.len()
+            + touched.layers.len()
+            + touched.objects.len()
+            + touched.groups.len()
+            + touched.instructions.len()
+            + touched.semantic_snapshots.len()
+            + touched.results.len()
+            + touched.mask_versions.len()) as u64;
+        let created = (touched.created as u64).min(all);
+        let changed = all - created;
+        // The canonical bytes list the members by name: these before the
+        // objects, results and semantic snapshots after them.
+        let before_objects = !(touched.documents.is_empty()
+            && touched.assets.is_empty()
+            && touched.layers.is_empty()
+            && touched.groups.is_empty()
+            && touched.instructions.is_empty()
+            && touched.mask_versions.is_empty());
+        let hashed = if before_objects {
+            canonical
+        } else if let Some(first) = touched.objects.first() {
+            // The share of the bytes that the objects from there on take.
+            let behind = project.objects.range(first..).count() as u64;
+            canonical.saturating_mul(behind) / (project.objects.len() as u64).max(1)
         } else {
-            entities
+            0
         };
-        // Their share of the canonical bytes, which is what hashing reads.
-        let bytes = (host.canonical_len() as u64).saturating_mul(read_again) / entities.max(1);
-        self.micros = self
-            .micros
-            .saturating_add(50 + 6 * read_again + bytes / 160);
+        self.micros = self.micros.saturating_add(
+            50 + created.saturating_mul(15 + size / 60)
+                + changed.saturating_mul(55 + size / 36)
+                + hashed / 2500,
+        );
         self.span.add(stored);
     }
 }

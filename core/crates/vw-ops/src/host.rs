@@ -173,6 +173,11 @@ pub struct HostSequencer {
     hasher: StateHasher,
     #[serde(skip)]
     canonical_len: usize,
+    /// Derived from `records`: every accepted transaction and its author in
+    /// host order, so that what came after one is found without reading the
+    /// whole history. Never part of a checkpoint.
+    #[serde(skip)]
+    order: Vec<(Id, DeviceId)>,
 }
 
 // A private remote deserializer keeps callers from bypassing the validated
@@ -195,6 +200,8 @@ struct CheckpointState {
     hasher: StateHasher,
     #[serde(skip)]
     canonical_len: usize,
+    #[serde(skip)]
+    order: Vec<(Id, DeviceId)>,
 }
 
 /// What deciding a transaction reads but never changes.
@@ -203,6 +210,7 @@ struct View<'a> {
     sequence: u64,
     revisions: &'a BTreeMap<u64, StateHash>,
     records: &'a BTreeMap<Id, Record>,
+    order: &'a [(Id, DeviceId)],
     writes: &'a BTreeMap<String, WriteStamp>,
     tombstones: &'a BTreeMap<Id, Object>,
     seen_ops: &'a BTreeSet<(DeviceId, u64)>,
@@ -444,9 +452,11 @@ impl HostSequencer {
         let mut deleted = BTreeSet::new();
         let mut conflicts = Vec::new();
         let mut conflict_ids = BTreeSet::new();
+        let mut order = Vec::with_capacity(count);
         for (index, (sequence, (id, record))) in ordered.into_iter().enumerate() {
             let transaction = &record.transaction;
             let device = DeviceId::try_from(transaction.device_id.clone())?;
+            order.push((id.clone(), device.clone()));
             let base = transaction
                 .base_revision
                 .as_ref()
@@ -558,6 +568,7 @@ impl HostSequencer {
             }
             vw_model::validate_object_state(&object.state)?;
         }
+        self.order = order;
         Ok(())
     }
 
@@ -580,6 +591,7 @@ impl HostSequencer {
             conflicts: Vec::new(),
             hasher,
             canonical_len,
+            order: Vec::new(),
         })
     }
     /// The canonical state hash of the current revision.
@@ -598,6 +610,7 @@ impl HostSequencer {
             sequence: self.sequence,
             revisions: &self.revisions,
             records: &self.records,
+            order: &self.order,
             writes: &self.writes,
             tombstones: &self.tombstones,
             seen_ops: &self.seen_ops,
@@ -701,7 +714,7 @@ impl HostSequencer {
             Admission::New(device, id) => (device, id),
         };
         let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
-        let touched = undo.originals.touched();
+        let touched = Touched::of(&undo.originals);
         let mut recorded = Recorded {
             host: self,
             undo: Some(undo),
@@ -749,7 +762,7 @@ impl HostSequencer {
             self.revert(undo);
             return Ok(None);
         }
-        let touched = undo.originals.touched();
+        let touched = Touched::of(&undo.originals);
         if let Some(record) = self.records.get_mut(&id) {
             record.ack.notices.clone_from(&stored.notices);
         }
@@ -757,10 +770,11 @@ impl HostSequencer {
     }
 
     /// What `submit` would answer, without accepting anything, and the length
-    /// of the canonical project bytes the transaction would leave. Only the
-    /// project is copied to try it on, not the accepted history.
+    /// of the canonical project bytes the transaction would leave. The
+    /// transaction is decided on the project itself and taken back out, so
+    /// nothing is copied; the host is exactly as before the call.
     pub fn check(
-        &self,
+        &mut self,
         transaction: v1::Transaction,
         authenticated: &DeviceId,
         accepted_at_ms: i64,
@@ -769,25 +783,10 @@ impl HostSequencer {
             Admission::Duplicate(acceptance) => return Ok((acceptance, self.canonical_len)),
             Admission::New(device, id) => (device, id),
         };
-        let mut project = self.project.clone();
-        let mut hasher = self.hasher.clone();
-        let decision = evaluate(
-            &self.view(),
-            &mut project,
-            &mut hasher,
-            transaction,
-            device,
-            id,
-            accepted_at_ms,
-        )?;
-        Ok((
-            Acceptance {
-                ack: decision.record.ack,
-                conflicts: decision.record.conflicts,
-                duplicate: false,
-            },
-            decision.canonical_len,
-        ))
+        let (acceptance, undo) = self.commit(transaction, device, id, accepted_at_ms)?;
+        let canonical_len = self.canonical_len;
+        self.revert(undo);
+        Ok((acceptance, canonical_len))
     }
 
     fn admit(
@@ -836,12 +835,14 @@ impl HostSequencer {
             conflicts: _,
             hasher,
             canonical_len: _,
+            order,
         } = self;
         let view = View {
             host_device,
             sequence: *sequence,
             revisions,
             records,
+            order,
             writes,
             tombstones,
             seen_ops,
@@ -908,6 +909,7 @@ impl HostSequencer {
             duplicate: false,
         };
         self.conflicts.extend(record.conflicts.iter().cloned());
+        self.order.push((id.clone(), device));
         self.records.insert(id, record);
         self.sequence = sequence;
         self.revisions.insert(sequence, hash);
@@ -936,11 +938,12 @@ impl HostSequencer {
             self.gestures.remove(gesture);
         }
         self.records.remove(&undo.id);
+        self.order.pop();
         self.revisions.remove(&self.sequence);
         self.sequence = undo.sequence;
         self.conflicts.truncate(undo.conflicts);
         self.canonical_len = undo.canonical_len;
-        undo.originals.forget_in(&mut self.hasher);
+        self.hasher.replaced(&undo.originals);
         undo.originals.restore(&mut self.project);
     }
 }
@@ -1008,18 +1011,27 @@ impl<'a> View<'a> {
         if record.transaction.device_id != device.as_str() {
             return Err(OpsError::UndoOwnership);
         }
+        // What other devices had accepted after the transaction: usually
+        // nothing, and never the whole history.
+        let after = usize::try_from(record.ack.host_seq).unwrap_or(usize::MAX);
+        let peers = self
+            .order
+            .get(after..)
+            .unwrap_or_default()
+            .iter()
+            .filter(|(_, author)| author != device)
+            .filter_map(|(id, _)| self.records.get(id))
+            .collect::<Vec<_>>();
         let mut inverse = Vec::new();
         for change in record.changes.iter().rev() {
             // The last-write index is insufficient here: an intervening peer
             // edit may have since been overwritten by this device. Undo still
             // must not erase that peer's contribution without a notice.
-            let peer_changed = self.records.values().any(|later| {
-                later.ack.host_seq > record.ack.host_seq
-                    && later.transaction.device_id != device.as_str()
-                    && later
-                        .changes
-                        .iter()
-                        .any(|other| other.address.overlaps(&change.address))
+            let peer_changed = peers.iter().any(|later| {
+                later
+                    .changes
+                    .iter()
+                    .any(|other| other.address.overlaps(&change.address))
             });
             if peer_changed {
                 // Only property names are returned; no IDs, source names or values.
@@ -1357,7 +1369,7 @@ fn evaluate(
         accepted
     };
     let originals = draft::edit(project, |draft| patch::apply(draft, &changes))?;
-    originals.forget_in(hasher);
+    hasher.replaced(&originals);
     // The project now holds the result. Anything that still fails has to put
     // it back before reporting the error.
     let concluded = (|| {
@@ -1384,7 +1396,7 @@ fn evaluate(
     let (tombstones, hash, canonical_len) = match concluded {
         Ok(concluded) => concluded,
         Err(error) => {
-            originals.forget_in(hasher);
+            hasher.replaced(&originals);
             originals.restore(project);
             return Err(error);
         }

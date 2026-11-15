@@ -5,10 +5,10 @@
 //! first change, so a rejected transaction is undone by putting those values
 //! back and an accepted one knows exactly which entities it touched.
 use crate::OpsError;
-use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+use std::collections::{BTreeSet, btree_map::Entry};
 use vw_model::{
     AssetId, Document, Group, Id, Instruction, Layer, ModelError, Object, Project, ResultCandidate,
-    SemanticSnapshot, StateHasher,
+    SemanticSnapshot,
 };
 use vw_proto::v1;
 
@@ -38,6 +38,9 @@ pub struct Touched {
     pub semantic_snapshots: BTreeSet<Id>,
     pub results: BTreeSet<Id>,
     pub mask_versions: BTreeSet<Id>,
+    /// How many of all these entities the transaction created. Deciding a
+    /// new entity again costs less than deciding a change to an existing one.
+    pub created: usize,
 }
 
 impl Touched {
@@ -56,18 +59,7 @@ impl Touched {
 
 /// The value every touched entity had before a draft first changed it;
 /// `None` for an entity the draft created.
-#[derive(Debug, Default)]
-pub(crate) struct Originals {
-    pub documents: BTreeMap<Id, Option<Document>>,
-    pub assets: BTreeMap<AssetId, Option<v1::AddAsset>>,
-    pub layers: BTreeMap<Id, Option<Layer>>,
-    pub objects: BTreeMap<Id, Option<Object>>,
-    pub groups: BTreeMap<Id, Option<Group>>,
-    pub instructions: BTreeMap<Id, Option<Instruction>>,
-    pub semantic_snapshots: BTreeMap<Id, Option<SemanticSnapshot>>,
-    pub results: BTreeMap<Id, Option<ResultCandidate>>,
-    pub mask_versions: BTreeMap<Id, Option<Vec<v1::MaskOp>>>,
-}
+pub(crate) type Originals = vw_model::Replaced;
 
 /// Runs `$body!(field, key type, value type)` once per project collection.
 macro_rules! for_each_collection {
@@ -85,78 +77,37 @@ macro_rules! for_each_collection {
 }
 pub(crate) use for_each_collection;
 
-impl Originals {
-    pub fn only_objects(&self) -> bool {
-        self.documents.is_empty()
-            && self.assets.is_empty()
-            && self.layers.is_empty()
-            && self.groups.is_empty()
-            && self.instructions.is_empty()
-            && self.semantic_snapshots.is_empty()
-            && self.results.is_empty()
-            && self.mask_versions.is_empty()
-    }
-
-    pub fn touched(&self) -> Touched {
-        let mut touched = Touched::default();
+impl Touched {
+    /// The entities a kept draft touched.
+    pub(crate) fn of(originals: &Originals) -> Self {
+        let mut touched = Self::default();
         macro_rules! keys {
             ($field:ident, $key:ty, $value:ty) => {
-                touched.$field = self.$field.keys().cloned().collect();
+                touched.$field = originals.$field.keys().cloned().collect();
+                touched.created += originals
+                    .$field
+                    .values()
+                    .filter(|original| original.is_none())
+                    .count();
             };
         }
         for_each_collection!(keys);
         touched
     }
+}
 
-    /// Tell a hasher that follows the project which part these edits replaced.
-    /// Call it once the edits are in place, and again after undoing them.
-    pub fn forget_in(&self, hasher: &mut StateHasher) {
-        if !self.only_objects() {
-            hasher.reset();
-        } else if let Some(first) = self.objects.keys().next() {
-            hasher.objects_changed_from(first);
-        }
-    }
-
-    /// Put every remembered value back, undoing the draft that produced this.
-    pub fn restore(self, project: &mut Project) {
-        macro_rules! restore {
-            ($field:ident, $key:ty, $value:ty) => {
-                for (id, original) in self.$field {
-                    match original {
-                        Some(value) => {
-                            project.$field.insert(id, value);
-                        }
-                        None => {
-                            project.$field.remove(&id);
-                        }
-                    }
-                }
-            };
-        }
-        for_each_collection!(restore);
-    }
-
-    /// What `Project::validate` would say about `project`, which was valid
-    /// when these originals were current. A change confined to objects is
-    /// checked without visiting the rest of the project.
-    pub fn validate(&self, project: &Project) -> Result<(), ModelError> {
-        if !self.only_objects() {
-            return project.validate();
-        }
-        let result = project.validate_changed_objects(
-            self.objects
-                .iter()
-                .map(|(id, original)| (id, original.as_ref())),
-        );
-        #[cfg(feature = "cross-check")]
-        assert_eq!(
-            result.as_ref().err().map(ToString::to_string),
-            project.validate().err().map(|error| error.to_string()),
-            "changed-object validation differs from whole-project validation"
-        );
-        result
-    }
+/// What `Project::validate` would say about `project`, which was valid when
+/// `originals` were current. Only what the edits can have affected is
+/// checked, never the entities they left alone.
+pub(crate) fn validate(originals: &Originals, project: &Project) -> Result<(), ModelError> {
+    let result = project.validate_replaced(originals);
+    #[cfg(feature = "cross-check")]
+    assert_eq!(
+        result.as_ref().err().map(ToString::to_string),
+        project.validate().err().map(|error| error.to_string()),
+        "validation of what an edit replaced differs from whole-project validation"
+    );
+    result
 }
 
 /// A project being edited in place. Reads see the edits made so far.
@@ -212,9 +163,9 @@ impl<'a> Draft<'a> {
     pub fn originals(&self) -> &Originals {
         &self.originals
     }
-    /// Validate the edited project; see `Originals::validate`.
+    /// Validate the edited project; see `validate`.
     pub fn validate(&self) -> Result<(), ModelError> {
-        self.originals.validate(self.project)
+        validate(&self.originals, self.project)
     }
     /// Keep the edits and hand back what they replaced.
     pub fn keep(self) -> Originals {

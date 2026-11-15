@@ -256,6 +256,50 @@ impl Replica {
         self.install(replayed);
         Ok(removed.into_iter().collect())
     }
+    /// Whether `queue` would take this transaction, without keeping it: the
+    /// same refusals, tried on the visible project itself and taken back out,
+    /// so nothing is copied and the replica is exactly as before.
+    pub fn check(&mut self, transaction: &v1::Transaction) -> Result<(), OpsError> {
+        if transaction.device_id != self.device.as_str() {
+            return Err(OpsError::DeviceMismatch);
+        }
+        if transaction.base_revision.as_ref() != Some(&self.revision) {
+            return Err(OpsError::RevisionMismatch);
+        }
+        if Id::from_proto(transaction.project_id.as_ref())? != self.authoritative.id {
+            return Err(OpsError::Invalid("project identity"));
+        }
+        admit_payload_bytes(0, transaction)?;
+        Id::from_proto(transaction.txn_id.as_ref())?;
+        if let Some(existing) = self
+            .pending
+            .iter()
+            .find(|p| p.transaction.txn_id == transaction.txn_id)
+        {
+            return if existing.transaction.encode_to_vec() == transaction.encode_to_vec() {
+                Ok(())
+            } else {
+                Err(OpsError::IdCollision)
+            };
+        }
+        if self.pending.len() >= MAX_PENDING_TRANSACTIONS
+            || transaction.ops.is_empty()
+            || transaction.ops.len() > 4096
+        {
+            return Err(OpsError::Invalid("pending queue bounds"));
+        }
+        self.pending
+            .iter()
+            .try_fold(transaction.encoded_len(), |bytes, pending| {
+                admit_payload_bytes(bytes, &pending.transaction)
+            })?;
+        validate_transaction(transaction)?;
+        let replaced = optimistic(&mut self.visible, transaction, &self.inverse_previews)?;
+        let inverse = inverse_of(&replaced, &self.visible);
+        replaced.restore(&mut self.visible);
+        inverse.map(|_| ())
+    }
+
     /// Apply one local transaction optimistically. Its base is the last host
     /// revision, not a fabricated revision for earlier unacknowledged local edits.
     pub fn queue(&mut self, transaction: v1::Transaction) -> Result<(), OpsError> {
@@ -294,7 +338,7 @@ impl Replica {
             })?;
         validate_transaction(&transaction)?;
         let replaced = optimistic(&mut self.visible, &transaction, &self.inverse_previews)?;
-        replaced.forget_in(&mut self.hasher);
+        self.hasher.replaced(&replaced);
         let concluded = inverse_of(&replaced, &self.visible).and_then(|inverse| {
             let (hash, _) = self.hasher.hash(&self.visible)?;
             Ok((inverse, hash))
@@ -302,7 +346,7 @@ impl Replica {
         let (inverse, hash) = match concluded {
             Ok(concluded) => concluded,
             Err(error) => {
-                replaced.forget_in(&mut self.hasher);
+                self.hasher.replaced(&replaced);
                 replaced.restore(&mut self.visible);
                 return Err(error);
             }
@@ -388,7 +432,7 @@ fn replay(
     for pending in pending {
         match optimistic(&mut visible, &pending.transaction, &inverses) {
             Ok(replaced) => {
-                replaced.forget_in(&mut hasher);
+                hasher.replaced(&replaced);
                 let inverse = inverse_of(&replaced, &visible)?;
                 inverses.insert(
                     Id::from_proto(pending.transaction.txn_id.as_ref())?,

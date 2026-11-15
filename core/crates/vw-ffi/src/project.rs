@@ -224,6 +224,9 @@ impl ProjectState {
     pub fn store(&self) -> Result<&ProjectStore> {
         self.store.as_ref().ok_or(CoreError::Closed)
     }
+    pub fn store_mut(&mut self) -> Result<&mut ProjectStore> {
+        self.store.as_mut().ok_or(CoreError::Closed)
+    }
     pub fn project(&self) -> Result<&Project> {
         self.store()?;
         Ok(self

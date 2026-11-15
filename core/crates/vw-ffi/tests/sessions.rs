@@ -507,7 +507,7 @@ async fn original_acquisition_preflight_is_read_only_and_author_bound() {
     let session = create_image_project(create(&path), cancel()).await.unwrap();
     session.close().await.unwrap();
     drop(session);
-    let store = vw_store::ProjectStore::open(&path).unwrap();
+    let mut store = vw_store::ProjectStore::open(&path).unwrap();
     let before = store.checkpoint_bytes().unwrap();
     let author = DeviceId::from_bytes([8; 16]);
     let asset = vw_model::AssetId::hash(b"not acquired yet");

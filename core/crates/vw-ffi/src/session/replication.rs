@@ -253,7 +253,7 @@ pub(crate) async fn transaction_missing(
             return Err(SessionError::Authentication);
         }
         state
-            .store()?
+            .store_mut()?
             .validate_transaction(&txn, &peer, now()?)
             .map_err(|_| SessionError::Invalid)?;
         let mut missing = Vec::new();
@@ -280,7 +280,7 @@ pub(crate) async fn install_transaction_asset(
     call(project, move |state| {
         use std::io::{Seek, SeekFrom};
         state
-            .store()?
+            .store_mut()?
             .validate_transaction(&txn, &peer, now()?)
             .map_err(|_| SessionError::Invalid)?;
         if transaction_assets(&txn)?.get(&id) != Some(&size)

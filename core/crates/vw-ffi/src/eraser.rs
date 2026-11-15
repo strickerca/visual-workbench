@@ -366,17 +366,16 @@ fn apply(
             .map_err(|_| WorkflowError::Invalid)?;
     let estimated_peak = add(initial_peak, multiply(single, 16)?)?;
     memory(estimated_peak, request.memory_budget_bytes)?;
-    if let Some(replica) = &state.replica {
+    if let Some(replica) = &mut state.replica {
         if transaction.base_revision.as_ref() != Some(replica.revision()) {
             return Err(WorkflowError::Stale);
         }
-        let mut candidate = replica.clone();
-        candidate
-            .queue(transaction.clone())
+        replica
+            .check(&transaction)
             .map_err(|_| WorkflowError::Invalid)?;
     } else {
         state
-            .store()?
+            .store_mut()?
             .validate_transaction(&transaction, &device, request.metadata.created_at_ms)
             .map_err(|_| WorkflowError::Invalid)?;
     }
