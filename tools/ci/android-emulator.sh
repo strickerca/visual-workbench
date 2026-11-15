@@ -36,8 +36,12 @@ step "start emulator"
 export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 mkdir -p "$ANDROID_AVD_HOME"
 echo no | "$avdmanager" create avd --force -n vw-ci -k "$ANDROID_EMULATOR_IMAGE" -d pixel_6 >/dev/null
+# Two of the runner's four cores stay with the host, where the software
+# renderer draws: with all four given to the guest, drawing froze for Android's
+# 4 s buffer timeout about eight times a run and screen checks failed although
+# the app had drawn correctly.
 "$ANDROID_HOME/emulator/emulator" -avd vw-ci -no-window -no-audio -no-boot-anim -no-snapshot \
-  -gpu swiftshader_indirect -memory 4096 -cores 4 -camera-back none >"${TMPDIR:-/tmp}/vw-emulator.log" 2>&1 &
+  -gpu swiftshader_indirect -memory 4096 -cores 2 -camera-back none >"${TMPDIR:-/tmp}/vw-emulator.log" 2>&1 &
 emulator_pid=$!
 trap '"$adb" emu kill >/dev/null 2>&1 || true; kill "$emulator_pid" 2>/dev/null || true' EXIT
 booted=""
@@ -83,7 +87,7 @@ focus_log="${TMPDIR:-/tmp}/vw-focus.log"
       echo "$(date +%T) sample $count: closed a system error dialog" ;;
     esac
     echo "$count" >"$focus_log.count"
-    sleep 1
+    sleep 3
   done
 ) >"$focus_log" 2>/dev/null &
 focus_pid=$!
@@ -106,7 +110,7 @@ if [ "$status" -ne 0 ]; then
   echo "--- canvas lifecycle of each failed on-screen test ---"
   # A test that fails in its setup wait has no present_failed line; the test
   # runner's own "failed:" line closes its block instead.
-  "$adb" logcat -d -v time -s VW_CANVAS_LIFE:I TestRunner:E | awk '/ test_begin /{n=0} {b[n++]=$0} / present_failed |TestRunner.*failed: /{for(i=0;i<n;i++)print b[i]; n=0}' | tail -n 400 || true
+  "$adb" logcat -d -v time -s VW_CANVAS_LIFE:I TestRunner:E | awk '/ test_begin /{n=0} {b[n++]=$0} / present_failed |TestRunner.*failed: /{for(i=0;i<n;i++)print b[i]; n=0}' | tail -n 1500 || true
   echo "--- platform lines about drawing ---"
   "$adb" logcat -d -v time '*:I' | grep -E "dequeueBuffer failed|SurfaceSyncGroup|BufferPool|LowLatencyCanvas|Davey|Skipped [0-9]+ frames|queue stalled" | tail -n 60 || true
   echo "--- focused window during the tests (changes only) ---"
