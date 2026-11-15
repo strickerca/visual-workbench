@@ -301,6 +301,40 @@ impl HostSequencer {
             .map(|(device, gesture)| (device, gesture))
     }
 
+    /// Whether `other` holds the same accepted history: the project, every
+    /// revision, every accepted transaction with its acknowledgement, journal
+    /// and conflict records, and the indexes kept over them. Cancellations
+    /// are not history and are not compared. Storage uses this to tell that
+    /// a state it decided again from the log is the one a checkpoint holds.
+    ///
+    /// The journal and the indexes are compared as a checkpoint would write
+    /// them: a state read from a checkpoint and the same state as the engine
+    /// left it differ in memory where the written form does not, for one in
+    /// an absent value that the engine holds as a null.
+    pub fn same_history(&self, other: &Self) -> bool {
+        fn written<T: Serialize>(left: &T, right: &T) -> bool {
+            matches!(
+                (serde_json::to_vec(left), serde_json::to_vec(right)),
+                (Ok(left), Ok(right)) if left == right
+            )
+        }
+        self.host_device == other.host_device
+            && self.sequence == other.sequence
+            && self.revisions == other.revisions
+            && self.seen_ops == other.seen_ops
+            && self.gestures == other.gestures
+            && self.project == other.project
+            && self.records.len() == other.records.len()
+            && self
+                .records
+                .iter()
+                .zip(&other.records)
+                .all(|(left, right)| left.0 == right.0 && written(left.1, right.1))
+            && written(&self.writes, &other.writes)
+            && written(&self.tombstones, &other.tombstones)
+            && written(&self.conflicts, &other.conflicts)
+    }
+
     /// Exact accepted transaction/acknowledgement binding for storage audits,
     /// without computing optimistic inverse previews for the entire history.
     pub fn accepted_transaction(&self, id: &Id) -> Option<(&v1::Transaction, &v1::TxnAck)> {
@@ -435,11 +469,7 @@ impl HostSequencer {
                     .get(&sequence)
                     .map(|hash| hash.bytes().to_vec())
                     != Some(record.ack.state_hash.clone())
-                || record
-                    .ack
-                    .notices
-                    .iter()
-                    .any(|notice| notice.len() > 1024 || notice.contains('\0'))
+                || !valid_notices(&record.ack.notices)
             {
                 return Err(OpsError::Invalid("checkpoint record metadata"));
             }
@@ -679,6 +709,51 @@ impl HostSequencer {
         let value = persist(&*recorded.host, &acceptance, &touched)?;
         recorded.undo = None;
         Ok((acceptance, Some(value)))
+    }
+
+    /// Decide again a transaction that storage holds as accepted, and keep the
+    /// acknowledgement it was accepted with. Returns what it touched, or
+    /// nothing when this engine does not reproduce the stored outcome: it
+    /// refuses the transaction, or gives it another revision or state hash.
+    /// The host is then exactly as before the call.
+    ///
+    /// The outcome is the revision and the state hash. Notices are text for a
+    /// person and are not compared: the stored ones are kept as they are, so a
+    /// retry is answered, and a checkpoint is written, with the bytes the
+    /// device first received whatever this build would word them as. See the
+    /// replay rule at `evaluate`.
+    pub fn replay(
+        &mut self,
+        transaction: v1::Transaction,
+        accepted_at_ms: i64,
+        stored: &v1::TxnAck,
+    ) -> Result<Option<Touched>, OpsError> {
+        let author = DeviceId::try_from(transaction.device_id.clone())?;
+        let (device, id) = match self.admit(&transaction, &author)? {
+            // A stored transaction is never a retry of an earlier one.
+            Admission::Duplicate(_) => return Err(OpsError::AlreadyExists),
+            Admission::New(device, id) => (device, id),
+        };
+        if !valid_notices(&stored.notices) {
+            return Err(OpsError::Invalid("stored acknowledgement"));
+        }
+        let Ok((acceptance, undo)) = self.commit(transaction, device, id.clone(), accepted_at_ms)
+        else {
+            return Ok(None);
+        };
+        let ack = &acceptance.ack;
+        if ack.txn_id != stored.txn_id
+            || ack.host_seq != stored.host_seq
+            || ack.state_hash != stored.state_hash
+        {
+            self.revert(undo);
+            return Ok(None);
+        }
+        let touched = undo.originals.touched();
+        if let Some(record) = self.records.get_mut(&id) {
+            record.ack.notices.clone_from(&stored.notices);
+        }
+        Ok(Some(touched))
     }
 
     /// What `submit` would answer, without accepting anything, and the length
@@ -1002,9 +1077,39 @@ impl<'a> View<'a> {
     }
 }
 
+/// What a stored acknowledgement's notices may be.
+fn valid_notices(notices: &[String]) -> bool {
+    notices
+        .iter()
+        .all(|notice| notice.len() <= 1024 && !notice.contains('\0'))
+}
+
 /// Decide one new transaction. On success `project` holds the accepted result
 /// and `hasher` has followed it; on any error both describe the project as it
 /// was. Nothing in `view` is changed either way.
+///
+/// REPLAY RULE. Storage keeps the accepted transactions and not their
+/// results. When a project opens, every transaction stored after its last
+/// checkpoint is decided again here, and for most projects that is every
+/// transaction since the project was created. So for an input that a released
+/// build accepted, this function, and everything it calls in this crate and
+/// in `vw-model`, must go on accepting it with the same resulting project
+/// (the state hash) and the same conflict records. A build that decides such
+/// an input differently cannot open the projects that hold it: storage does
+/// not guess, it refuses them as saved by a different version of the app
+/// (`HostSequencer::replay`, `vw_store::StoreError::EngineMismatch`).
+///
+/// Free to change: the wording and number of notices (replay keeps the stored
+/// ones), what is refused that was refused before, new kinds of operation,
+/// speed. Not free: who wins a conflict, what an undo restores, defaults
+/// filled in, validation that turns an accepted input into a refused one,
+/// the canonical bytes, any field of a conflict record. To change one of
+/// those, keep the old rule for transactions stored before the change. A log
+/// row carries no engine version today; the build that first needs one adds
+/// it, and rows without it were decided by this rule.
+///
+/// The pinned logs in `vw-store/tests/replay_rule.rs` fail when this is
+/// broken. Do not update their expected values to make them pass.
 fn evaluate(
     view: &View<'_>,
     project: &mut Project,

@@ -1,6 +1,6 @@
 use crate::{
     StoreError,
-    database::{decode, replay_log, write_conflict, write_snapshot},
+    database::{Acks, Replay, decode, replay_log, write_conflict, write_snapshot},
 };
 use rusqlite::{Connection, TransactionBehavior};
 use vw_model::{DeviceId, Project};
@@ -124,7 +124,12 @@ pub(crate) fn upgrade(connection: &mut Connection) -> Result<(), StoreError> {
     tx.execute_batch(MIGRATION_2)?;
     crate::projections::persist(&tx, host.project(), 0, time)?;
     write_snapshot(&tx, &host, time)?;
-    replay_log(&tx, &mut host, 0, false, None)?;
+    if !matches!(
+        replay_log(&tx, &mut host, 0, Acks::Write, None)?,
+        Replay::Done(..)
+    ) {
+        return Err(StoreError::Corrupt("operation replay"));
+    }
     // Verify every pre-existing snapshot against independent historical replay.
     let snapshots = tx
         .prepare("SELECT host_seq,state,state_hash FROM snapshots ORDER BY host_seq")?

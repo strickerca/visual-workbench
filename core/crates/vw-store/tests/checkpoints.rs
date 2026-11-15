@@ -14,7 +14,7 @@ use tempfile::TempDir;
 use vw_model::{AssetId, DeviceId, Document, Id, Layer, Project};
 use vw_ops::HostSequencer;
 use vw_proto::{Message, v1 as pb};
-use vw_store::{CommitStage, OpenStage, ProjectStore};
+use vw_store::{CheckpointNeed, CommitStage, OpenStage, ProjectStore, Upkeeping};
 
 fn temporary() -> TempDir {
     let mut builder = tempfile::Builder::new();
@@ -455,16 +455,17 @@ fn the_newest_checkpoint_is_kept_when_the_log_does_not_replay_from_the_oldest() 
     other.cancel_gesture(device(2), id(88)).unwrap();
     write_checkpoint(&query(&old.path), &other);
     assert_eq!(checkpoints(&old.path), [0, 4, 8, 12]);
-    // The cancellation is kept although its checkpoint is not: it moves into
-    // the one that is.
+    // The project opens from the newest checkpoint. A revision-zero
+    // checkpoint that loads is never removed, whatever the log makes of it:
+    // its cancellation counts, and it stays the place they are recorded.
     let mut host = old.host.clone();
     host.cancel_gesture(device(2), id(88)).unwrap();
     let store = assert_opens_as(&old.path, &host);
     assert_eq!(store.replayed_transactions(), 0);
     drop(store);
-    assert_eq!(checkpoints(&old.path), [12]);
+    assert_eq!(checkpoints(&old.path), [0, 12]);
     let mut store = assert_opens_as(&old.path, &host);
-    // Saving and cancelling go on from the checkpoint that was kept.
+    // Saving and cancelling go on from the checkpoint that is in use.
     let txn = title(store.revision().unwrap(), 500, 0);
     store.commit(&txn, &device(1), 9000).unwrap();
     host.submit(txn, &device(1), 9000).unwrap();
@@ -473,7 +474,7 @@ fn the_newest_checkpoint_is_kept_when_the_log_does_not_replay_from_the_oldest() 
         .unwrap();
     host.cancel_gesture(device(2), id(CANCELLED)).unwrap();
     drop(store);
-    assert_eq!(checkpoints(&old.path), [12]);
+    assert_eq!(checkpoints(&old.path), [0, 12]);
     let store = assert_opens_as(&old.path, &host);
     assert_eq!(store.replayed_transactions(), 1);
     drop(store);
@@ -650,6 +651,13 @@ fn process_exit_at_each_boundary_of_the_clean_up_leaves_a_project_that_opens_the
         OpenStage::Restored,
         OpenStage::Pruned,
         OpenStage::Committed,
+        // The compaction: noted but not started, inside SQLite's copy of the
+        // rows, committed to the write-ahead log, moved into the database
+        // file with the log not yet emptied, and done.
+        OpenStage::Compacting,
+        OpenStage::Copying,
+        OpenStage::Vacuumed,
+        OpenStage::Transferred,
         OpenStage::Compacted,
     ] {
         let temp = temporary();
@@ -664,7 +672,7 @@ fn process_exit_at_each_boundary_of_the_clean_up_leaves_a_project_that_opens_the
         );
         // The pile goes in one transaction: all of it is there, or only the
         // checkpoint the log replays from.
-        let committed = matches!(stage, OpenStage::Committed | OpenStage::Compacted);
+        let committed = !matches!(stage, OpenStage::Restored | OpenStage::Pruned);
         assert_eq!(
             checkpoints(&old.path),
             if committed { vec![0] } else { pile },
@@ -685,7 +693,7 @@ fn process_exit_at_each_boundary_of_the_clean_up_leaves_a_project_that_opens_the
 fn clean_up_exit_worker() {
     let path = std::env::var_os("VW_CHECKPOINT_PROJECT").expect("owned project");
     let stage = std::env::var("VW_CHECKPOINT_STAGE").expect("owned boundary");
-    let _store = ProjectStore::open_observed(Path::new(&path), |at| {
+    let _store = ProjectStore::open_observed(Path::new(&path), move |at| {
         if format!("{at:?}") == stage {
             std::process::exit(83);
         }
@@ -696,7 +704,7 @@ fn clean_up_exit_worker() {
 
 #[test]
 fn a_kill_while_the_pile_is_handed_back_leaves_a_project_that_opens_the_same() {
-    // Compaction is a single step with no boundary to stop at, so the writer
+    // Besides the exits at the compaction's own boundaries above, the writer
     // is killed at a spread of moments after it starts.
     for delay_ms in [0, 1, 3, 8, 21] {
         let temp = temporary();
@@ -738,7 +746,7 @@ fn a_kill_while_the_pile_is_handed_back_leaves_a_project_that_opens_the_same() {
 fn clean_up_kill_worker() {
     let path = std::env::var_os("VW_CHECKPOINT_PROJECT").expect("owned project");
     let marker = std::env::var_os("VW_CHECKPOINT_STAGE").expect("owned marker");
-    let _store = ProjectStore::open_observed(Path::new(&path), |at| {
+    let _store = ProjectStore::open_observed(Path::new(&path), move |at| {
         if at == OpenStage::Committed {
             fs::write(&marker, b"").unwrap();
         }
@@ -746,6 +754,79 @@ fn clean_up_kill_worker() {
     .unwrap();
     std::thread::sleep(Duration::from_secs(60));
     panic!("the owning test did not end this worker");
+}
+
+#[test]
+fn a_compaction_that_ended_with_the_process_twice_is_not_started_at_every_open() {
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let before = database_bytes(&old.path);
+    // The process ends inside the copy, as it does when the system takes it
+    // away for the memory the copy needs. Twice.
+    for _ in 0..2 {
+        let status = run_worker("clean_up_exit_worker", &old.path, "Copying");
+        assert_eq!(status.code(), Some(83));
+    }
+    // The third open leaves it alone, says so, and is a normal open.
+    let store = assert_opens_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().tidy, Upkeeping::NotDue));
+    assert!(matches!(store.open_report().compaction, Upkeeping::Skipped));
+    drop(store);
+    assert_eq!(checkpoints(&old.path), [0]);
+    assert!(database_bytes(&old.path) * 2 > before);
+    // Without the note the next open compacts.
+    assert_eq!(
+        query(&old.path)
+            .execute("DELETE FROM meta WHERE key='compaction_attempt'", [])
+            .unwrap(),
+        1
+    );
+    let store = assert_opens_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::Done(_)));
+    drop(store);
+    assert!(database_bytes(&old.path) * 4 < before);
+    let store = assert_opens_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::NotDue));
+    drop(store);
+    temp.close().unwrap();
+}
+
+#[test]
+fn a_clean_up_the_file_refuses_leaves_the_project_open_and_the_next_open_does_it() {
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let pile = checkpoints(&old.path);
+    let before = database_bytes(&old.path);
+    // Something else holds the database for writing, which this store's own
+    // lock does not rule out for a program that ignores it.
+    let other = query(&old.path);
+    other.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let started = Instant::now();
+    let store = assert_opens_as(&old.path, &old.host);
+    // The open did not sit out the five seconds a save waits for the file.
+    assert!(started.elapsed() < Duration::from_secs(4));
+    assert!(store.gesture_closed(&device(2), &id(CANCELLED)));
+    let report = store.open_report();
+    assert!(matches!(report.tidy, Upkeeping::Failed(..)), "{report:?}");
+    assert!(matches!(report.checkpoint, Upkeeping::Skipped));
+    assert!(matches!(report.compaction, Upkeeping::Skipped));
+    drop(store);
+    other.execute_batch("ROLLBACK").unwrap();
+    drop(other);
+    // Nothing was removed and nothing sealed.
+    assert_eq!(checkpoints(&old.path), pile);
+    assert_eq!(seal(&old.path), None);
+    assert_eq!(database_bytes(&old.path), before);
+
+    let store = assert_opens_as(&old.path, &old.host);
+    let report = store.open_report();
+    assert!(matches!(report.tidy, Upkeeping::Done(_)), "{report:?}");
+    assert!(matches!(report.compaction, Upkeeping::Done(_)));
+    assert_eq!(report.skipped_checkpoints, 0);
+    drop(store);
+    assert_eq!(checkpoints(&old.path), [0]);
+    assert!(database_bytes(&old.path) * 4 < before);
+    temp.close().unwrap();
 }
 
 #[test]
@@ -1072,4 +1153,290 @@ fn checkpoint_exit_worker() {
         })
         .unwrap();
     panic!("requested checkpoint boundary was not reached");
+}
+
+/// The `host_seq` and digest of every stored checkpoint.
+fn stored_checkpoints(path: &Path) -> Vec<(i64, String)> {
+    query(path)
+        .prepare("SELECT host_seq,checkpoint_hash FROM snapshots ORDER BY host_seq")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+}
+
+/// A new checkpoint replaces the one before it in the same transaction. On
+/// the other device no revision-zero checkpoint stays behind, so the new row
+/// is then the only way into the project and into the edits queued in it.
+/// Here the new row is written and cannot be read back: the project the
+/// database says it belongs to is not the one the checkpoint holds.
+#[test]
+fn a_checkpoint_that_does_not_read_back_is_not_stored_and_the_one_before_it_stays() {
+    for other_device in [false, true] {
+        let temp = temporary();
+        let host_path = temp.path().join("host.vwb");
+        let mut host = heavy_project(&host_path);
+        let path = if other_device {
+            temp.path().join("mirror.vwb")
+        } else {
+            host_path.clone()
+        };
+        let mut mirror = other_device.then(|| {
+            ProjectStore::create_authenticated_checkpoint(
+                &path,
+                &host.checkpoint_bytes().unwrap(),
+                &device(1),
+                &device(2),
+                1,
+            )
+            .unwrap()
+        });
+        retitle(&mut host, 0, 3);
+        let state = host.checkpoint_bytes().unwrap();
+        if let Some(mirror) = &mut mirror {
+            mirror
+                .install_authenticated_checkpoint(&state, &device(1), 2)
+                .unwrap();
+            // An edit made offline, waiting for the host.
+            let mut queued = title(mirror.revision().unwrap(), 700, 0);
+            queued.device_id = device(2).to_string();
+            queued.ops[0].op_id.as_mut().unwrap().device_id = device(2).to_string();
+            mirror.enqueue_pending(&queued).unwrap();
+        }
+        let store = mirror.as_mut().unwrap_or(&mut host);
+        let before = stored_checkpoints(&path);
+        assert_eq!(
+            before.iter().map(|(seq, _)| *seq).collect::<Vec<_>>(),
+            if other_device { vec![1] } else { vec![0] }
+        );
+
+        let identity = |value: &str| {
+            assert_eq!(
+                query(&path)
+                    .execute("UPDATE meta SET value=?1 WHERE key='project_id'", [value])
+                    .unwrap(),
+                1
+            );
+        };
+        identity(id(999).as_str());
+        assert!(store.checkpoint_now(9).is_err(), "{other_device}");
+        identity(id(1).as_str());
+        // What was stored is untouched, and so is the open project.
+        assert_eq!(stored_checkpoints(&path), before);
+        assert!(store.checkpoint_bytes().unwrap() == state);
+        assert_eq!(store.pending().unwrap().len(), usize::from(other_device));
+        drop(mirror);
+        drop(host);
+        let mut store = assert_opens_to(&path, &state);
+        assert_eq!(
+            store.replayed_transactions(),
+            if other_device { 3 } else { 4 }
+        );
+        assert_eq!(store.pending().unwrap().len(), usize::from(other_device));
+
+        // One that reads back replaces it.
+        store.checkpoint_now(10).unwrap();
+        drop(store);
+        assert_eq!(
+            checkpoints(&path),
+            if other_device { vec![4] } else { vec![0, 4] }
+        );
+        let store = assert_opens_to(&path, &state);
+        assert_eq!(store.replayed_transactions(), 0);
+        assert_eq!(store.pending().unwrap().len(), usize::from(other_device));
+        drop(store);
+        temp.close().unwrap();
+    }
+}
+
+#[test]
+fn process_exit_at_each_boundary_of_a_checkpoint_on_the_other_device_keeps_a_way_in() {
+    for stage in [
+        CommitStage::Prepared,
+        CommitStage::LogWritten,
+        CommitStage::BeforeCommit,
+        CommitStage::Committed,
+    ] {
+        let temp = temporary();
+        let mut host =
+            ProjectStore::create(&temp.path().join("host.vwb"), project(), device(1), 0).unwrap();
+        retitle(&mut host, 0, 2);
+        // The other device joins at revision two: that checkpoint is its
+        // only one, and there is no revision-zero checkpoint beside it.
+        let path = temp.path().join("mirror.vwb");
+        let mut mirror = ProjectStore::create_authenticated_checkpoint(
+            &path,
+            &host.checkpoint_bytes().unwrap(),
+            &device(1),
+            &device(2),
+            1,
+        )
+        .unwrap();
+        retitle(&mut host, 2, 3);
+        host.cancel_gesture(device(2), id(CANCELLED), 5).unwrap();
+        let state = host.checkpoint_bytes().unwrap();
+        mirror
+            .install_authenticated_checkpoint(&state, &device(1), 2)
+            .unwrap();
+        let mut queued = title(mirror.revision().unwrap(), 700, 0);
+        queued.device_id = device(2).to_string();
+        queued.ops[0].op_id.as_mut().unwrap().device_id = device(2).to_string();
+        mirror.enqueue_pending(&queued).unwrap();
+        drop(mirror);
+        assert_eq!(checkpoints(&path), [2]);
+
+        let status = run_worker("checkpoint_exit_worker", &path, &format!("{stage:?}"));
+        assert_eq!(
+            status.code(),
+            Some(83),
+            "worker must exit without running Rust destructors at {stage:?}"
+        );
+        let committed = stage == CommitStage::Committed;
+        assert_eq!(
+            checkpoints(&path),
+            if committed { [5] } else { [2] },
+            "{stage:?}"
+        );
+        let store = assert_opens_to(&path, &state);
+        assert_eq!(
+            store.replayed_transactions(),
+            if committed { 0 } else { 3 },
+            "{stage:?}"
+        );
+        assert!(store.gesture_closed(&device(2), &id(CANCELLED)));
+        assert_eq!(store.pending().unwrap(), [queued], "{stage:?}");
+        drop(store);
+        drop(host);
+        temp.close().unwrap();
+    }
+}
+
+/// Cancellations are recorded in the revision-zero checkpoint, which is one
+/// row. Each also has a row of its own, so a project that has to open from
+/// its later checkpoint still holds those recorded after that one was
+/// written.
+#[test]
+fn cancellations_recorded_in_a_checkpoint_that_is_then_damaged_are_kept() {
+    let temp = temporary();
+    let path = temp.path().join("project.vwb");
+    let mut store = heavy_project(&path);
+    store.cancel_gesture(device(2), id(CANCELLED), 800).unwrap();
+    retitle(&mut store, 0, 25);
+    assert!(store.checkpoint_if_due(900).unwrap());
+    let later = store.revision().unwrap().host_seq as i64;
+    store
+        .cancel_gesture(device(2), id(CANCELLED + 1), 901)
+        .unwrap();
+    let state = store.checkpoint_bytes().unwrap();
+    drop(store);
+    assert_eq!(checkpoints(&path), [0, later]);
+    // The later checkpoint does not hold the second cancellation.
+    assert!(!open_as_an_older_build(&path).gesture_closed(&device(2), &id(CANCELLED + 1)));
+
+    assert_eq!(
+        query(&path)
+            .execute("UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=0", [])
+            .unwrap(),
+        1
+    );
+    let mut store = assert_opens_to(&path, &state);
+    assert_eq!(store.open_report().skipped_checkpoints, 1);
+    for n in [CANCELLED, CANCELLED + 1] {
+        assert!(store.gesture_closed(&device(2), &id(n)));
+        let mut late = title(store.revision().unwrap(), 900 + n, 0);
+        late.device_id = device(2).to_string();
+        late.ops[0].op_id.as_mut().unwrap().device_id = device(2).to_string();
+        late.gesture_id = Some(id(n).to_proto());
+        assert!(store.commit(&late, &device(2), 5000).is_err());
+    }
+    drop(store);
+    // The damaged row is gone, the cancellations are recorded in the one
+    // that is left, and an older build finds both there.
+    assert_eq!(checkpoints(&path), [later]);
+    let store = assert_opens_to(&path, &state);
+    assert_eq!(store.open_report().skipped_checkpoints, 0);
+    drop(store);
+    assert!(open_as_an_older_build(&path).checkpoint_bytes().unwrap() == state);
+    // A copy that is not a cancellation is damage, not something to skip.
+    query(&path)
+        .execute(
+            "INSERT INTO meta(key,value) VALUES('cancelled nonsense','')",
+            [],
+        )
+        .unwrap();
+    assert!(ProjectStore::open(&path).is_err());
+    temp.close().unwrap();
+}
+
+/// How much a checkpoint is needed grows with what the next open would
+/// replay, and each caller asks for its own degree: closing for one that is
+/// due, an idle project for one that is overdue, a busy one only for one that
+/// is urgent.
+#[test]
+fn the_need_for_a_checkpoint_grows_with_the_replay_it_would_save() {
+    let temp = temporary();
+    let path = temp.path().join("project.vwb");
+    let mut store = heavy_project(&path);
+    draw(&mut store, 0, 40);
+    // Enough history that loading it takes longer than the least replay a
+    // checkpoint is written for; otherwise due and overdue are one step.
+    for bulk in 0..8 {
+        let txn = rectangles(
+            store.revision().unwrap(),
+            60 + bulk,
+            10_000 + bulk * 900,
+            900,
+        );
+        store.commit(&txn, &device(1), 60 + bulk as i64).unwrap();
+    }
+    assert_eq!(store.checkpoint_need(), CheckpointNeed::None);
+    for need in [
+        CheckpointNeed::None,
+        CheckpointNeed::Due,
+        CheckpointNeed::Overdue,
+        CheckpointNeed::Urgent,
+    ] {
+        assert!(!store.checkpoint_if(need, 900).unwrap());
+    }
+    // From a checkpoint on, as after an open: while the whole log is still
+    // to replay, a checkpoint that is due is overdue as well.
+    store.checkpoint_now(900).unwrap();
+    let start = store.revision().unwrap().host_seq as i64;
+    let mut retitled = 0;
+    let mut reached = Vec::new();
+    for need in [
+        CheckpointNeed::Due,
+        CheckpointNeed::Overdue,
+        CheckpointNeed::Urgent,
+    ] {
+        while store.checkpoint_need() < need {
+            retitle(&mut store, retitled, 1);
+            retitled += 1;
+            assert!(retitled < 4000, "{need:?} was never reached");
+        }
+        reached.push(retitled);
+        if need < CheckpointNeed::Urgent {
+            assert_eq!(store.checkpoint_need(), need);
+            // Not written for a caller that asks for more than this.
+            assert!(!store.checkpoint_if(CheckpointNeed::Urgent, 901).unwrap());
+            assert_eq!(checkpoints(&path), [0, start]);
+        }
+    }
+    // Overdue takes more replay than due, and urgent is seconds of it.
+    assert!(reached[0] < reached[1], "{reached:?}");
+    assert!(reached[1] * 4 < reached[2], "{reached:?}");
+    // Asking for nothing writes nothing; asking for what is there writes it.
+    assert!(!store.checkpoint_if(CheckpointNeed::None, 902).unwrap());
+    assert!(store.checkpoint_if(CheckpointNeed::Urgent, 903).unwrap());
+    let revision = store.revision().unwrap().host_seq as i64;
+    assert_eq!(checkpoints(&path), [0, revision]);
+    assert_eq!(store.checkpoint_need(), CheckpointNeed::None);
+    let state = store.checkpoint_bytes().unwrap();
+    drop(store);
+    let store = assert_opens_to(&path, &state);
+    assert_eq!(store.replayed_transactions(), 0);
+    assert!(matches!(store.open_report().checkpoint, Upkeeping::NotDue));
+    drop(store);
+    temp.close().unwrap();
 }

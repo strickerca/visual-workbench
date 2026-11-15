@@ -40,6 +40,12 @@ pub enum StoreError {
     UnsupportedSchema(i64),
     #[error("project is already open for writing")]
     Busy,
+    /// The stored log is as it was written, but this build does not decide one
+    /// of its transactions the way the build that stored it did. Nothing is
+    /// wrong with the project and nothing in it was changed; the build that
+    /// saved it opens it.
+    #[error("project was last saved by a different version of the app")]
+    EngineMismatch,
     #[error("not enough free space for caching; original assets are preserved")]
     LowSpace,
 }

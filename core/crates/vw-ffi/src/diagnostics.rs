@@ -255,6 +255,7 @@ pub(crate) fn store_cause(error: &vw_store::StoreError) -> &'static str {
         StoreError::Invalid(what) | StoreError::Corrupt(what) => what,
         StoreError::UnsupportedSchema(_) => "unsupported store schema",
         StoreError::Busy => "store busy",
+        StoreError::EngineMismatch => "saved by a different version of the app",
         StoreError::LowSpace => "low disk space",
     }
 }
@@ -335,5 +336,21 @@ mod tests {
             store_cause(&vw_store::StoreError::LowSpace),
             "low disk space"
         );
+    }
+
+    /// A project this build cannot decide again the way the build that saved
+    /// it did is refused like any storage failure, since the public error
+    /// cannot say more, and the reason is on record in fixed words for the
+    /// application to show.
+    #[test]
+    fn a_project_saved_by_another_version_has_a_cause_of_its_own() {
+        let before = core_diagnostics(0).latest_sequence;
+        let error: crate::CoreError = vw_store::StoreError::EngineMismatch.into();
+        assert!(matches!(error, crate::CoreError::Storage));
+        assert!(core_diagnostics(before).events.iter().any(|event| {
+            event.kind == CoreDiagnosticKind::Failure
+                && event.area == "store"
+                && event.name == "saved by a different version of the app"
+        }));
     }
 }
