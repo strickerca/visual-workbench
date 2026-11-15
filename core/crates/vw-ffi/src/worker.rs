@@ -1,8 +1,11 @@
 use crate::{CoreError, Result};
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
-    mpsc::{self, SyncSender, TrySendError},
+use std::{
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
+    },
+    time::{Duration, Instant},
 };
 use tokio::sync::{oneshot, watch};
 
@@ -34,6 +37,13 @@ impl Cancellation {
 }
 
 type Job<T> = Box<dyn FnOnce(&mut T) + Send>;
+/// Work the worker does by itself, between the jobs it is given: `run` is
+/// called once `every` has passed since it last ran and nothing is waiting.
+/// It never runs ahead of a queued job, and not at all after shutdown.
+pub(crate) struct Upkeep<T> {
+    pub every: Duration,
+    pub run: Box<dyn FnMut(&mut T) + Send>,
+}
 type ShutdownJob<T> = Box<dyn FnOnce(&mut T) -> Result<()> + Send>;
 enum Message<T> {
     Call(Job<T>),
@@ -75,6 +85,14 @@ impl Drop for Completion {
 }
 impl<T: Send + 'static> Worker<T> {
     pub fn new(name: &str, state: T, capacity: usize) -> Result<Self> {
+        Self::with_upkeep(name, state, capacity, None)
+    }
+    pub fn with_upkeep(
+        name: &str,
+        state: T,
+        capacity: usize,
+        upkeep: Option<Upkeep<T>>,
+    ) -> Result<Self> {
         let (sender, receiver) =
             mpsc::sync_channel::<Message<T>>(capacity.checked_add(1).ok_or(CoreError::Invalid)?);
         let admission = Arc::new(Mutex::new(Admission {
@@ -91,7 +109,31 @@ impl<T: Send + 'static> Worker<T> {
             .spawn(move || {
                 let completion = Completion(completion);
                 let mut state = state;
-                while let Ok(message) = receiver.recv() {
+                let mut upkeep = upkeep.map(|upkeep| (Instant::now() + upkeep.every, upkeep));
+                loop {
+                    let message = match &mut upkeep {
+                        None => match receiver.recv() {
+                            Ok(message) => message,
+                            Err(_) => break,
+                        },
+                        Some((due, upkeep)) => match receiver.try_recv() {
+                            Ok(message) => message,
+                            Err(TryRecvError::Disconnected) => break,
+                            Err(TryRecvError::Empty) => {
+                                let now = Instant::now();
+                                if now >= *due {
+                                    (upkeep.run)(&mut state);
+                                    *due = Instant::now() + upkeep.every;
+                                    continue;
+                                }
+                                match receiver.recv_timeout(*due - now) {
+                                    Ok(message) => message,
+                                    Err(RecvTimeoutError::Timeout) => continue,
+                                    Err(RecvTimeoutError::Disconnected) => break,
+                                }
+                            }
+                        },
+                    };
                     match message {
                         Message::Call(job) => {
                             let Ok(mut admission) = gate.lock() else {
@@ -233,6 +275,55 @@ pub(crate) async fn startup<R: Send + 'static>(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn upkeep_runs_between_jobs_while_nothing_waits_and_never_after_shutdown() {
+        let runs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = runs.clone();
+        let worker = Worker::with_upkeep(
+            "ffi-test-upkeep",
+            Vec::<&'static str>::new(),
+            4,
+            Some(Upkeep {
+                every: Duration::from_millis(20),
+                run: Box::new(move |order| {
+                    counted.fetch_add(1, Ordering::AcqRel);
+                    order.push("upkeep");
+                }),
+            }),
+        )
+        .unwrap();
+        // A job that takes several periods, with two more queued behind it:
+        // upkeep is due the whole time and still waits for all three.
+        worker
+            .enqueue(Box::new(|order| {
+                std::thread::sleep(Duration::from_millis(80));
+                order.push("first");
+            }))
+            .unwrap();
+        worker
+            .enqueue(Box::new(|order| order.push("second")))
+            .unwrap();
+        let order = worker
+            .call(|order| {
+                order.push("third");
+                Ok(order.clone())
+            })
+            .await
+            .unwrap();
+        assert_eq!(order, ["first", "second", "third"]);
+        // Left alone, it runs, and goes on running.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while runs.load(Ordering::Acquire) < 3 {
+            assert!(Instant::now() < deadline, "upkeep did not run while idle");
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        let order = worker.call(|order| Ok(order.clone())).await.unwrap();
+        assert_eq!(order[..4], ["first", "second", "third", "upkeep"]);
+        worker.shutdown(|_| Ok(())).await.unwrap();
+        let stopped = runs.load(Ordering::Acquire);
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        assert_eq!(runs.load(Ordering::Acquire), stopped);
+    }
     #[test]
     fn shutdown_waits_for_actual_thread_exit_after_state_completion() {
         use std::{cell::RefCell, time::Duration};
