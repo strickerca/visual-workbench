@@ -55,6 +55,15 @@ done
 # full-screen app; that belongs to the emulator, not to the app.
 "$adb" shell settings put secure immersive_mode_confirmations confirmed || true
 
+# On a software-rendered emulator the system's own launcher is slow enough to
+# get an "isn't responding" dialog. It stays in front for the whole run and
+# dims the screen to 40 %, which fails every screen-pixel check although the
+# app drew correctly (seen in run 9: "Application Not Responding:
+# com.google.android.apps.nexuslauncher"). Such dialogs are switched off, and
+# one that still appears is closed and logged.
+"$adb" shell settings put global hide_error_dialogs 1 || true
+"$adb" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+
 # Which window had the focus while the tests ran (changes only), so that a
 # system dialog lying over the app can be told from a defect in the app.
 focus_log="${TMPDIR:-/tmp}/vw-focus.log"
@@ -66,6 +75,10 @@ focus_log="${TMPDIR:-/tmp}/vw-focus.log"
       | grep -E 'mCurrentFocus=|mFocusedApp=' | sed 's/^ *//' | sort -u | tr '\n' ' ')"
     count=$((count + 1))
     if [ -n "$now" ] && [ "$now" != "$last" ]; then echo "$(date +%T) sample $count: $now"; last="$now"; fi
+    case "$now" in *"Application Not Responding"*|*"Application Error"*)
+      "$adb" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS </dev/null >/dev/null 2>&1
+      echo "$(date +%T) sample $count: closed a system error dialog" ;;
+    esac
     echo "$count" >"$focus_log.count"
     sleep 1
   done
