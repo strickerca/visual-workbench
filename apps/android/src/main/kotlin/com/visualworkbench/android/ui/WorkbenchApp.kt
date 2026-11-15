@@ -257,7 +257,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     }
     if(editor.remoteOpen)editor.remoteCapability?.let { remote ->
         com.visualworkbench.android.remote.RemoteEditPanel(remote, onDismiss = editor::remoteClosed,
-            airActions = { palette, blocked -> AirActionDialogControls(editor, remote, palette, blocked) })
+            toggles = editor.preferences.penPath, airActions = { palette, blocked -> AirActionDialogControls(editor, remote, palette, blocked) })
     }
     AiEditorOverlay(editor)
     if (editor.showBrush) BrushDialog(editor.tool, editor.displayedBrush(), editor.brushPreview, editor::brush) { editor.brushDialog(false) }

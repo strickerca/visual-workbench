@@ -49,6 +49,8 @@ internal data class EditorPreferences(
         EditorTool.Marker to BrushPreference(12.0, 0xffec8792, 0.10f),
     ),
     val airActions: AirActionBindings = AirActionBindings(),
+    /** Developer switches for the pen path; every one is off by default. */
+    val penPath: PenPathToggles = PenPathToggles(),
 ) {
     init { require(railOffset.isFinite() && railOffset in 0f..1f) }
     fun brush(tool: EditorTool): BrushPreference = brushes[tool] ?: brushes.getValue(EditorTool.Pen)
@@ -75,7 +77,7 @@ internal class EditorPreferencesStore(context: Context) {
             }
             EditorPreferences(value.optBoolean("drawWithFinger"), value.optBoolean("leftHanded"),
                 value.optBoolean("darkTheme", true), value.optBoolean("reducedMotion"), value.optDouble("railOffset", 0.25).toFloat(), brushes,
-                readAirActionBindings(value.optJSONObject("airActions")))
+                readAirActionBindings(value.optJSONObject("airActions")), readPenPathToggles(value.optJSONObject("penPath")))
         } catch (_: IllegalArgumentException) { defaults }
         catch (_: org.json.JSONException) { defaults }
     }
@@ -84,6 +86,10 @@ internal class EditorPreferencesStore(context: Context) {
             .put("leftHanded", settings.leftHanded).put("darkTheme", settings.darkTheme)
             .put("reducedMotion", settings.reducedMotion).put("railOffset", settings.railOffset.toDouble())
             .put("airActions", writeAirActionBindings(settings.airActions))
+        // Written only while a developer switch is on, so untouched settings keep their stored form.
+        if (settings.penPath.anyOn) json.put("penPath", JSONObject().also { stored ->
+            settings.penPath.encode().forEach { (key, on) -> stored.put(key, on) }
+        })
         settings.brushes.forEach { (tool, brush) ->
             json.put(tool.name, JSONObject().put("width", brush.width).put("argb", brush.colorArgb)
                 .put("stabilization", brush.stabilization.toDouble()).put("pressure", JSONObject()
@@ -103,6 +109,9 @@ internal fun readAirActionBindings(value: JSONObject?): AirActionBindings {
         .associate { it.name to value?.opt(it.name) }
     return decodeAirActionPreferences(values)
 }
+
+internal fun readPenPathToggles(value: JSONObject?): PenPathToggles =
+    PenPathToggles.decode(PenPathToggle.entries.associate { it.key to value?.opt(it.key) })
 
 internal fun writeAirActionBindings(bindings: AirActionBindings): JSONObject = JSONObject().also { json ->
     encodeAirActionPreferences(bindings).forEach { (gesture, command) -> json.put(gesture, command ?: JSONObject.NULL) }

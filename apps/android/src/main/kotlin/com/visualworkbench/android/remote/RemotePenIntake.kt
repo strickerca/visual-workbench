@@ -1,0 +1,70 @@
+package com.visualworkbench.android.remote
+
+/** How one pen event's samples enter the bounded phone queue.
+ *
+ * The computer takes pen samples through an eight-slot queue and ends the
+ * connection when it overflows, so the phone never hands it more than eight at
+ * once. Until now an event with more than eight samples (the main thread was
+ * held up for a few frames) was refused and input paused. With [longBatches]
+ * such an event is reserved in groups of at most eight and its samples are
+ * later released to the computer by [RemoteSendPacer]. Without it this class
+ * makes exactly the calls the controller made before: one reservation for the
+ * whole event, then one enqueue per sample, stopping at the first refusal. */
+internal class RemotePenIntake(val longBatches: Boolean) {
+    enum class Result { Admitted, CommandBusy, Refused }
+
+    /** Largest MotionEvent history accepted; one more sample is the event itself. */
+    val maxHistory: Int get() = if (longBatches) LONG_SAMPLES - 1 else GROUP - 1
+    /** Samples that may wait on the phone between the touch thread and the sender. */
+    val queueCapacity: Int get() = if (longBatches) LONG_QUEUE else GROUP
+
+    /** [reserve] is the short native state-only reservation: false means an
+     * editor command is refreshing and no sample of this event may be queued.
+     * [enqueue] is false when the phone queue is full. Call under the input
+     * fence. After [Result.Refused] the caller clears the queue and pauses,
+     * which also retires every reservation made here. */
+    fun <T> admit(batch: List<T>, reserve: (UInt) -> Boolean, enqueue: (T) -> Boolean): Result {
+        if (!longBatches) {
+            if (!reserve(batch.size.toUInt())) return Result.CommandBusy
+            return if (batch.all(enqueue)) Result.Admitted else Result.Refused
+        }
+        var reserved = 0
+        while (reserved < batch.size) {
+            val group = minOf(GROUP, batch.size - reserved)
+            if (!reserve(group.toUInt())) return if (reserved == 0) Result.CommandBusy else Result.Refused
+            reserved += group
+        }
+        return if (batch.all(enqueue)) Result.Admitted else Result.Refused
+    }
+
+    companion object {
+        /** The computer's input queue length and the native per-call reservation bound. */
+        const val GROUP = 8
+        /** Two native reservations: the native queue bound is sixteen samples. */
+        const val LONG_SAMPLES = 16
+        const val LONG_QUEUE = 32
+    }
+}
+
+/** Releases queued samples to the computer no faster than its eight-slot input
+ * queue is known to take them today: eight at once, then one more per
+ * millisecond. In ordinary drawing (two to four samples per frame) it never
+ * waits. Used only with long batches; one sender thread owns it. */
+internal class RemoteSendPacer(private val burst: Int = RemotePenIntake.GROUP, private val refillNanos: Long = 1_000_000L) {
+    private var tokens = burst
+    private var updated = Long.MIN_VALUE
+
+    /** Takes one send slot and returns 0, or returns the nanoseconds to wait
+     * before asking again. [nowNanos] is a monotonic clock. */
+    fun acquire(nowNanos: Long): Long {
+        if (updated == Long.MIN_VALUE || nowNanos < updated) updated = nowNanos
+        val earned = (nowNanos - updated) / refillNanos
+        if (earned > 0) {
+            // A full bucket carries no partial progress toward a ninth slot.
+            if (tokens + earned >= burst) { tokens = burst; updated = nowNanos }
+            else { tokens += earned.toInt(); updated += earned * refillNanos }
+        }
+        if (tokens > 0) { tokens--; return 0L }
+        return refillNanos - (nowNanos - updated)
+    }
+}
