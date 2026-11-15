@@ -51,11 +51,6 @@ for scale in window_animation_scale transition_animation_scale animator_duration
   "$adb" shell settings put global "$scale" 0
 done
 "$adb" shell input keyevent 82 || true
-# The on-screen tests use coordinates written for the S23 Ultra. Give the
-# emulator the size and density that phone reports (docs/HARDWARE_TRUTH.md).
-"$adb" shell wm size 1080x2316
-"$adb" shell wm density 450
-sleep 5
 
 step "instrumented tests: $classes"
 status=0
@@ -65,6 +60,10 @@ bash apps/gradlew -p apps :android:connectedDebugAndroidTest -PvwEmulatorAbi=x86
 step "result summary"
 "$adb" shell wm size || true
 "$adb" shell wm density || true
+if [ "$status" -ne 0 ]; then
+  # The app's own warnings and errors, to tell an emulator limit from a defect.
+  "$adb" logcat -d -v brief '*:W' | grep -iE "visualworkbench|VW_|vw_core|AndroidRuntime" | tail -n 40 || true
+fi
 "$PYTHON" - <<'PY' || true
 import glob, xml.etree.ElementTree as ET
 total = failed = 0

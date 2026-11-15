@@ -145,11 +145,9 @@ jobs:
       - run: rustup show active-toolchain; if ($LASTEXITCODE -ne 0) { rustup toolchain install }
       - run: pwsh -NoProfile -File tools/ci/windows-rust.ps1
 
-  # Informational until it has passed on hosted machines; not yet in ci-required.
   kotlin-windows:
     runs-on: windows-2025
     timeout-minutes: 120
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -175,7 +173,7 @@ jobs:
 
   ci-required:
     if: always()
-    needs: [policy, rust-lint, rust-test, python-node, advisories, kotlin-linux, rust-windows]
+    needs: [policy, rust-lint, rust-test, python-node, advisories, kotlin-linux, rust-windows, kotlin-windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
