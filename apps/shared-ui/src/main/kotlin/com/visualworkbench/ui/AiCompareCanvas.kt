@@ -1,5 +1,5 @@
 @file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
-package com.visualworkbench.android.editor
+package com.visualworkbench.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -27,8 +27,8 @@ internal fun aiMatrix(t: Transform): Matrix = Matrix(floatArrayOf(t.a.toFloat(),
  * a real pen/primary mouse contact uses the explicitly selected acceptance tool.
  * Predicted points never enter the acceptance mask. */
 @Composable
-internal fun AiCompareCanvas(controller: AiEditorController<AiBitmap>, core: WorkbenchCore,
-    state: AiEditorState<AiBitmap>, modifier: Modifier = Modifier) {
+internal fun <B : AiDisplayImage> AiCompareCanvas(controller: AiEditorController<B>, core: WorkbenchCore,
+    state: AiEditorState<B>, modifier: Modifier = Modifier) {
     val latest by rememberUpdatedState(state)
     LaunchedEffect(state.open, state.view) {
         if (state.open && state.view == AiView.Blink) while (true) { delay(500); controller.blink() }

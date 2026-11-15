@@ -102,7 +102,7 @@ throwaway key, so it installs on a phone that does not have the app yet.
 | --- | --- |
 | `core/crates/` | The shared Rust core: geometry, document model, edit log, storage, ink, export, protocol, networking, pairing, and the bindings both apps use |
 | `host-win/crates/` | Windows-only Rust: capture, video, pen injection, UI Automation |
-| `apps/shared`, `apps/android`, `apps/desktop` | Kotlin and Compose apps for the phone and the PC, with their shared module |
+| `apps/shared`, `apps/shared-ui`, `apps/android`, `apps/desktop` | Kotlin and Compose apps for the phone and the PC, with their shared logic module and the screens both apps use |
 | `mcp/` | The local MCP server that AI coding agents talk to |
 | `contracts/` | Wire protocol, package schema and database schema |
 | `tools/` | Build, test, release and hardware-test tooling; `tools/ci` holds the automatic checks |

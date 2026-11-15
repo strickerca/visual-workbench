@@ -8,7 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.visualworkbench.shared.*
-import com.visualworkbench.android.offline.OfflineReviewPanel
+import com.visualworkbench.ui.*
 
 /** A failed or still-loading format query cannot hide the owner that guards edits. */
 internal fun showFrameControls(available: Boolean, state: ImageFramesState): Boolean =
@@ -24,7 +24,7 @@ internal fun showFrameControls(available: Boolean, state: ImageFramesState): Boo
         DocumentNavigatorPanel(owner.navigator,{owner.activate(EditorWorkflowPanel.Documents,it)},owner::choose,owner::cancelSwitch)
         LocalViewsPanel(owner.views,{owner.activate(EditorWorkflowPanel.SavedViews,it)},owner::saveView,owner::restoreView)
         LayersPanel(owner.controls,editor::workflowId,setOfNotNull(editor.selected),{owner.activate(EditorWorkflowPanel.Layers,it)})
-        if(editor.toneControlsAvailable || tone.blocksInput) ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
+        if(editor.toneControlsAvailable || tone.blocksInput) ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)},{TonePreviewTile(it)})
         else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Tone unavailable for this source")}
         if(showFrameControls(editor.frameControlsAvailable,frame)) ImageFramesPanel(editor.imageFrames,editor::framePanel)
         else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Output frame unavailable for this source")}

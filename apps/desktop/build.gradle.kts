@@ -17,6 +17,9 @@ if (providers.systemProperty("os.name").get().startsWith("Linux", ignoreCase = t
     dependencyLocking { lockFile = file("gradle-linux.lockfile") }
 }
 sourceSets.main { resources.srcDir(rootProject.file("../third_party/notices")) }
+// Screens that are the same on the phone and the PC exist once, in
+// apps/shared-ui, and are compiled into each app with that app's Compose.
+kotlin.sourceSets.named("main") { kotlin.srcDir(rootProject.file("shared-ui/src/main/kotlin")) }
 dependencies {
     implementation(project(":shared"))
     implementation(project(":bindings-core"))

@@ -1,4 +1,4 @@
-package com.visualworkbench.desktop
+package com.visualworkbench.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,7 +13,8 @@ import com.visualworkbench.shared.*
 /** Private drafts preview without committing; Apply/Remove are explicit actions.
  * Canvas composition is a separate caller hook and is not needed by this panel. */
 @Composable
-internal fun ToneControlsPanel(controls: ToneControlsInteraction, activate: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+internal fun ToneControlsPanel(controls: ToneControlsInteraction, activate: (Boolean) -> Unit,
+    previewTile: @Composable (ToneControlPreview) -> Unit, modifier: Modifier = Modifier) {
     val state by controls.state.collectAsState()
     val opening = controls.capture()
     OutlinedButton(onClick={if (opening != null && controls.capture() == opening) activate(true)},
@@ -119,7 +120,7 @@ internal fun ToneControlsPanel(controls: ToneControlsInteraction, activate: (Boo
             state.preview?.let { preview ->
                 Text((if (state.previewDraft) "Private preview" else "Saved tones") + " · revision ${preview.binding.hostSeq} · " +
                     "region [${preview.x}, ${preview.y}, ${preview.width}, ${preview.height}]",style=MaterialTheme.typography.caption)
-                TonePreviewTile(preview)
+                previewTile(preview) // drawn by each app with its own bitmap type
             }
         }
     },confirmButton={TextButton(onClick={if (current()) activate(false)},enabled=state.mayLeave && token != null) { Text("Close") }})

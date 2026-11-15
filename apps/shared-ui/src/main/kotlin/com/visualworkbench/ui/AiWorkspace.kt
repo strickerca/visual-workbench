@@ -1,4 +1,4 @@
-package com.visualworkbench.desktop
+package com.visualworkbench.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
@@ -18,7 +18,7 @@ import com.visualworkbench.shared.*
 /** No effect sends, retries, initializes history or reads a credential. Those
  * actions have separate buttons; Send captures this exact displayed review. */
 @Composable
-internal fun AiWorkspace(controller: AiEditorController<AiBitmap>, service: AiServiceController,
+internal fun <B : AiDisplayImage> AiWorkspace(controller: AiEditorController<B>, service: AiServiceController,
     core: WorkbenchCore, onKeys: (AiProviderKind) -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val state by controller.state.collectAsState()
     val settings by service.state.collectAsState()
@@ -45,8 +45,8 @@ internal fun AiWorkspace(controller: AiEditorController<AiBitmap>, service: AiSe
 }
 
 @Composable
-private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServiceController,
-    state: AiEditorState<AiBitmap>, settings: AiServiceState, onKeys: (AiProviderKind) -> Unit, modifier: Modifier) {
+private fun <B : AiDisplayImage> AiControls(controller: AiEditorController<B>, service: AiServiceController,
+    state: AiEditorState<B>, settings: AiServiceState, onKeys: (AiProviderKind) -> Unit, modifier: Modifier) {
     var showSettings by remember { mutableStateOf(false) }
     var instruction by remember { mutableStateOf("") }
     var textTokens by remember { mutableStateOf("") }
@@ -172,7 +172,7 @@ private fun AiControls(controller: AiEditorController<AiBitmap>, service: AiServ
 /** Images are real native After pixels. Large candidates show a labelled center
  * crop; selecting a card opens the existing full-resolution comparison tools. */
 @Composable
-private fun AiCandidateGrid(controller: AiEditorController<AiBitmap>, state: AiEditorState<AiBitmap>) {
+private fun <B : AiDisplayImage> AiCandidateGrid(controller: AiEditorController<B>, state: AiEditorState<B>) {
     if (state.entries.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("Candidate grid · ${state.entries.size}/$AI_CANDIDATE_LIMIT · each review requires explicit Send", style = MaterialTheme.typography.subtitle2)

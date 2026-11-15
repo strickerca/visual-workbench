@@ -29,6 +29,7 @@ import androidx.compose.ui.window.*
 import com.visualworkbench.bindings.host.*
 import com.visualworkbench.shared.*
 import com.visualworkbench.desktop.mcp.*
+import com.visualworkbench.ui.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.collect

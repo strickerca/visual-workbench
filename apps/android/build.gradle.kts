@@ -45,6 +45,9 @@ android {
         jniLibs.keepDebugSymbols += "**/libvw_core.so"
     }
     sourceSets.getByName("main").assets.srcDir(rootProject.file("../third_party/notices"))
+    // Screens that are the same on the phone and the PC exist once, in
+    // apps/shared-ui, and are compiled into each app with that app's Compose.
+    sourceSets.getByName("main").kotlin.directories.add(rootProject.file("shared-ui/src/main/kotlin").path)
     if(remoteIntegration) {
         // This opt-in source graph has its own real integration census. The
         // ordinary166-case app HIL source set and artifacts stay unchanged.
