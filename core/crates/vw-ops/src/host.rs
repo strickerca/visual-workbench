@@ -292,6 +292,15 @@ impl HostSequencer {
         self.cancelled.is_subset(&newer.cancelled)
     }
 
+    /// Every durable gesture cancellation. They are the one part of this state
+    /// the accepted journal cannot rebuild, so storage keeps them with the
+    /// checkpoint its journal replays from.
+    pub fn cancelled_gestures(&self) -> impl Iterator<Item = (&DeviceId, &Id)> {
+        self.cancelled
+            .iter()
+            .map(|(device, gesture)| (device, gesture))
+    }
+
     /// Exact accepted transaction/acknowledgement binding for storage audits,
     /// without computing optimistic inverse previews for the entire history.
     pub fn accepted_transaction(&self, id: &Id) -> Option<(&v1::Transaction, &v1::TxnAck)> {

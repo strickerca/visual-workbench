@@ -294,9 +294,10 @@ fn query_rows(database: &rusqlite::Connection, sql: &str) -> Vec<Vec<rusqlite::t
 
 fn stored_rows(database: &rusqlite::Connection) -> Vec<Vec<Vec<rusqlite::types::Value>>> {
     // Include historical inventory, local rows and exact protobuf BLOBs. Only
-    // the schema-version value is expected to change during this migration.
+    // the schema-version value is expected to change during this migration;
+    // the open that follows adds the seal of the log.
     [
-        "SELECT * FROM meta WHERE key!='schema_version' ORDER BY key",
+        "SELECT * FROM meta WHERE key NOT IN ('schema_version','log_seal') ORDER BY key",
         "SELECT * FROM devices ORDER BY device_id",
         "SELECT * FROM assets ORDER BY asset_id",
         "SELECT * FROM documents ORDER BY document_id",
@@ -407,10 +408,19 @@ fn version_two_upgrade_preserves_exact_history_local_data_and_linked_projection_
     assert_eq!(store.project(), fixture.host.project());
     assert_eq!(store.checkpoint_bytes().unwrap(), expected_checkpoint);
     assert_eq!(store.pending().unwrap(), vec![fixture.pending.clone()]);
-    assert_eq!(store.replayed_transactions(), 0);
+    assert_eq!(store.replayed_transactions(), 2);
     let database = rusqlite::Connection::open(fixture.path.join("project.sqlite")).unwrap();
     assert_eq!(schema_version(&database), "3");
+    // Every row is kept except the later checkpoint: the log replays from the
+    // revision-zero one, which stays exactly as the schema 2 store wrote it.
+    let mut before = before;
+    assert_eq!(before[9].len(), 2);
+    before[9].truncate(1);
     assert_eq!(stored_rows(&database), before);
+    assert_eq!(
+        query_rows(&database, "SELECT COUNT(*) FROM meta WHERE key='log_seal'"),
+        vec![vec![rusqlite::types::Value::Integer(1)]]
+    );
     let fresh = rusqlite::Connection::open_in_memory().unwrap();
     fresh.execute_batch(CURRENT).unwrap();
     assert_eq!(schema(&database), schema(&fresh));
@@ -479,8 +489,9 @@ fn malformed_version_two_is_refused_without_partial_version_or_table_changes() {
     for sql in [
         "ALTER TABLE layers ADD COLUMN unexpected_fixture TEXT",
         "CREATE TRIGGER sqlitex AFTER INSERT ON objects BEGIN DELETE FROM objects; END",
-        "UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=2",
-        "UPDATE snapshots SET state_hash='0000000000000000000000000000000000000000000000000000000000000000' WHERE host_seq=2",
+        "UPDATE snapshots SET checkpoint=x'00'",
+        "UPDATE snapshots SET state_hash='0000000000000000000000000000000000000000000000000000000000000000'",
+        "UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=0; UPDATE op_log SET accepted_at=accepted_at+1 WHERE host_seq=2",
         "UPDATE op_log SET ack=x'ff' WHERE host_seq=1",
         "UPDATE op_log SET accepted_at=accepted_at+1 WHERE host_seq=1",
         "UPDATE pending_txns SET txn=x'ff'",
@@ -510,6 +521,54 @@ fn malformed_version_two_is_refused_without_partial_version_or_table_changes() {
 }
 
 #[test]
+fn version_two_with_a_damaged_checkpoint_upgrades_from_the_other_one_and_the_log() {
+    for sql in [
+        "UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=2",
+        "UPDATE snapshots SET state_hash='0000000000000000000000000000000000000000000000000000000000000000' WHERE host_seq=2",
+        "UPDATE snapshots SET state=x'7b7d' WHERE host_seq=2",
+        "UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=0",
+        "DELETE FROM snapshots WHERE host_seq=0",
+    ] {
+        let temporary = temporary();
+        let fixture = version_two(temporary.path());
+        let database = rusqlite::Connection::open(fixture.path.join("project.sqlite")).unwrap();
+        database.execute_batch(sql).unwrap();
+        drop(database);
+        let store = ProjectStore::open(&fixture.path).unwrap();
+        assert_eq!(
+            store.revision().unwrap(),
+            fixture.host.revision().unwrap(),
+            "{sql}"
+        );
+        assert_eq!(
+            store.checkpoint_bytes().unwrap(),
+            fixture.host.checkpoint_bytes().unwrap(),
+            "{sql}"
+        );
+        assert_eq!(store.pending().unwrap(), vec![fixture.pending.clone()]);
+        drop(store);
+        let database = rusqlite::Connection::open(fixture.path.join("project.sqlite")).unwrap();
+        assert_eq!(schema_version(&database), "3");
+        // The checkpoint that verified is the one that stays.
+        let kept = if sql.ends_with("host_seq=2") { 0 } else { 2 };
+        assert_eq!(
+            query_rows(&database, "SELECT host_seq FROM snapshots"),
+            vec![vec![rusqlite::types::Value::Integer(kept)]],
+            "{sql}"
+        );
+        drop(database);
+        let reopened = ProjectStore::open(&fixture.path).unwrap();
+        assert_eq!(
+            reopened.revision().unwrap(),
+            fixture.host.revision().unwrap()
+        );
+        assert_eq!(reopened.replayed_transactions(), 2 - kept as u64);
+        drop(reopened);
+        temporary.close().unwrap();
+    }
+}
+
+#[test]
 fn draft_migration_replays_history_preserves_hash_retries_labels_and_pending_queue() {
     for count in [0, 3] {
         let temporary = temporary();
@@ -518,7 +577,7 @@ fn draft_migration_replays_history_preserves_hash_retries_labels_and_pending_que
         let mut store = ProjectStore::open(&fixture.path).unwrap();
         assert_eq!(store.revision().unwrap(), expected);
         assert_eq!(store.project(), fixture.host.project());
-        assert_eq!(store.replayed_transactions(), 0);
+        assert_eq!(store.replayed_transactions(), count);
         assert_eq!(store.pending().unwrap(), vec![fixture.pending]);
         for txn in &fixture.transactions {
             let retry = store.commit(txn, &device(), 200).unwrap();

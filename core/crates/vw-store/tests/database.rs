@@ -179,10 +179,9 @@ fn reopen_retains_exact_retry_ack_undo_and_conflict_records() {
         3.0
     );
     let expected = store.project().state_hash().unwrap();
-    store.snapshot_now(103).unwrap();
     drop(store);
     let mut restored = ProjectStore::open(&path).unwrap();
-    assert_eq!(restored.replayed_transactions(), 0);
+    assert_eq!(restored.replayed_transactions(), 3);
     assert_eq!(restored.project().state_hash().unwrap(), expected);
     assert_eq!(restored.conflicts().unwrap(), accepted.conflicts);
     let retry = restored.commit(&offline, &device(2), 104).unwrap();
@@ -361,18 +360,30 @@ fn writer_lock_is_exclusive_and_released_after_drop() {
     temporary.close().unwrap();
 }
 
+fn checkpoint_revisions(path: &Path) -> Vec<i64> {
+    query(path)
+        .prepare("SELECT host_seq FROM snapshots ORDER BY host_seq")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+}
+
 #[test]
-fn transaction_count_checkpoint_replays_only_the_three_transaction_tail() {
+fn saving_never_adds_a_checkpoint_and_reopening_replays_the_log() {
     let temporary = temporary();
     let path = temporary.path().join("project.vwb");
     let mut store = ProjectStore::create(
         &path,
-        Project::new(id(1), "Snapshot counter".into(), device(1)),
+        Project::new(id(1), "Checkpoint counter".into(), device(1)),
         device(1),
         0,
     )
     .unwrap();
-    // Document creation is transaction 1; all later transactions change its title.
+    // Document creation is transaction 1; all later transactions change its
+    // title. Older builds wrote a checkpoint of the whole history at the 500th
+    // save and whenever five minutes had passed; both happen here.
     for index in 1..=503_u64 {
         let kind = if index == 1 {
             pb::op::Kind::CreateDocument(pb::CreateDocument {
@@ -389,50 +400,19 @@ fn transaction_count_checkpoint_replays_only_the_three_transaction_tail() {
             })
         };
         let txn = transaction(store.revision().unwrap(), 1000 + index, 1, kind);
-        store.commit(&txn, &device(1), index as i64).unwrap();
+        store
+            .commit(&txn, &device(1), index as i64 * 301_000)
+            .unwrap();
     }
     let expected = store.revision().unwrap();
-    assert_eq!(
-        query(&path)
-            .query_row("SELECT MAX(host_seq) FROM snapshots", [], |row| row
-                .get::<_, i64>(0))
-            .unwrap(),
-        500
-    );
+    let checkpoint = store.checkpoint_bytes().unwrap();
+    assert_eq!(checkpoint_revisions(&path), [0]);
     drop(store);
     let restored = ProjectStore::open(&path).unwrap();
-    assert_eq!(restored.replayed_transactions(), 3);
+    assert_eq!(restored.replayed_transactions(), 503);
     assert_eq!(restored.revision().unwrap(), expected);
-    drop(restored);
-    temporary.close().unwrap();
-}
-
-#[test]
-fn elapsed_time_and_explicit_idle_checkpoints_limit_replay() {
-    let temporary = temporary();
-    let path = temporary.path().join("project.vwb");
-    let mut store = create(&path);
-    for (number, time) in [(10, 299_999), (11, 300_000), (12, 300_001)] {
-        let txn = title(store.revision().unwrap(), number);
-        store.commit(&txn, &device(1), time).unwrap();
-    }
-    assert_eq!(
-        query(&path)
-            .query_row("SELECT MAX(host_seq) FROM snapshots", [], |row| row
-                .get::<_, i64>(0))
-            .unwrap(),
-        2
-    );
-    let expected = store.revision().unwrap();
-    drop(store);
-    let mut restored = ProjectStore::open(&path).unwrap();
-    assert_eq!(restored.replayed_transactions(), 1);
-    assert_eq!(restored.revision().unwrap(), expected);
-    restored.snapshot_now(300_002).unwrap();
-    drop(restored);
-    let restored = ProjectStore::open(&path).unwrap();
-    assert_eq!(restored.replayed_transactions(), 0);
-    assert_eq!(restored.revision().unwrap(), expected);
+    assert_eq!(restored.checkpoint_bytes().unwrap(), checkpoint);
+    assert_eq!(checkpoint_revisions(&path), [0]);
     drop(restored);
     temporary.close().unwrap();
 }
@@ -450,6 +430,31 @@ fn cancellation_survives_a_checkpoint_without_mutating_visible_state() {
     txn.gesture_id = Some(id(50).to_proto());
     assert!(restored.commit(&txn, &device(1), 101).is_err());
     assert_eq!(restored.revision().unwrap(), before);
+    // A cancellation recorded after saves is kept the same way: in the one
+    // checkpoint, which stays at the revision the log replays from.
+    let saved = title(before, 11);
+    restored.commit(&saved, &device(1), 102).unwrap();
+    restored.cancel_gesture(device(1), id(51), 103).unwrap();
+    restored.cancel_gesture(device(1), id(51), 104).unwrap();
+    // A gesture that was saved cannot be cancelled afterwards.
+    let mut gesture = title(restored.revision().unwrap(), 12);
+    gesture.gesture_id = Some(id(52).to_proto());
+    restored.commit(&gesture, &device(1), 105).unwrap();
+    assert!(restored.cancel_gesture(device(1), id(52), 106).is_err());
+    let after = restored.revision().unwrap();
+    let checkpoint = restored.checkpoint_bytes().unwrap();
+    assert_eq!(checkpoint_revisions(&path), [0]);
+    drop(restored);
+    let mut restored = ProjectStore::open(&path).unwrap();
+    assert_eq!(restored.replayed_transactions(), 2);
+    assert_eq!(restored.checkpoint_bytes().unwrap(), checkpoint);
+    for cancelled in [50, 51] {
+        let mut late = title(after.clone(), 20 + cancelled);
+        late.gesture_id = Some(id(cancelled).to_proto());
+        assert!(restored.commit(&late, &device(1), 107).is_err());
+        assert!(restored.gesture_closed(&device(1), &id(cancelled)));
+    }
+    assert_eq!(restored.revision().unwrap(), after);
     drop(restored);
     temporary.close().unwrap();
 }
@@ -635,21 +640,29 @@ fn rich_document_projections_preserve_full_capture_identity_and_model_types() {
 
 #[test]
 fn corrupted_log_checkpoint_and_snapshot_bindings_are_rejected() {
+    // The one checkpoint is what the log replays from, and every log row is
+    // under the seal: nothing here has a second copy to fall back on.
     for (index, sql) in [
-        "UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=2",
-        "UPDATE snapshots SET state_hash='0000000000000000000000000000000000000000000000000000000000000000' WHERE host_seq=2",
+        "UPDATE snapshots SET checkpoint=x'00' WHERE host_seq=0",
+        "UPDATE snapshots SET state_hash='0000000000000000000000000000000000000000000000000000000000000000' WHERE host_seq=0",
         "UPDATE op_log SET txn=x'ff' WHERE host_seq=1",
         "UPDATE op_log SET ack=x'ff' WHERE host_seq=1",
         "UPDATE op_log SET state_hash='0000000000000000000000000000000000000000000000000000000000000000' WHERE host_seq=1",
         "UPDATE op_log SET created_at_wall=created_at_wall+1 WHERE host_seq=1",
         "UPDATE op_log SET accepted_at=accepted_at+1 WHERE host_seq=1",
+        "UPDATE op_log SET accepted_at=accepted_at+1 WHERE host_seq=2",
         "DELETE FROM op_log WHERE host_seq=1",
-        "UPDATE snapshots SET state=x'7b7d' WHERE host_seq=2",
+        "DELETE FROM op_log WHERE host_seq=2",
+        "UPDATE snapshots SET state=x'7b7d' WHERE host_seq=0",
+        "DELETE FROM snapshots",
+        "UPDATE meta SET value='v1 2 0000000000000000000000000000000000000000000000000000000000000000' WHERE key='log_seal'",
+        "UPDATE meta SET value='v1 3 '||substr(value,6) WHERE key='log_seal'",
+        "UPDATE meta SET value=value||' ' WHERE key='log_seal'",
     ].into_iter().enumerate() {
         let temporary = temporary(); let path = temporary.path().join("project.vwb"); let mut store = create(&path);
         for number in [10,11] { let txn = title(store.revision().unwrap(), number); store.commit(&txn, &device(1), 100 + number as i64).unwrap(); }
-        store.snapshot_now(200).unwrap(); drop(store);
-        let database = query(&path); database.execute_batch(sql).unwrap(); drop(database);
+        drop(store);
+        let database = query(&path); assert_ne!(database.execute(sql, []).unwrap(), 0, "corruption case {index} changed nothing"); drop(database);
         assert!(ProjectStore::open(&path).is_err(), "corruption case {index} accepted");
         assert!(path.join("project.sqlite").is_file()); temporary.close().unwrap();
     }

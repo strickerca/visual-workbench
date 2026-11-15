@@ -162,9 +162,23 @@ fn checkpoint_install_preserves_exact_history_conflicts_and_unrelated_local_data
     client
         .install_authenticated_checkpoint(&remote.checkpoint_bytes().unwrap(), &device(1), 105)
         .unwrap();
+    // Each install stores the new log rows; the one checkpoint stays where
+    // the mirror started.
+    assert_eq!(
+        query(&path)
+            .query_row("SELECT count(*),max(host_seq) FROM snapshots", [], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })
+            .unwrap(),
+        (1, 0)
+    );
     drop(client);
     let mut client = ProjectStore::open(&path).unwrap();
-    assert_eq!(client.replayed_transactions(), 0);
+    assert_eq!(client.replayed_transactions(), 3);
+    assert_eq!(
+        client.checkpoint_bytes().unwrap(),
+        remote.checkpoint_bytes().unwrap()
+    );
     assert_eq!(client.revision().unwrap(), remote.revision().unwrap());
     assert_eq!(client.conflicts().unwrap(), accepted.conflicts);
     assert_eq!(client.pending().unwrap(), vec![unrelated]);
@@ -489,6 +503,9 @@ fn process_exit_at_each_sync_boundary_recovers_both_state_and_outbox_atomically(
         let pending = title(old.clone(), 10, 2);
         client.enqueue_pending(&pending).unwrap();
         let ack = remote.submit(pending.clone(), &device(2), 100).unwrap().ack;
+        // The host also cancelled a gesture, which the install has to add to
+        // the checkpoint the mirror's log replays from.
+        remote.cancel_gesture(device(2), id(77)).unwrap();
         let checkpoint_path = temp.path().join("host.checkpoint");
         fs::write(&checkpoint_path, remote.checkpoint_bytes().unwrap()).unwrap();
         drop(client);
@@ -527,12 +544,20 @@ fn process_exit_at_each_sync_boundary_recovers_both_state_and_outbox_atomically(
         let mut client = ProjectStore::open(&path).unwrap();
         if stage == CommitStage::Committed {
             assert_eq!(client.revision().unwrap(), remote.revision().unwrap());
+            assert_eq!(
+                client.checkpoint_bytes().unwrap(),
+                remote.checkpoint_bytes().unwrap()
+            );
             assert!(client.pending().unwrap().is_empty());
             assert_eq!(client.commit(&pending, &device(2), 200).unwrap().ack, ack);
         } else {
             assert_eq!(client.revision().unwrap(), old);
             assert_eq!(client.pending().unwrap(), vec![pending]);
         }
+        assert_eq!(
+            client.gesture_closed(&device(2), &id(77)),
+            stage == CommitStage::Committed
+        );
         client.integrity_check().unwrap();
         drop(client);
         temp.close().unwrap();

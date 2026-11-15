@@ -286,14 +286,10 @@ fn every_kind_of_change_leaves_rows_equal_to_a_full_rebuild() {
             store.state_hash().unwrap().bytes().to_vec()
         );
         store.integrity_check().unwrap();
-        if step % 5 == 4 {
-            // Vary how much of the log is replayed on the next open.
-            store.snapshot_now(n as i64).unwrap();
-        }
         let revision = store.revision().unwrap();
         let checkpoint = store.checkpoint_bytes().unwrap();
         drop(store);
-        // Open verifies the checkpoint, replays the tail and compares every
+        // Open verifies the checkpoint, replays the log and compares every
         // projection row with a rebuild from the restored project.
         let reopened = ProjectStore::open(&path);
         assert!(
@@ -335,6 +331,37 @@ fn every_kind_of_change_leaves_rows_equal_to_a_full_rebuild() {
     assert_eq!(
         rows(&path, "SELECT object_id,1 FROM mask_versions").len(),
         1
+    );
+}
+
+/// A project opens by replaying its log, so every later build has to accept
+/// each stored transaction with the acknowledgement and state hash the build
+/// that stored it gave. The seal is a digest of exactly those stored bytes.
+/// A change to this value means projects already on disk stop opening: it
+/// needs a migration, not a new constant.
+#[test]
+fn the_stored_log_of_every_kind_of_change_is_pinned() {
+    let root = tempfile::Builder::new()
+        .prefix("vw-touched-rows-")
+        .tempdir()
+        .unwrap();
+    let path = root.path().join("project.vwb");
+    let mut store = ProjectStore::create(&path, project(), device(1), 0).unwrap();
+    for (step, kinds) in script().into_iter().enumerate() {
+        let n = step as u64 + 2;
+        let txn = transaction(&store, n, kinds);
+        store.commit(&txn, &device(1), n as i64).unwrap();
+    }
+    drop(store);
+    let seal: String = rusqlite::Connection::open(path.join("project.sqlite"))
+        .unwrap()
+        .query_row("SELECT value FROM meta WHERE key='log_seal'", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(
+        seal,
+        "v1 24 416d6e10a7e1a0b16ae2b2794f007663c6609d2362d7c6905b0068c2393024b5"
     );
 }
 
