@@ -100,6 +100,17 @@ impl Upkeeping {
     }
 }
 
+/// What one sync update from the host changed: every entity its
+/// transactions touched, and how much queued work they acknowledged.
+#[derive(Debug, Clone, Default)]
+pub struct HostBatch {
+    pub touched: Touched,
+    pub removed: usize,
+}
+
+/// The size a sync batch may have, as a device checks it (`vw_net`).
+const HOST_BATCH_BYTES: usize = 8 * 1024 * 1024 - 256;
+
 /// How much the next open would gain from a checkpoint written now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CheckpointNeed {
@@ -155,6 +166,8 @@ pub struct ProjectStore {
     /// The history has outgrown what a checkpoint may hold. Writing one was
     /// tried and refused; it is not tried again while the project is open.
     beyond_checkpoint: bool,
+    /// A lower limit on the size of a checkpoint than the one it has anyway.
+    history_limit: usize,
 }
 
 /// The advisory lock, given up explicitly. A lock belongs to the open file
@@ -240,6 +253,7 @@ impl ProjectStore {
             replayed_transactions: 0,
             opened: OpenReport::default(),
             beyond_checkpoint: false,
+            history_limit: usize::MAX,
         })
     }
 
@@ -304,6 +318,7 @@ impl ProjectStore {
             replayed_transactions: 0,
             opened: OpenReport::default(),
             beyond_checkpoint: false,
+            history_limit: usize::MAX,
         })
     }
 
@@ -364,6 +379,7 @@ impl ProjectStore {
                 ..OpenReport::default()
             },
             beyond_checkpoint: false,
+            history_limit: usize::MAX,
         };
         store.upkeep(&upkeep, &mut observer);
         observer(OpenStage::Compacted);
@@ -642,6 +658,192 @@ impl ProjectStore {
         observer(CommitStage::Committed);
         Ok(removed)
     }
+    /// Take in one ordinary sync update from the host this project mirrors:
+    /// the transactions it accepted since this store's revision. Each is
+    /// decided again by this build's engine and kept with the host's
+    /// acknowledgement when it gives the same revision and state hash, as an
+    /// open decides a stored log; the notices are the host's. The log rows,
+    /// the rows of the entities they touched, their conflict records and the
+    /// removal of the exactly matching queued work happen in one SQLite
+    /// transaction, so the work follows the update, not the history.
+    ///
+    /// The checks are those a device makes of a batch (`vw_net`
+    /// `SyncReceiver::receive`): it comes from the host, belongs to this
+    /// project, starts at this store's revision, continues it without a gap
+    /// and ends where it says it does. A batch that names a checkpoint is
+    /// not taken here (`install_authenticated_checkpoint`). On any refusal
+    /// the store and the database are as they were.
+    pub fn receive_host_batch(
+        &mut self,
+        batch: &v1::SyncBatch,
+        authenticated_host: &DeviceId,
+        now_ms: i64,
+    ) -> Result<HostBatch, StoreError> {
+        if now_ms < 0 || authenticated_host != self.host.host_device() {
+            return Err(StoreError::Invalid("host batch identity/time"));
+        }
+        let previous = self.host.revision()?;
+        let revision = batch
+            .revision
+            .as_ref()
+            .ok_or(StoreError::Invalid("host batch revision"))?;
+        if batch.project_id.as_ref() != Some(&self.project().id.to_proto())
+            || batch.encoded_len() > HOST_BATCH_BYTES
+            || batch.txns.len() > 256
+            || !batch.checkpoint_asset_id.is_empty()
+            || batch.checkpoint_size != 0
+            || revision.state_hash.len() != 32
+            || revision.host_seq < previous.host_seq
+            || batch.base.as_ref() != Some(&previous)
+        {
+            return Err(StoreError::Invalid("host batch"));
+        }
+        let mut entries = Vec::with_capacity(batch.txns.len());
+        let mut expected = previous.host_seq;
+        for entry in &batch.txns {
+            let txn = entry
+                .txn
+                .as_ref()
+                .ok_or(StoreError::Invalid("host batch transaction"))?;
+            let ack = entry
+                .ack
+                .as_ref()
+                .ok_or(StoreError::Invalid("host batch acknowledgement"))?;
+            expected = expected
+                .checked_add(1)
+                .ok_or(StoreError::Invalid("host batch continuity"))?;
+            if entry.host_seq != expected
+                || entry.host_seq > revision.host_seq
+                || ack.txn_id != txn.txn_id
+                || ack.host_seq != entry.host_seq
+                || ack.state_hash != entry.state_hash
+            {
+                return Err(StoreError::Invalid("host batch continuity"));
+            }
+            entries.push((txn, bounded_encode(txn)?, ack, entry.accepted_at_ms));
+        }
+        if (batch.complete && expected != revision.host_seq)
+            || (!batch.complete && (batch.txns.is_empty() || expected >= revision.host_seq))
+        {
+            return Err(StoreError::Invalid("host batch completion"));
+        }
+        let conflicts_before = self.host.conflicts().len();
+        let Self {
+            host,
+            connection,
+            seal,
+            cost,
+            log,
+            ..
+        } = self;
+        let decided = host.replay_with(
+            entries
+                .iter()
+                .map(|(txn, _, ack, accepted_at)| ((*txn).clone(), *accepted_at, (*ack).clone())),
+            |host, touched| -> Result<(LogSeal, ReplayCost, LogSpan, HostBatch), StoreError> {
+                if batch.complete && &host.revision()? != revision {
+                    return Err(StoreError::Invalid("host batch completion"));
+                }
+                let mut sealed = seal.clone();
+                let (mut replay, mut span) = (*cost, *log);
+                let mut all = Touched::default();
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+                let mut removed = 0;
+                for ((txn, bytes, ack, accepted_at), touched) in entries.iter().zip(touched) {
+                    let seq = sql_u64(ack.host_seq)?;
+                    let base = txn
+                        .base_revision
+                        .as_ref()
+                        .ok_or(StoreError::Invalid("base revision"))?;
+                    for op in &txn.ops {
+                        sql_u64(
+                            op.op_id
+                                .as_ref()
+                                .ok_or(StoreError::Invalid("op ID"))?
+                                .lamport,
+                        )?;
+                        // Keep originals introduced and removed again, as a
+                        // checkpoint's log rows do.
+                        if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
+                            super::projections::persist_asset(&tx, asset)?;
+                        }
+                    }
+                    let hash: [u8; 32] = ack
+                        .state_hash
+                        .as_slice()
+                        .try_into()
+                        .map_err(|_| StoreError::Invalid("host batch hash"))?;
+                    let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
+                    let ack_bytes = bounded_encode(*ack)?;
+                    sealed = sealed.with_row(seq, bytes, &hash, *accepted_at, &ack_bytes);
+                    tx.prepare("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")?
+                        .execute(params![seq,uuid(txn.txn_id.as_ref())?,txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bytes,hash,txn.created_at_wall_ms,accepted_at,ack_bytes])?;
+                    // The exactly matching queued work is acknowledged.
+                    let id = uuid(txn.txn_id.as_ref())?;
+                    let queued: Option<Vec<u8>> = tx
+                        .query_row("SELECT txn FROM pending_txns WHERE txn_id=?1", [&id], |row| {
+                            row.get(0)
+                        })
+                        .optional()?;
+                    if let Some(queued) = queued {
+                        if &queued != bytes {
+                            return Err(StoreError::Invalid(
+                                "pending checkpoint transaction collision",
+                            ));
+                        }
+                        removed += tx.execute(
+                            "DELETE FROM pending_txns WHERE txn_id=?1 AND txn=?2",
+                            params![id, bytes],
+                        )?;
+                    }
+                    replay.add(host, touched, bytes.len());
+                    span.add(bytes.len());
+                    all.extend(touched);
+                }
+                write_seal(&tx, &sealed)?;
+                super::projections::persist_touched(
+                    &tx,
+                    host.project(),
+                    &all,
+                    sql_u64(host.revision()?.host_seq)?,
+                    now_ms,
+                )?;
+                for conflict in &host.conflicts()[conflicts_before..] {
+                    write_conflict(&tx, conflict)?;
+                }
+                tx.commit()?;
+                Ok((
+                    sealed,
+                    replay,
+                    span,
+                    HostBatch {
+                        touched: all,
+                        removed,
+                    },
+                ))
+            },
+        )?;
+        let Some((sealed, replay, span, received)) = decided else {
+            return Err(StoreError::EngineMismatch);
+        };
+        *seal = sealed;
+        *cost = replay;
+        *log = span;
+        Ok(received)
+    }
+
+    /// What undoing the accepted transaction `target` would change in the
+    /// project as it is now, for a replica that shows it to `device`; see
+    /// `HostSequencer::inverse_preview`. Nothing is changed or written.
+    pub fn inverse_preview(
+        &mut self,
+        target: &Id,
+        device: &DeviceId,
+    ) -> Result<vw_ops::InversePreview, StoreError> {
+        Ok(self.host.inverse_preview(target, device)?)
+    }
+
     /// Number of accepted operations replayed from the log on this open.
     pub const fn replayed_transactions(&self) -> u64 {
         self.replayed_transactions
@@ -650,20 +852,45 @@ impl ProjectStore {
         integrity(&self.connection)
     }
 
+    /// How many bytes `checkpoint_bytes` would return. Every save keeps this
+    /// up to date; nothing is serialized to answer it.
+    pub fn checkpoint_len(&self) -> usize {
+        self.host.checkpoint_len()
+    }
+
+    /// Refuse saves that would leave a checkpoint larger than `bytes`. The
+    /// limit a checkpoint has anyway (256 MB) always applies; this can only
+    /// lower it, which is how the limit is tested.
+    pub fn limit_history(&mut self, bytes: usize) {
+        self.history_limit = bytes;
+    }
+
     /// Validate against the current authority without advancing it. Transport
     /// uses this before acquiring new originals; commit revalidates after I/O.
+    /// The transaction is decided in place and taken back out, so the store
+    /// is exactly as before and nothing is copied or written.
     pub fn validate_transaction(
-        &self,
+        &mut self,
         txn: &v1::Transaction,
         authenticated: &DeviceId,
         accepted_at_ms: i64,
     ) -> Result<Acceptance, StoreError> {
         bounded_encode(txn)?;
-        let (acceptance, canonical_len) =
+        let limit = self.history_limit;
+        let (acceptance, (canonical_len, history)) =
             self.host
-                .check(txn.clone(), authenticated, accepted_at_ms)?;
+                .check_with(txn.clone(), authenticated, accepted_at_ms, |host| {
+                    (
+                        host.canonical_len(),
+                        host.admit_checkpoint_len_within(limit),
+                    )
+                })?;
         if canonical_len > MAX_PAYLOAD {
             return Err(StoreError::Invalid("snapshot size"));
+        }
+        // A retry of an accepted transaction adds nothing.
+        if !acceptance.duplicate {
+            history?;
         }
         sql_u64(acceptance.ack.host_seq)?;
         sql_u64(
@@ -710,6 +937,7 @@ impl ProjectStore {
             seal,
             cost,
             log,
+            history_limit,
             ..
         } = self;
         // The host accepts the transaction in place and takes it back out if
@@ -722,6 +950,11 @@ impl ProjectStore {
                 if host.canonical_len() > MAX_PAYLOAD {
                     return Err(StoreError::Invalid("snapshot size"));
                 }
+                // The history a checkpoint holds, and with it what a joining
+                // device is given, has a limit. Saves no longer write a
+                // checkpoint, so the save that would cross it is refused
+                // here, from the size the host keeps up to date.
+                host.admit_checkpoint_len_within(*history_limit)?;
                 let seq = sql_u64(acceptance.ack.host_seq)?;
                 let base = txn
                     .base_revision
@@ -1285,14 +1518,23 @@ fn cancelled(host: &HostSequencer) -> BTreeSet<(DeviceId, Id)> {
 /// machine the estimate was fitted on (a four-core Linux container); only its
 /// ratio to `LogSpan::load_micros`, fitted on the same machine, matters.
 ///
-/// Replaying a transaction costs what accepting it did. The engine keeps
-/// that small for one that changes objects at the end of the object order,
-/// which every new stroke is. For one that changes an earlier object it
-/// hashes every object from there on again, and for one that changes
-/// anything else (a layer, an instruction, a mask, a result, the document)
-/// it validates and hashes the whole project. Measured at 8,000 objects:
-/// 0.06 ms for a new stroke, 45 ms for a change to the first object, and for
-/// a new document title 62 ms with small shapes and 170 ms with strokes.
+/// Replaying a transaction costs what accepting it did: the entities it
+/// touched are decided, journaled and serialized again, and the project's
+/// canonical bytes are hashed from the first one it changed to the end. A new
+/// stroke is the last object and has next to nothing behind it. An earlier
+/// object has every later object behind it, and a layer, an instruction, a
+/// document, a mask history, a group or an asset is written in front of all
+/// objects. Nothing behind the change is serialized or checked again, only
+/// hashed, at about 2.5 GB a second.
+///
+/// Measured on that machine. A new entity: 0.06 ms for a stroke of 48
+/// samples, less for a small shape, and always less than loading it from a
+/// checkpoint costs. A changed one: 0.07 ms for a small shape, 0.13 ms for
+/// such a stroke. The hash, at 8,000 strokes and 20 MB of canonical bytes:
+/// 7 ms for a change to the first object or to a layer or a title (the whole
+/// edit was 45 to 170 ms while the engine went over the whole project for
+/// it), nothing to speak of for a result, which is written behind the
+/// objects.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct ReplayCost {
     micros: u64,
@@ -1302,6 +1544,7 @@ impl ReplayCost {
     /// One transaction, given the state it left and what it touched.
     fn add(&mut self, host: &HostSequencer, touched: &Touched, stored: usize) {
         let project = host.project();
+        let canonical = host.canonical_len() as u64;
         let entities = (project.documents.len()
             + project.assets.len()
             + project.layers.len()
@@ -1311,19 +1554,41 @@ impl ReplayCost {
             + project.semantic_snapshots.len()
             + project.results.len()
             + project.mask_versions.len()) as u64;
-        let read_again = if touched.only_objects() {
-            touched
-                .objects
-                .first()
-                .map_or(0, |first| project.objects.range(first..).count()) as u64
+        // What one entity takes of the canonical bytes, on average.
+        let size = canonical / entities.max(1);
+        let all = (touched.documents.len()
+            + touched.assets.len()
+            + touched.layers.len()
+            + touched.objects.len()
+            + touched.groups.len()
+            + touched.instructions.len()
+            + touched.semantic_snapshots.len()
+            + touched.results.len()
+            + touched.mask_versions.len()) as u64;
+        let created = (touched.created as u64).min(all);
+        let changed = all - created;
+        // The canonical bytes list the members by name: these before the
+        // objects, results and semantic snapshots after them.
+        let before_objects = !(touched.documents.is_empty()
+            && touched.assets.is_empty()
+            && touched.layers.is_empty()
+            && touched.groups.is_empty()
+            && touched.instructions.is_empty()
+            && touched.mask_versions.is_empty());
+        let hashed = if before_objects {
+            canonical
+        } else if let Some(first) = touched.objects.first() {
+            // The share of the bytes that the objects from there on take.
+            let behind = project.objects.range(first..).count() as u64;
+            canonical.saturating_mul(behind) / (project.objects.len() as u64).max(1)
         } else {
-            entities
+            0
         };
-        // Their share of the canonical bytes, which is what hashing reads.
-        let bytes = (host.canonical_len() as u64).saturating_mul(read_again) / entities.max(1);
-        self.micros = self
-            .micros
-            .saturating_add(50 + 6 * read_again + bytes / 160);
+        self.micros = self.micros.saturating_add(
+            50 + created.saturating_mul(15 + size / 60)
+                + changed.saturating_mul(55 + size / 36)
+                + hashed / 2500,
+        );
         self.span.add(stored);
     }
 }

@@ -211,6 +211,7 @@ pub(crate) struct ProjectState {
     pub events: Arc<EventHub>,
     pub history: crate::editor::History,
     pub replica: Option<vw_ops::Replica>,
+    /// Only between a checkpoint the host announced and its arrival.
     pub remote: Option<vw_net::SyncReceiver>,
     pub changed: Arc<tokio::sync::Notify>,
     _permit: Option<SessionPermit>,
@@ -223,6 +224,9 @@ pub(crate) struct ProjectState {
 impl ProjectState {
     pub fn store(&self) -> Result<&ProjectStore> {
         self.store.as_ref().ok_or(CoreError::Closed)
+    }
+    pub fn store_mut(&mut self) -> Result<&mut ProjectStore> {
+        self.store.as_mut().ok_or(CoreError::Closed)
     }
     pub fn project(&self) -> Result<&Project> {
         self.store()?;
@@ -352,12 +356,13 @@ impl ProjectSession {
         let store = &input.store;
         record_open(store.open_report());
         let history = crate::editor::History::restore(store)?;
-        let mut remote = None;
+        // A mirror's store holds the host's state; sync updates are taken
+        // into it directly. A receiver is built only for a checkpoint.
+        let remote = None;
         let replica = if store.local_device()? != *store.host_device() {
             let host = vw_ops::HostSequencer::from_checkpoint_bytes(&store.checkpoint_bytes()?)?;
             let mut replica = vw_ops::Replica::new(store.local_device()?, host.snapshot()?)?;
             replica.queue_recovered_batch(store.pending()?)?;
-            remote = Some(vw_net::SyncReceiver::new(host));
             Some(replica)
         } else {
             None

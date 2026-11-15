@@ -231,7 +231,6 @@ impl SyncReceiver {
                 .txn
                 .as_ref()
                 .ok_or(NetError::Invalid("sync transaction"))?;
-            let author = DeviceId::try_from(txn.device_id.clone())?;
             if entry.host_seq
                 != staged
                     .revision()?
@@ -242,12 +241,26 @@ impl SyncReceiver {
             {
                 return Err(NetError::Invalid("sync continuity"));
             }
-            let accepted = staged.submit(txn.clone(), &author, entry.accepted_at_ms)?;
-            if accepted.duplicate
-                || entry.ack.as_ref() != Some(&accepted.ack)
-                || entry.state_hash != accepted.ack.state_hash
-                || entry.host_seq != accepted.ack.host_seq
+            // What the host decided is the transaction's revision and state
+            // hash, and this device has to decide the same. The notices in
+            // its acknowledgement are text for a person: another build words
+            // them differently, or gives more or fewer, and that must not
+            // break the session. They are kept as the host sent them, which
+            // is what a retry is answered with and what gets stored. This is
+            // the rule storage follows when it decides a log again (see the
+            // replay rule at `evaluate` in vw-ops).
+            let ack = entry.ack.as_ref().ok_or(NetError::Integrity)?;
+            if ack.txn_id != txn.txn_id
+                || ack.host_seq != entry.host_seq
+                || ack.state_hash != entry.state_hash
             {
+                return Err(NetError::Integrity);
+            }
+            if staged
+                .replay(txn.clone(), entry.accepted_at_ms, ack)?
+                .is_none()
+            {
+                // This engine refuses the transaction or decides another state.
                 return Err(NetError::Integrity);
             }
         }

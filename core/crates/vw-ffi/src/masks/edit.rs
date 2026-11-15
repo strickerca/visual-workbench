@@ -326,19 +326,16 @@ pub(super) fn apply(
     };
     // Use the same authority as ProjectState::commit for a dry run before blob
     // admission, including optimistic pending objects on a connected client.
-    if let Some(replica) = &state.replica {
-        let mut candidate = replica.clone();
+    if let Some(replica) = &mut state.replica {
         // This is new work, not a recovered retry. Never return a prepared-mask
         // receipt for a transaction queued in the replica's blocked list.
-        if txn.base_revision.as_ref() != Some(candidate.revision()) {
+        if txn.base_revision.as_ref() != Some(replica.revision()) {
             return Err(SelectionError::Conflict);
         }
-        candidate
-            .queue(txn.clone())
-            .map_err(|_| SelectionError::Invalid)?;
+        replica.check(&txn).map_err(|_| SelectionError::Invalid)?;
     } else {
         state
-            .store()?
+            .store_mut()?
             .validate_transaction(&txn, &device, options.created_at_ms)
             .map_err(|_| SelectionError::Invalid)?;
     }

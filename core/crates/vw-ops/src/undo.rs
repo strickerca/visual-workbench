@@ -192,6 +192,33 @@ impl UndoManager {
         if extends {
             return self.append(id, project, bytes, kind, acceptance);
         }
+        // The receipt of the oldest pending event, above every receipt known
+        // so far, while everything acknowledged is ordered before everything
+        // pending: the event keeps its place, so the order and the cursors
+        // stay as they are. That is a device's own queue coming back in order.
+        if let Some(acceptance) = acceptance
+            && self.keeps_place(&id, acceptance.ack.host_seq)
+            && let Some(event) = self.events.get_mut(&id)
+        {
+            event.ack = Some(acceptance.ack.clone());
+            self.project = Some(project);
+            self.highest_ack = acceptance.ack.host_seq;
+            self.unacknowledged = self.unacknowledged.saturating_sub(1);
+            #[cfg(feature = "cross-check")]
+            {
+                let mut reference = self.clone();
+                assert!(
+                    reference.rebuild().is_ok()
+                        && reference.undo == self.undo
+                        && reference.redo == self.redo
+                        && reference.unacknowledged == self.unacknowledged
+                        && reference.highest_ack == self.highest_ack
+                        && reference.unresolved == self.unresolved,
+                    "an in-order receipt differs from ordering the history again"
+                );
+            }
+            return Ok(());
+        }
         let mut candidate = self.clone();
         candidate.project = Some(project);
         if let Some(event) = candidate.events.get_mut(&id) {
@@ -219,6 +246,43 @@ impl UndoManager {
         candidate.rebuild()?;
         *self = candidate;
         Ok(())
+    }
+
+    /// Whether acknowledging the pending event `id` at `host_seq` leaves it
+    /// where it is in the order `rebuild` makes. It does when it is the
+    /// oldest pending event, the receipt is above every known one, every
+    /// event has arrived that an inverse names, every acknowledged event was
+    /// queued before it, and no acknowledged inverse waits on pending work.
+    /// Those are scans, not a sort and a copy of the history.
+    fn keeps_place(&self, id: &Id, host_seq: u64) -> bool {
+        let Some(order) = self
+            .events
+            .get(id)
+            .filter(|event| event.ack.is_none())
+            .and_then(|event| event.local_order)
+        else {
+            return false;
+        };
+        let pending = |target: &Id| {
+            target == id
+                || self
+                    .events
+                    .get(target)
+                    .is_some_and(|event| event.ack.is_none())
+        };
+        host_seq > self.highest_ack
+            && self.unresolved.is_empty()
+            && self.events.iter().all(|(other, event)| {
+                let placed = match (&event.ack, event.local_order) {
+                    (None, Some(local)) => local > order || other == id,
+                    (None, None) => false,
+                    (Some(_), Some(local)) => local < order,
+                    (Some(_), None) => true,
+                };
+                let waits = event.ack.is_some()
+                    && matches!(&event.kind, EventKind::Inverse { target, .. } if pending(target));
+                placed && !waits
+            })
     }
 
     /// Register an event known to sort last. The checks are those `rebuild`

@@ -527,12 +527,11 @@ pub(super) fn save(
             false
         };
     if !duplicate {
-        if let Some(replica) = &state.replica {
-            let mut trial = replica.clone();
-            trial.queue(txn.clone()).map_err(|_| AiEditError::Invalid)?;
+        if let Some(replica) = &mut state.replica {
+            replica.check(txn).map_err(|_| AiEditError::Invalid)?;
         } else {
             state
-                .store()?
+                .store_mut()?
                 .validate_transaction(txn, &device, options.metadata.created_at_ms)
                 .map_err(|_| AiEditError::Invalid)?;
         }

@@ -139,9 +139,10 @@ impl ProjectState {
             return Err(CoreError::Invalid);
         }
         // Saving a new stroke takes about a millisecond whatever the project
-        // holds. Record the saves that take 50 ms or more (an edit the engine
-        // checks the whole project for, or a disk slow to sync), so a stutter
-        // can be explained afterwards.
+        // holds, and any other edit a few milliseconds more on a very large
+        // one. Record the saves that take 50 ms or more (an edit to thousands
+        // of objects at once, or a disk slow to sync), so a stutter can be
+        // explained afterwards.
         let _timer = crate::diagnostics::slow_timer("project", "slow save", 50_000);
         if self.replica.is_some() {
             return self.queue(txn);
@@ -180,6 +181,19 @@ impl ProjectState {
                 return Err(CoreError::Invalid);
             }
             return self.info();
+        }
+        // An undo of accepted work needs what undoing it changes now, which
+        // the replica asks of the host's state in the store when it is used.
+        if let Some(target) = replica.inverse_needed(txn) {
+            let device = DeviceId::try_from(txn.device_id.clone())?;
+            if let Ok(preview) = self
+                .store
+                .as_mut()
+                .ok_or(CoreError::Closed)?
+                .inverse_preview(&target, &device)
+            {
+                replica.provide_inverse(target, preview);
+            }
         }
         // The edit goes into the visible project in place. Only a refusal by
         // the undo history or the outbox takes it back out, which replays the

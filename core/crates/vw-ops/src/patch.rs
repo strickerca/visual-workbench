@@ -82,6 +82,25 @@ fn value_in<K: Key, V: Serialize>(
         .transpose()?)
 }
 
+/// Name in `touched` every entity these changes address.
+pub(crate) fn touched_by(changes: &[Change], touched: &mut crate::draft::Touched) {
+    for change in changes {
+        let entity = change.address.entity.as_str();
+        match change.address.collection.as_str() {
+            "documents" => touched.documents.extend(Id::parse(entity)),
+            "assets" => touched.assets.extend(AssetId::parse(entity)),
+            "layers" => touched.layers.extend(Id::parse(entity)),
+            "objects" => touched.objects.extend(Id::parse(entity)),
+            "groups" => touched.groups.extend(Id::parse(entity)),
+            "instructions" => touched.instructions.extend(Id::parse(entity)),
+            "semantic_snapshots" => touched.semantic_snapshots.extend(Id::parse(entity)),
+            "results" => touched.results.extend(Id::parse(entity)),
+            "mask_versions" => touched.mask_versions.extend(Id::parse(entity)),
+            _ => {}
+        }
+    }
+}
+
 /// One entity as it appears inside the project's JSON, if it exists.
 fn current(project: &Project, collection: &str, entity: &str) -> Result<Option<Value>, OpsError> {
     match collection {
