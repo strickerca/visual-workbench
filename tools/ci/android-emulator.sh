@@ -51,18 +51,38 @@ for scale in window_animation_scale transition_animation_scale animator_duration
   "$adb" shell settings put global "$scale" 0
 done
 "$adb" shell input keyevent 82 || true
+# A fresh emulator shows a one-time "Viewing full screen" panel over the first
+# full-screen app; that belongs to the emulator, not to the app.
+"$adb" shell settings put secure immersive_mode_confirmations confirmed || true
+
+# Which window had the focus while the tests ran (changes only), so that a
+# system dialog lying over the app can be told from a defect in the app.
+focus_log="${TMPDIR:-/tmp}/vw-focus.log"
+(
+  last=""
+  while :; do
+    now="$("$adb" shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' || true)"
+    if [ -n "$now" ] && [ "$now" != "$last" ]; then echo "$(date +%T) $now"; last="$now"; fi
+    sleep 1
+  done
+) >"$focus_log" 2>/dev/null &
+focus_pid=$!
+trap 'kill "$focus_pid" 2>/dev/null || true; "$adb" emu kill >/dev/null 2>&1 || true; kill "$emulator_pid" 2>/dev/null || true' EXIT
 
 step "instrumented tests: $classes"
 status=0
 bash apps/gradlew -p apps :android:connectedDebugAndroidTest -PvwEmulatorAbi=x86_64 \
   "-Pandroid.testInstrumentationRunnerArguments.class=$classes" \
   -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers="${VW_GRADLE_WORKERS:-2}" || status=$?
+kill "$focus_pid" 2>/dev/null || true
 step "result summary"
 "$adb" shell wm size || true
 "$adb" shell wm density || true
 if [ "$status" -ne 0 ]; then
   # The app's own warnings and errors, to tell an emulator limit from a defect.
   "$adb" logcat -d -v brief '*:W' | grep -iE "visualworkbench|VW_|vw_core|AndroidRuntime" | tail -n 40 || true
+  echo "--- focused window during the tests (changes only) ---"
+  tail -n 60 "$focus_log" || true
 fi
 "$PYTHON" - <<'PY' || true
 import glob, xml.etree.ElementTree as ET

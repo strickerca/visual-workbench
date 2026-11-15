@@ -40,7 +40,11 @@ class DesktopStreamViewTest {
         var closes=0
         override fun signal()=mutable.value
         fun advance(value:CaptureStreamSignal){mutable.value=value}
-        override suspend fun beginDraw():CaptureStreamDraw?=if(draws.isEmpty())null else draws.removeFirst()
+        // The view may ask for a frame at any moment (its signal collector and
+        // its worker both wake it), so a test that needs "first frame, then
+        // second" queues the second only after it has seen the first.
+        fun enqueue(draw:Draw){synchronized(draws){draws+=draw}}
+        override suspend fun beginDraw():CaptureStreamDraw?=synchronized(draws){if(draws.isEmpty())null else draws.removeFirst()}
         override suspend fun frozenBackground():CaptureFrozenBackground?=background
         override suspend fun firstContact(draftId:String):CaptureFreezeReceipt?=error("Caller owns freeze")
         override suspend fun resumeAfterDraftDisposed():String?=error("Caller owns resume")
@@ -202,7 +206,7 @@ class DesktopStreamViewTest {
     @Test fun canceledOfferStillAcknowledgesTheExactSubmittedFrameAtContact()=runBlocking {
         val second=frame.copy(frameId=8u)
         val firstDraw=Draw(frame);val secondDraw=Draw(second)
-        val stream=Stream(live).apply{draws+=firstDraw;draws+=secondDraw}
+        val stream=Stream(live).apply{draws+=firstDraw}
         val backend=Backend(true);val resources=Resources()
         val ui=Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
@@ -210,6 +214,7 @@ class DesktopStreamViewTest {
         try {
             withTimeout(5000){while(view.state.value.displayed!=frame)yield()}
             backend.offerEntered=CountDownLatch(1);backend.offerRelease=CountDownLatch(1)
+            stream.enqueue(secondDraw)
             stream.advance(live.copy(sequence=2u))
             assertTrue(backend.offerEntered!!.await(5,TimeUnit.SECONDS))
             val contact=async(Dispatchers.Default){view.stopForContact(Point(1.0,1.0))}
@@ -291,7 +296,7 @@ class DesktopStreamViewTest {
 
     @Test fun nativeSurfaceEnvelopePrecedesStrategyAndSurvivesResizeBetweenDraws()=runBlocking {
         val second=frame.copy(frameId=8u)
-        val stream=Stream(live).apply{draws+=Draw(frame);draws+=Draw(second)}
+        val stream=Stream(live).apply{draws+=Draw(frame)}
         val backend=Backend(true);val resources=Resources()
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
         val view=DesktopStreamView(scope,core,stream,{true},resources,Dispatchers.Unconfined,{_,_,_,_->backend})
@@ -300,6 +305,7 @@ class DesktopStreamViewTest {
             assertEquals(STREAM_PLATFORM_SURFACE_RESERVE.toULong(),resources.requests.first())
             assertEquals(0,resources.charges.first().closes)
             backend.surfaceBytesValue=STREAM_SURFACE_RGBA_MAX.toLong()
+            stream.enqueue(Draw(second))
             stream.advance(live.copy(sequence=2u))
             withTimeout(5000){while(view.state.value.displayed!=second)yield()}
             assertEquals(3,resources.requests.size)
