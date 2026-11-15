@@ -165,8 +165,27 @@ class EditorSurfaceInstrumentedTest {
             val now = SystemClock.uptimeMillis() - start
             if ((lastPresented && now >= observeMs) || now >= deadlineMs) break
         }
+        // Diagnosis only, after the verdict is fixed: does the page appear by itself
+        // later (a slow machine) or never (a missed redraw)? The test fails either way.
+        var latePresentedMs = -1L
+        if (!lastPresented) {
+            val lateStart = SystemClock.uptimeMillis()
+            while (SystemClock.uptimeMillis() - lateStart < 12_000) {
+                var probe: CanvasProbe? = null
+                scenario.onActivity { probe = canvasProbe(it) }
+                val current = probe
+                val raw = if (current == null) null else automation.takeScreenshot()
+                if (current != null && raw != null) {
+                    val shot = if (raw.config == Bitmap.Config.HARDWARE) raw.copy(Bitmap.Config.ARGB_8888, false).also { raw.recycle() } else raw
+                    val shown = try { presentSample(shot, current).presented } finally { shot.recycle() }
+                    if (shown) { latePresentedMs = SystemClock.uptimeMillis() - start; break }
+                }
+                SystemClock.sleep(100)
+            }
+        }
         val summary = "phase=$phase samples=$samples black_samples=$blackSamples black_band_samples=$bandSamples " +
-            "first_black_ms=$firstBlackMs last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented $detail"
+            "first_black_ms=$firstBlackMs last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented " +
+            "late_presented_ms=$latePresentedMs $detail"
         Log.i("VW_CANVAS_PRESENT", summary)
         if (!lastPresented || blackSamples > 0 || bandSamples > 0) fail("Canvas presentation failed: $summary")
     }
