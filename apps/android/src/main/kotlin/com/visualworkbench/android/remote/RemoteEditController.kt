@@ -94,7 +94,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     private val intake=RemotePenIntake(toggles[PenPathToggle.RemoteLongBatches],
         typed=toggles[PenPathToggle.RemoteTypedBatches]&&remote is RemotePenBatches)
     private val input=Channel<TouchAdmission>(intake.queueCapacity)
-    private val pacer=if(intake.longBatches)RemoteSendPacer() else null
+    private val pacer=if(remoteSendPaced(intake.longBatches,toggles[PenPathToggle.RemoteUnbufferedPen]))RemoteSendPacer() else null
     /** Developer switch: reservation and sends go through the typed calls, several samples at once. */
     private val batches=(remote as? RemotePenBatches)?.takeIf{toggles[PenPathToggle.RemoteTypedBatches]}
     private val sampleClock=RemoteSampleClock(toggles[PenPathToggle.RemoteExactTimes])
@@ -141,13 +141,15 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         }
         scope.launch(Dispatchers.Default) {
             for(item in input){
-                // Long batches only: never hand the computer's eight-slot input queue more than it takes today.
+                // Long batches or unbuffered pen only: never hand the computer's eight-slot input queue more than it takes today.
                 if(pacer!=null)while(true){val wait=pacer.acquire(System.nanoTime());if(wait<=0L)break;delay((wait+999_999L)/1_000_000L)}
                 // Typed batches only: whatever else is already waiting goes in the same call,
-                // up to eight samples. A send slot taken for a sample that is not there is lost, not reused.
+                // up to eight samples. A send slot taken for a sample that is not there is given back.
                 val group=if(batches==null)listOf(item)else buildList{add(item);while(size<RemotePenIntake.GROUP){
                     if(pacer!=null&&pacer.acquire(System.nanoTime())>0L)break
-                    add(input.tryReceive().getOrNull()?:break)}}
+                    val more=input.tryReceive().getOrNull()
+                    if(more==null){pacer?.giveBack();break}
+                    add(more)}}
                 val now=System.nanoTime()
                 if(group.any{(now-it.sample.sampledLocalNanos) !in 0 until 50_000_000L}){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
                 val allowed=synchronized(inputFence){enabled&&foregroundActive&&group.all{it.fence==admissionFence&&it.binding==item.binding}&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}

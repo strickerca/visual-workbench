@@ -61,10 +61,19 @@ internal fun remoteUnbufferedPenRequest(enabled: Boolean, actionMasked: Int, too
     enabled && actionMasked == android.view.MotionEvent.ACTION_DOWN &&
         (toolType == android.view.MotionEvent.TOOL_TYPE_STYLUS || toolType == android.view.MotionEvent.TOOL_TYPE_ERASER)
 
+/** Whether sends to the computer are paced. Without either switch one event
+ * carries at most eight samples and events are a display frame apart, so the
+ * computer's eight-slot queue cannot be overrun and there is no pacer, as
+ * before. Long batches hand the sender more than eight samples of one event;
+ * unbuffered delivery can hand it several small events within a millisecond
+ * after the main thread was held up. Either one switches the pacer on. */
+internal fun remoteSendPaced(longBatches: Boolean, unbufferedPen: Boolean): Boolean = longBatches || unbufferedPen
+
 /** Releases queued samples to the computer no faster than its eight-slot input
  * queue is known to take them today: eight at once, then one more per
- * millisecond. In ordinary drawing (two to four samples per frame) it never
- * waits. Used only with long batches; one sender thread owns it. */
+ * millisecond. In ordinary drawing (a pen sample every two to four
+ * milliseconds) it never waits. Used only when [remoteSendPaced]; one sender
+ * owns it. */
 internal class RemoteSendPacer(private val burst: Int = RemotePenIntake.GROUP, private val refillNanos: Long = 1_000_000L) {
     private var tokens = burst
     private var updated = Long.MIN_VALUE
@@ -82,4 +91,7 @@ internal class RemoteSendPacer(private val burst: Int = RemotePenIntake.GROUP, p
         if (tokens > 0) { tokens--; return 0L }
         return refillNanos - (nowNanos - updated)
     }
+
+    /** Returns a slot that [acquire] granted and that was not used for a send. */
+    fun giveBack() { if (tokens < burst) tokens++ }
 }

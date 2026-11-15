@@ -109,6 +109,40 @@ class RemotePenIntakeTest {
         assertEquals(0L, backwards.acquire(901 * ms))
     }
 
+    @Test fun sends_are_paced_only_with_a_switch_that_can_hand_over_more_than_one_frames_samples() {
+        // Both off: no pacer exists, so sending is exactly as before.
+        assertFalse(remoteSendPaced(longBatches = false, unbufferedPen = false))
+        assertTrue(remoteSendPaced(longBatches = true, unbufferedPen = false))
+        assertTrue(remoteSendPaced(longBatches = false, unbufferedPen = true))
+        assertTrue(remoteSendPaced(longBatches = true, unbufferedPen = true))
+    }
+
+    @Test fun a_slot_that_was_not_used_is_given_back_and_never_adds_a_ninth() {
+        val ms = 1_000_000L
+        val pacer = RemoteSendPacer()
+        // A full bucket stays at eight.
+        pacer.giveBack()
+        repeat(8) { assertEquals(0L, pacer.acquire(0L)) }
+        assertEquals(ms, pacer.acquire(0L))
+        // Looking for a second sample that is not there costs nothing: a pen
+        // reporting every millisecond for a second never waits.
+        val steady = RemoteSendPacer()
+        var now = 0L
+        repeat(1_000) {
+            assertEquals(0L, steady.acquire(now))   // the sample itself
+            assertEquals(0L, steady.acquire(now))   // a look for one more
+            steady.giveBack()                       // none was waiting
+            now += ms
+        }
+        // A slot given back is the very next one granted, without waiting.
+        val empty = RemoteSendPacer()
+        repeat(8) { assertEquals(0L, empty.acquire(0L)) }
+        assertEquals(ms, empty.acquire(0L))
+        empty.giveBack()
+        assertEquals(0L, empty.acquire(0L))
+        assertEquals(ms, empty.acquire(0L))
+    }
+
     @Test fun a_sixteen_sample_burst_reaches_the_computer_as_eight_then_eight_within_about_eight_milliseconds() {
         val ms = 1_000_000L
         val pacer = RemoteSendPacer()
