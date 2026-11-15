@@ -9,6 +9,9 @@ on:
       - "apps/**"
       - "core/**"
       - "tools/ci/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/emulator.yml"
   workflow_dispatch:
 
