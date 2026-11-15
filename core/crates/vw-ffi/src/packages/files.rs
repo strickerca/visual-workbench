@@ -38,15 +38,11 @@ pub(super) fn directory(path: &Path) -> PackageResult<PathBuf> {
 fn options() -> OpenOptions {
     let mut o = OpenOptions::new();
     o.read(true);
+    vw_store::no_follow(&mut o);
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
-        o.custom_flags(0x0020_0000).share_mode(1);
-    }
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        o.custom_flags(0x0002_0000);
+        o.share_mode(1);
     }
     o
 }

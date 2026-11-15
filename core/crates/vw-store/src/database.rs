@@ -867,16 +867,7 @@ fn lock_project(root: &Path) -> Result<ProjectLock, StoreError> {
     }
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x0020_0000);
-    }
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x0002_0000);
-    }
+    blobs::no_follow(&mut options);
     let file = options.open(path)?;
     blobs::check_regular_metadata(&file.metadata()?)?;
     fs2::FileExt::try_lock_exclusive(&file).map_err(|e| {
