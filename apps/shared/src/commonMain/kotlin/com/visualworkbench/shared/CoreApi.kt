@@ -43,6 +43,19 @@ public interface WorkbenchDocumentChanges {
      * [WorkbenchProject.document]. */
     public suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot?
 }
+/** Optional project capability: start a stroke without waiting for the
+ * project, so ink can be drawn while the project is saving or writing a
+ * recovery checkpoint. */
+public interface WorkbenchDeferredStrokes {
+    /** Like [WorkbenchProject.beginStroke], but nothing is read from the
+     * project now: the layer, device and object checks are made, and the base
+     * revision taken, when the stroke is committed. A stroke that fails them is
+     * refused by [WorkbenchStroke.commit] and nothing of it is saved. Returns
+     * null for a stroke that needs the project at its start (highlighter); use
+     * [WorkbenchProject.beginStroke] for it. The caller owns the result and
+     * must [WorkbenchStroke.dispose] it. */
+    public fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke?
+}
 public interface WorkbenchStroke {
     /** Retain and retry this exact sequence only when CoreFailure.Backpressure is reported. */
     public suspend fun append(batch: SampleBatch): InkUpdate

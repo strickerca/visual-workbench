@@ -32,6 +32,41 @@ class DocumentChangesTest {
     }
     private fun UIntArray.toLongArray(): LongArray = LongArray(size) { this[it].toLong() }
 
+    /** A stroke begun without reading the project saves like any other, takes
+     * ink before an earlier stroke is saved, and a highlighter is handed back
+     * to the ordinary begin. */
+    @Test fun aDeferredStrokeTakesInkBeforeTheEarlierOneIsSavedAndSavesInOrder(): Unit = runBlocking {
+        val f = fixture(); val core = workbenchCore()
+        val directory = Files.createTempDirectory("vw-ffi-smoke-").toFile()
+        val now = f.getProperty("time_ms").toLong(); val device = f.getProperty("device_id")
+        val documentId = f.getProperty("id2"); val layerId = f.getProperty("id3")
+        val project = core.create(CreateProject(File(directory, "project").absolutePath, f.getProperty("id1"), documentId, layerId,
+            device, "Deferred strokes", f.getProperty("source_png_hex").bytes(), now))
+        try {
+            val deferred = project as WorkbenchDeferredStrokes
+            var clock = now.toULong()
+            fun id(): String = core.newId(++clock)
+            fun options(objectId: String, lamport: ULong, family: String = "pen") =
+                StrokeOptions(id(), id(), objectId, documentId, layerId, device, lamport, now + 1, family, 4.0, 0x203040ffu)
+            val samples = SampleBatch(1uL, doubleArrayOf(10.0, 20.0, 30.0), doubleArrayOf(12.0, 24.0, 18.0), uintArrayOf(0u, 8u, 16u), floatArrayOf(0.5f, 0.75f, 1f))
+            assertNull(deferred.beginStrokeDeferred(options(id(), 1uL, "highlighter")))
+            val firstId = id(); val secondId = id()
+            val first = project.beginStroke(options(firstId, 1uL))
+            val second = checkNotNull(deferred.beginStrokeDeferred(options(secondId, 4uL)))
+            try {
+                first.append(samples)
+                // The second stroke has ink while the first is not saved yet.
+                assertEquals(3uL, second.append(samples).sampleCount)
+                assertEquals(1uL, first.commit().hostSeq)
+                assertEquals(2uL, second.commit().hostSeq)
+            } finally { first.dispose(); second.dispose() }
+            assertEquals(listOf(firstId, secondId), project.document(documentId).render.items.map { it.objectId })
+        } finally {
+            project.close()
+            drainNativeTransfers(); CoreSmokeContract.disposeDirectory(directory)
+        }
+    }
+
     @Test fun changesEqualThePlainReadAndKeepUnchangedStrokeInstances(): Unit = runBlocking {
         val f = fixture(); val core = workbenchCore()
         val directory = Files.createTempDirectory("vw-ffi-smoke-").toFile()

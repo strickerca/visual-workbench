@@ -2094,11 +2094,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    private fun editorInputAllowed(ownCaptureStream: Boolean = false): Boolean =
+    private fun editorInputAllowed(ownCaptureStream: Boolean = false, ink: Boolean = false): Boolean =
         (ownCaptureStream || !captureStreamBlocksParent) && !streamEditsSealed&&!disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
-        !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
+        (ink||(!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy))&&!documents.state.value.busy&&
         !ai.state.value.open&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)
-    internal fun precisionInputAllowed():Boolean = editorInputAllowed() && airModals.isEmpty() && aiResultReady() &&
+    internal fun precisionInputAllowed():Boolean = precisionInputAllowed(false)
+    private fun precisionInputAllowed(ink:Boolean):Boolean = editorInputAllowed(ink = ink) && airModals.isEmpty() && aiResultReady() &&
         document?.let{(!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
             (background!=null||streamBackgroundReady()||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
@@ -2110,12 +2111,18 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
         clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
+        // Developer switch: after every save the instruction and marker lists are
+        // read again, and a pen-down in those few milliseconds was dropped without
+        // a message. A plain ink stroke needs neither list, so it is let through.
+        val ink = preferences.penPath[PenPathToggle.CanvasInkBeforeSave] && tool in INK_TOOLS && !assistedCollecting &&
+            !documents.state.value.textTool && !documents.state.value.regionTool &&
+            erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Editor
+        if (busy || (!ink && (instructionEditor.state.value.busy || semanticEditor.state.value.busy)) || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
         }
         val current = project ?: return
-        if(!precisionInputAllowed())return
+        if(!precisionInputAllowed(ink))return
         val route=erasers.tools.route(rawSample.tool==PointerTool.Eraser)
         if(route==EraserInputRoute.Blocked)return
         val raw=Point(rawSample.x,rawSample.y)
@@ -2362,59 +2369,56 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun predict(sample: PenSample?) { gesture?.stroke?.prediction = sample?.let{precision.routePen(listOf(it)).single()} }
 
-    private fun batch(run: StrokeRun, samples: List<PenSample>, predicted: Boolean = false): SampleBatch {
+    private fun batch(run: StrokeRun, samples: List<PenSample>, predicted: Boolean = false,
+                      sequence: ULong = run.sequence, after: Long = run.lastTime): SampleBatch {
         require(samples.isNotEmpty() && samples.size <= if (predicted) 32 else 512)
-        require(samples.first().timeMs >= run.lastTime && samples.zipWithNext().all { (a, b) -> a.timeMs <= b.timeMs })
+        require(samples.first().timeMs >= after && samples.zipWithNext().all { (a, b) -> a.timeMs <= b.timeMs })
         val points = core.mapPoints(run.camera, true, samples.map { Point(it.x, it.y) })
-        return SampleBatch(run.sequence, points.map { it.x }.toDoubleArray(), points.map { it.y }.toDoubleArray(),
+        return SampleBatch(sequence, points.map { it.x }.toDoubleArray(), points.map { it.y }.toDoubleArray(),
             samples.map { require(it.timeMs >= run.start.timeMs && it.timeMs - run.start.timeMs <= UInt.MAX_VALUE.toLong()); (it.timeMs - run.start.timeMs).toUInt() }.toUIntArray(),
             samples.map { it.pressure }.toFloatArray(),
             if (run.capabilities.tilt) samples.map { it.tilt ?: 0f }.toFloatArray() else floatArrayOf(),
             if (run.capabilities.orientation) samples.map { it.orientation ?: 0f }.toFloatArray() else floatArrayOf())
     }
 
+    // region Stroke: ink, then save
+    private val strokeTurns = StrokeTurns()
+
     private fun startStroke(current: WorkbenchProject, run: StrokeRun) {
+        // Developer switch, read at pen-down. Off: the whole stroke, from its
+        // first sample to its refresh, runs under the mutation lock, so it
+        // starts only after the stroke before it is saved and refreshed. On:
+        // ink needs no lock; only the save takes it, in pen-down order.
+        val turn = if (preferences.penPath[PenPathToggle.CanvasInkBeforeSave]) strokeTurns.enter() else null
         scope.launch {
             try {
-                mutations.withLock {
-                    if (run.canceled.get() || run.epoch != epoch) return@withLock
-                    val native = current.beginStroke(run.options); run.native = native
-                    diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
-                    if (run.canceled.get()) { cancelNative(native); return@withLock }
-                    for (samples in run.queue) {
-                        if (run.canceled.get() || run.epoch != epoch) break
-                        require(run.samples + samples.size <= 100_000) { "Stroke sample limit reached. The unfinished stroke was canceled." }
-                        val realBatch = batch(run, samples)
-                        val update = appendWithBackpressure(native, realBatch)
-                        try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
-                        catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
-                        require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
-                        val additions = withContext(Dispatchers.Default) { EditorDrawing.contourPath(update.contours, run.origin) }
-                        run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
-                        run.samples += samples.size; run.lastTime = samples.last().timeMs; run.sequence++
-                        val path = Path(run.real)
-                        val predicted = run.prediction
-                        if (!run.finished && predicted != null && predicted.timeMs > run.lastTime && predicted.timeMs - run.lastTime <= 100) {
-                            try { path.addPath(EditorDrawing.contourPath(native.predict(batch(run, listOf(predicted), true)).contours, run.origin)) }
-                            catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error }
+                if (turn == null) mutations.withLock {
+                    val native = inkStroke(current, run, lockFree = false) ?: return@withLock
+                    val saved = saveStroke(run, native) ?: return@withLock
+                    refresh(current, saved.first, run.epoch)
+                    diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
+                } else {
+                    val native = inkStroke(current, run, lockFree = true)
+                    val saved = try {
+                        if (native == null) null
+                        // A cancelled stroke has nothing to save and waits for nobody.
+                        else if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); null }
+                        else {
+                            // The predicted tail goes at pen-up, not after a wait for the lock.
+                            run.drawing = wetObject(run, Path(run.real)); publish()
+                            turn.awaitEarlier()
+                            mutations.withLock { saveStroke(run, native) }
                         }
-                        if (!run.canceled.get() && run.epoch == epoch) { run.drawing = wetObject(run, path); publish() }
+                    } finally { turn.done() } // The next stroke may save now; it does not wait for this refresh.
+                    if (saved != null) {
+                        refresh(current, saved.first, run.epoch)
+                        diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
                     }
-                    if (run.finished && !run.canceled.get() && run.epoch == epoch) {
-                        // Predictions are replaced by canonical real contours before commit.
-                        run.drawing = wetObject(run, Path(run.real)); publish()
-                        val result = native.commit()
-                        run.committed = true
-                        val saved = SystemClock.uptimeMillis()
-                        diagnostics.pen.recordMillis(PenTiming.CanvasSave, saved - run.lastTime)
-                        finishRemotePreview(run.link, run.options.gestureId, false)
-                        refresh(current, result, run.epoch)
-                        diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved)
-                    } else cancelNative(native)
                 }
             } catch (cancel: CancellationException) { cancelNative(run.native); throw cancel }
             catch (error: Exception) { cancelNative(run.native); if (!run.canceled.get()) report(error) }
             finally {
+                turn?.done()
                 withContext(NonCancellable) {
                     try { if (!run.committed) finishRemotePreview(run.link, run.options.gestureId, true) }
                     finally {
@@ -2425,6 +2429,82 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }
         }
     }
+
+    /** Begins the native stroke and feeds it every queued batch until pen-up or
+     * cancellation. Null: the stroke ended before it began. With [lockFree] the
+     * stroke begins without reading the project when the core offers that (not
+     * for a highlighter), and each batch makes one trip off the main thread. */
+    private suspend fun inkStroke(current: WorkbenchProject, run: StrokeRun, lockFree: Boolean): WorkbenchStroke? {
+        if (run.canceled.get() || run.epoch != epoch) return null
+        val native = (if (lockFree) (current as? WorkbenchDeferredStrokes)?.beginStrokeDeferred(run.options) else null)
+            ?: current.beginStroke(run.options)
+        run.native = native
+        diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
+        if (run.canceled.get()) { cancelNative(native); return null }
+        for (samples in run.queue) {
+            if (run.canceled.get() || run.epoch != epoch) break
+            require(run.samples + samples.size <= 100_000) { "Stroke sample limit reached. The unfinished stroke was canceled." }
+            if (lockFree) { inkBatchInOneTrip(native, run, samples); continue }
+            val realBatch = batch(run, samples)
+            val update = appendWithBackpressure(native, realBatch)
+            try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
+            catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
+            require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
+            val additions = withContext(Dispatchers.Default) { EditorDrawing.contourPath(update.contours, run.origin) }
+            run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
+            run.samples += samples.size; run.lastTime = samples.last().timeMs; run.sequence++
+            val path = Path(run.real)
+            val predicted = run.prediction
+            if (!run.finished && predicted != null && predicted.timeMs > run.lastTime && predicted.timeMs - run.lastTime <= 100) {
+                try { path.addPath(EditorDrawing.contourPath(native.predict(batch(run, listOf(predicted), true)).contours, run.origin)) }
+                catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error }
+            }
+            if (!run.canceled.get() && run.epoch == epoch) { run.drawing = wetObject(run, path); publish() }
+        }
+        return native
+    }
+
+    /** The same work as one pass of the loop above, with the append, the path
+     * of its contours and the predicted tail done in a single trip off the main
+     * thread instead of three. The stroke's counters stay on the main thread. */
+    private suspend fun inkBatchInOneTrip(native: WorkbenchStroke, run: StrokeRun, samples: List<PenSample>) {
+        val realBatch = batch(run, samples)
+        val last = samples.last().timeMs
+        val predicted = run.prediction?.takeIf { !run.finished && it.timeMs > last && it.timeMs - last <= 100 }
+        // The tail follows this batch: its request carries the next sequence.
+        val tailBatch = predicted?.let { batch(run, listOf(it), true, sequence = run.sequence + 1uL, after = last) }
+        val origin = run.origin
+        val (update, additions, tail) = withContext(Dispatchers.Default) {
+            val update = appendWithBackpressure(native, realBatch)
+            val additions = EditorDrawing.contourPath(update.contours, origin)
+            val tail = if (tailBatch == null) null else try { EditorDrawing.contourPath(native.predict(tailBatch).contours, origin) }
+                catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error; null }
+            Triple(update, additions, tail)
+        }
+        try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
+        catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
+        require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
+        run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
+        run.samples += samples.size; run.lastTime = last; run.sequence++
+        val path = Path(run.real)
+        if (tail != null && !run.finished) path.addPath(tail)
+        if (!run.canceled.get() && run.epoch == epoch) { run.drawing = wetObject(run, path); publish() }
+    }
+
+    /** Saves a finished stroke and returns its revision with the time it was
+     * saved; a stroke that was cancelled instead is cancelled natively. */
+    private suspend fun saveStroke(run: StrokeRun, native: WorkbenchStroke): Pair<ProjectInfo, Long>? {
+        if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); return null }
+        // Predictions are replaced by canonical real contours before commit.
+        run.drawing = wetObject(run, Path(run.real)); publish()
+        val result = native.commit()
+        run.committed = true
+        val saved = SystemClock.uptimeMillis()
+        diagnostics.pen.recordMillis(PenTiming.CanvasSave, saved - run.lastTime)
+        finishRemotePreview(run.link, run.options.gestureId, false)
+        return result to saved
+    }
+    // endregion
 
     private suspend fun appendWithBackpressure(native: WorkbenchStroke, batch: SampleBatch): InkUpdate {
         repeat(4) { attempt ->
@@ -2909,6 +2989,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 }
 
 private fun PressureCurve.values() = listOf(0.0, 0.0, x1.toDouble(), y1.toDouble(), x2.toDouble(), y2.toDouble(), 1.0, 1.0)
+
+private val INK_TOOLS = setOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)
 
 /** One read for the save itself, one for its own change event, one for a peer
  * edit landing at the same moment. Past that the queued refresh takes over. */

@@ -67,7 +67,14 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges {
+private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchDeferredStrokes {
+    override fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke? {
+        if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
+        if(options.family=="highlighter")return null
+        // One short native call that never touches the project worker. The
+        // handle goes straight to the caller, which owns and disposes it.
+        return try { NativeStroke(handle.beginStrokeDeferred(options.native())) } catch(error:CoreException) { throw mapFailure(error) }
+    }
     /** The strokes of the snapshot last returned by [documentChanges], each with
      * the digest the core gave for it. Only an instance still held by the
      * caller's snapshot is ever named to the core as known. */
@@ -193,7 +200,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
     }
     override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke {
         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
-        return acquireNative({handle.beginStroke(NStrokeOptions(options.gestureId,options.transactionId,options.objectId,options.documentId,options.layerId,options.deviceId,options.lamport,options.createdAtMs,options.family,options.width,options.rgba,options.stabilization,options.pressureCurve))},{NativeStroke(it)},{try{it.shutdown()}finally{it.destroy()}})
+        return acquireNative({handle.beginStroke(options.native())},{NativeStroke(it)},{try{it.shutdown()}finally{it.destroy()}})
     }
     override suspend fun edit(options: EditOptions,commands: List<EditCommand>): ProjectInfo = call {
         if ((options.expectedHostSeq == null) != (options.expectedStateHash == null)) throw CoreFailure(CoreFailureKind.Invalid)
@@ -264,6 +271,7 @@ private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
         } }
     }
 }
+private fun StrokeOptions.native(): NStrokeOptions = NStrokeOptions(gestureId,transactionId,objectId,documentId,layerId,deviceId,lamport,createdAtMs,family,width,rgba,stabilization,pressureCurve)
 private fun Camera.native(): NCamera = NCamera(center.native(),scale,rotation,viewportWidth,viewportHeight)
 private fun Point.native(): NPoint = NPoint(x,y)
 private fun NPoint.common(): Point = Point(x,y)
