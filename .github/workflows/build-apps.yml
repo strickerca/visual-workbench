@@ -1,5 +1,10 @@
-# Builds installable app packages on request. Run it from the Actions tab
-# ("Run workflow") or by pushing a tag that starts with "v".
+# Builds the app packages on request. Run it from the Actions tab ("Run
+# workflow") or by pushing a tag that starts with "v". It also runs whenever
+# this file or the Windows packaging script changes, so a change to the
+# packaging is proven before it is merged.
+#
+# The Windows package is the ready-to-run app folder (no installer): download
+# it, unzip it and start VisualWorkbenchDev.exe.
 #
 # The Android package is signed with a throwaway development key created on the
 # build machine. It installs on a phone that does not have the app yet; it will
@@ -11,6 +16,10 @@ on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+    branches: ["**"]
+    paths:
+      - .github/workflows/build-apps.yml
+      - tools/ci/windows-package.ps1
 
 permissions:
   contents: read
@@ -45,5 +54,31 @@ jobs:
         with:
           name: visual-workbench-android-development
           path: apps/android/build/outputs/apk/debug/android-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  desktop-windows:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_BUILD_JOBS: "4"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: rustup show active-toolchain; if ($LASTEXITCODE -ne 0) { rustup toolchain install }
+      - run: pwsh -NoProfile -File tools/ci/windows-package.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-workbench-windows-development
+          path: apps/desktop/build/compose/binaries/main/app/VisualWorkbenchDev
           if-no-files-found: error
           retention-days: 30
