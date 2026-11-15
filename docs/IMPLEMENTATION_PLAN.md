@@ -83,6 +83,21 @@ Only the owner can: merge pull requests and protect main on `ci-required`; run
 the S23 sessions (B4 re-check, latency baseline, B6, B9, pen-path re-measure,
 Jetpack Ink A/B); decide live AI spend; check Paint's version and auto-update.
 
+Kept in mind, not to be built until the owner asks (2026-11-15):
+- **Editable image file.** Saving would produce one PNG that any app shows as
+  the edited picture, with the original and the marks inside it, so that
+  Visual Workbench can reopen it with the marks still movable; the working
+  project would become invisible housekeeping and the project list "recent
+  images". Ordinary single-image work only.
+- **One-file project copy.** The core can already pack a project into a single
+  `.vwbz` file (specification 4.5); neither app offers it. Not wired while the
+  editable image file is undecided.
+- **Folding old edit history into the current state** to shrink a project
+  further. Not planned: the gain is small once old checkpoints are gone, and
+  syncing and conflict review read that history.
+- **Material 3 redesign and new icons.** Wait until the owner has used the
+  current build and can look at it.
+
 ## How to run this plan
 
 1. Put this package at `C:\dev\visual-workbench` (the repository root; any path works if you tell the agent).
