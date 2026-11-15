@@ -103,8 +103,10 @@ if [ "$status" -ne 0 ]; then
   "$adb" logcat -d -v brief '*:W' | grep -iE "visualworkbench|VW_|vw_core|AndroidRuntime" | tail -n 40 || true
   # For each failed screen check: the canvas's own account from that test's
   # start to the failure, and the platform's lines about stalled drawing.
-  echo "--- canvas lifecycle of each failed screen check ---"
-  "$adb" logcat -d -v time -s VW_CANVAS_LIFE:I | awk '/ test_begin /{n=0} {b[n++]=$0} / present_failed /{for(i=0;i<n;i++)print b[i]; n=0}' | tail -n 400 || true
+  echo "--- canvas lifecycle of each failed on-screen test ---"
+  # A test that fails in its setup wait has no present_failed line; the test
+  # runner's own "failed:" line closes its block instead.
+  "$adb" logcat -d -v time -s VW_CANVAS_LIFE:I TestRunner:E | awk '/ test_begin /{n=0} {b[n++]=$0} / present_failed |TestRunner.*failed: /{for(i=0;i<n;i++)print b[i]; n=0}' | tail -n 400 || true
   echo "--- platform lines about drawing ---"
   "$adb" logcat -d -v time '*:I' | grep -E "dequeueBuffer failed|SurfaceSyncGroup|BufferPool|LowLatencyCanvas|Davey|Skipped [0-9]+ frames|queue stalled" | tail -n 60 || true
   echo "--- focused window during the tests (changes only) ---"
