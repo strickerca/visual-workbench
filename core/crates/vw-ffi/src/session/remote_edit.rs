@@ -1806,6 +1806,110 @@ mod retained_tests {
         assert!(bad.sample().validate().is_err());
         Ok(())
     }
+    /// One pen sample at a time through the send path both pen calls share,
+    /// over a real carrier: an authenticated loopback connection whose other
+    /// end has granted input for this binding, as the computer does. What
+    /// arrives there is byte for byte the pinned event, and each sample takes
+    /// the next input sequence.
+    #[tokio::test]
+    async fn a_pen_sample_sent_over_a_carrier_arrives_as_the_pinned_bytes() -> SessionResult<()> {
+        use vw_net::carrier::{PinnedTls, TcpCarrier, TrustedPeer};
+        use vw_net::pairing::{DeviceIdentity, SERVER_NAME};
+        use vw_proto::Message;
+        let computer = DeviceIdentity::generate_for(vw_model::DeviceId::from_bytes([1; 16]))?;
+        let phone = DeviceIdentity::generate_for(vw_model::DeviceId::from_bytes([2; 16]))?;
+        let tls = |own: &DeviceIdentity, peer: &DeviceIdentity| -> SessionResult<PinnedTls> {
+            Ok(PinnedTls::new(
+                own.transport_identity()?,
+                TrustedPeer {
+                    device: peer.device().clone(),
+                    certificate: peer.transport_identity()?.certificate,
+                    server_name: SERVER_NAME.into(),
+                },
+            )?)
+        };
+        let (computer_tls, phone_tls) = (tls(&computer, &phone)?, tls(&phone, &computer)?);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|_| SessionError::Worker)?;
+        let address = listener.local_addr().map_err(|_| SessionError::Worker)?;
+        let (accepted, connected) = tokio::join!(
+            TcpCarrier::accept(&listener, &computer_tls),
+            TcpCarrier::connect(address, &phone_tls)
+        );
+        let hello = |identity: &DeviceIdentity| vw_net::LocalHello {
+            device: identity.device().clone(),
+            platform: pb::Platform::Windows,
+            app_version: "fixture".into(),
+            label: String::new(),
+            capabilities: std::collections::BTreeSet::from(["remote_edit_v1".to_string()]),
+        };
+        let (computer_hello, phone_hello) = (hello(&computer), hello(&phone));
+        let (served, joined) = tokio::join!(
+            vw_net::SecureConnection::server(vw_net::CarrierIo::Tcp(accepted?), &computer_hello),
+            vw_net::SecureConnection::client(vw_net::CarrierIo::Tcp(connected?), &phone_hello)
+        );
+        let (computer_send, mut computer_receive) = served?.into_duplex()?;
+        let (phone_send, _phone_receive) = joined?.into_duplex()?;
+        computer_send.grant_input(
+            native_id(&binding().input_session_id)?,
+            native_id(&binding().scope.capture_session_id)?,
+            binding().scope.geometry_revision,
+            0,
+        )?;
+        let hub = close_fixture(false)?;
+        hub.state.lock().map_err(|_| SessionError::Worker)?.sender = Some(phone_send.clone());
+        // The four hover samples of the pinned table, in its order. The
+        // fixture's client area starts at the origin, so the same point is
+        // given in its coordinates.
+        let hovers = [
+            (0, 0, 0, 0, 0, 1),
+            (1024, 90, -90, 359, 5, 15),
+            (511, -37, 12, 0, 1, 13),
+            (1, 0, 0, 180, 4, 3),
+        ];
+        for (index, (pressure, tilt_x, tilt_y, rotation, pen_flags, pen_mask)) in
+            hovers.into_iter().enumerate()
+        {
+            let sample = RemotePenPoint {
+                phase: RemotePenPointPhase::Hover,
+                x: 163,
+                y: 431,
+                pressure,
+                tilt_x,
+                tilt_y,
+                rotation,
+                pen_flags,
+                pen_mask,
+            }
+            .sample();
+            let sequence = {
+                let mut s = hub.state.lock().map_err(|_| SessionError::Worker)?;
+                hub.send_pen(&mut s, &binding(), &sample)?
+            };
+            assert_eq!(sequence, index as u64 + 1);
+            let arrived = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                computer_receive.receive(0),
+            )
+            .await
+            .map_err(|_| SessionError::Timeout)??;
+            let vw_net::Receive::Deliver(Body::InputEvent(event)) = arrived else {
+                return Err(SessionError::Invalid);
+            };
+            assert_eq!(hex(&event.encode_to_vec()), GOLDEN_PEN_EVENTS[index]);
+        }
+        assert_eq!(
+            hub.state
+                .lock()
+                .map_err(|_| SessionError::Worker)?
+                .input_seq,
+            4
+        );
+        phone_send.close();
+        computer_send.close();
+        Ok(())
+    }
     /// Both pen calls go through one admission. Without a carrier it sends
     /// nothing, uses no input sequence and counts no contact, whatever the
     /// sample or binding.
