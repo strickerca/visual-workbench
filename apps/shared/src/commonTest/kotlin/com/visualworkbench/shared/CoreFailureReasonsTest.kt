@@ -21,6 +21,13 @@ class CoreFailureReasonsTest {
         assertEquals(general, reasons.advice(CoreFailureKind.Storage))
     }
 
+    @Test fun aProjectAnotherVersionSavedDifferentlyIsNamedAsSuchAndSaysNothingWasChanged() {
+        val reasons = CoreFailureReasons { CoreEventLog(listOf(failure(3, "saved by a different version of the app")), 0) }
+        val advice = reasons.advice(CoreFailureKind.Storage)
+        assertTrue("different version" in advice.whatHappened)
+        assertTrue(advice.whatToDo.startsWith("Nothing was changed."))
+    }
+
     @Test fun withoutReadableEventsTheGeneralMessageIsUsedAndTheReasonIsNeverShown() {
         val unreadable = CoreFailureReasons { null }
         val text = unreadable.text(CoreFailure(CoreFailureKind.Worker))

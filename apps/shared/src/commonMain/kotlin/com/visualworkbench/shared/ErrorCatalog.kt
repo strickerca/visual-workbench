@@ -180,6 +180,10 @@ public object ErrorCatalog {
             "The project is open somewhere else.",
             "Close the other window or app that has this project open.",
         )
+        "saved by a different version of the app" -> ProblemAdvice(
+            "This project was last saved by a different version of the app, and this version reads one of its edits differently.",
+            "Nothing was changed. Open it with the version that saved it, or send a problem report.",
+        )
         else -> null
     }
 }
