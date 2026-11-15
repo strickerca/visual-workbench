@@ -282,12 +282,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     private suspend fun preparedDrawing(items: List<RenderItem>, reuse: List<DrawObject> = emptyList()): List<DrawObject> =
         prepareEditorObjects(core, items.filterNot { it.shape is Shape.Adjustment }, reuse)
-    /** The document as it is now. With [quick] the core is told which strokes
-     * [held] already has and rebuilds only the others; it has no such path for
-     * paged documents and then answers null, which falls back to the full read. */
-    private suspend fun readDocument(current: WorkbenchProject, held: DocumentSnapshot, quick: Boolean): DocumentSnapshot =
-        (if (quick) (current as? WorkbenchDocumentChanges)?.documentChanges(held.documentId, held) else null)
-            ?: current.document(held.documentId)
     private var giantRenderReady=false
     private var updatingGiant=false
     private val canvasRetirement:suspend()->Unit = {giantRenderReady=false;canvasOwners.retireAll()}
@@ -2121,9 +2115,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         // Developer switch: after every save the instruction and marker lists are
         // read again, and a pen-down in those few milliseconds was dropped without
         // a message. A plain ink stroke needs neither list, so it is let through.
-        val ink = preferences.penPath[PenPathToggle.CanvasInkBeforeSave] && tool in INK_TOOLS && !assistedCollecting &&
-            !documents.state.value.textTool && !documents.state.value.regionTool &&
-            erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Editor
+        val ink = inkPassesListRefresh(preferences.penPath[PenPathToggle.CanvasInkBeforeSave], tool, assistedCollecting,
+            documents.state.value.textTool, documents.state.value.regionTool) { erasers.tools.route(rawSample.tool == PointerTool.Eraser) }
         if (busy || (!ink && (instructionEditor.state.value.busy || semanticEditor.state.value.busy)) || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
@@ -2443,8 +2436,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
      * for a highlighter), and each batch makes one trip off the main thread. */
     private suspend fun inkStroke(current: WorkbenchProject, run: StrokeRun, lockFree: Boolean): WorkbenchStroke? {
         if (run.canceled.get() || run.epoch != epoch) return null
-        val native = (if (lockFree) (current as? WorkbenchDeferredStrokes)?.beginStrokeDeferred(run.options) else null)
-            ?: current.beginStroke(run.options)
+        val native = beginInkStroke(current, run.options, lockFree)
         run.native = native
         diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
         if (run.canceled.get()) { cancelNative(native); return null }
@@ -2591,7 +2583,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             // Developer switch: ask only for what changed and keep the paths
             // already built for untouched strokes. Off: the full read, as before.
             val quick = preferences.penPath[PenPathToggle.CanvasQuickRefresh]
-            val fetched = documentRefresh.load(doc,{document}){readDocument(current,doc,quick)} ?: return@readLatest null
+            val fetched = documentRefresh.load(doc,{document}){readDocumentSnapshot(current,doc,quick)} ?: return@readLatest null
             val prepared = preparedDrawing(fetched.snapshot.render.items, if (quick) objects else emptyList())
             if (token != epoch || project !== current || disposing ||
                 !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
@@ -2996,8 +2988,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 }
 
 private fun PressureCurve.values() = listOf(0.0, 0.0, x1.toDouble(), y1.toDouble(), x2.toDouble(), y2.toDouble(), 1.0, 1.0)
-
-private val INK_TOOLS = setOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)
 
 /** One read for the save itself, one for its own change event, one for a peer
  * edit landing at the same moment. Past that the queued refresh takes over. */

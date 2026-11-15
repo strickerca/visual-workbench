@@ -280,7 +280,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 val drawStarted = System.nanoTime()
                 // Developer switch: draw the kept picture and only the stroke in
                 // progress. Any scene it cannot draw exactly falls through.
-                if (!(snapshot.keepDryPicture && (currentSession.wetInk ?: WetInkLayer().also { currentSession.wetInk = it }).draw(canvas, snapshot)))
+                if (wholeSceneNeeded(snapshot.keepDryPicture) { (currentSession.wetInk ?: WetInkLayer().also { currentSession.wetInk = it }).draw(canvas, snapshot) })
                     drawOwned(canvas,snapshot,currentSession)
                 // Timing only: two clock reads and a bounded array write.
                 currentSession.frontSampleMs = snapshot.wetSampleMs
