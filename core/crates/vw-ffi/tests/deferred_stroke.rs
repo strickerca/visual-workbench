@@ -137,7 +137,7 @@ async fn update_layer(
 
 #[tokio::test]
 async fn what_begin_refuses_a_deferred_stroke_is_refused_with_the_same_error_and_takes_no_more_ink()
- {
+{
     let dir = tempfile::tempdir().unwrap();
     let project = create_image_project(create(&dir.path().join("project")), cancel())
         .await

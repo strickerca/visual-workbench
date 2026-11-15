@@ -123,7 +123,10 @@ impl Held {
                 is_stroke,
                 "only strokes carry a digest"
             );
-            assert!(change.cost >= 1024, "every entry counts at least its fixed part");
+            assert!(
+                change.cost >= 1024,
+                "every entry counts at least its fixed part"
+            );
             if let Some(digest) = &change.digest {
                 assert_eq!(digest.len(), 32);
                 next.insert(change.object_id.clone(), (digest.clone(), item.clone()));
