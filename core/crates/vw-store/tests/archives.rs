@@ -1137,3 +1137,78 @@ fn crc32(bytes: &[u8]) -> u32 {
     }
     !result
 }
+
+/// Hostile-input robustness: a valid project archive with bytes flipped, sizes
+/// and offsets overwritten, truncated or extended must always return, never
+/// panic or hang. A refused import must publish nothing and leave no staging
+/// folder; an accepted one must be the original project. Deterministic so a
+/// failure reproduces.
+#[test]
+fn mutated_archives_never_panic_and_a_refused_import_publishes_nothing() {
+    let temporary = temporary();
+    let (mut source, _) = fixture(temporary.path());
+    let expected = source.project().state_hash().unwrap();
+    let archive = temporary.path().join("seed.vwbz");
+    export_vwbz(&mut source, &archive).unwrap();
+    let seed = fs::read(&archive).unwrap();
+    let work = temporary.path().join("work");
+    fs::create_dir(&work).unwrap();
+    let candidate = work.join("candidate.vwbz");
+    let destination = work.join("restored.vwb");
+    let mut state = 0x9e37_79b9_7f4a_7c15u64;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let (mut accepted, mut refused) = (0u32, 0u32);
+    for round in 0..3_000u32 {
+        let mut bytes = seed.clone();
+        for _ in 0..1 + next() % 3 {
+            let at = (next() as usize) % bytes.len();
+            match next() % 5 {
+                0 => bytes[at] ^= 1 << (next() % 8),
+                1 => bytes[at] = next() as u8,
+                // ZIP sizes, counts and offsets are little-endian 16 and 32-bit fields.
+                2 if at + 4 <= bytes.len() => {
+                    let value = match next() % 4 {
+                        0 => 0u32,
+                        1 => u32::MAX,
+                        2 => (bytes.len() as u32).wrapping_add(next() as u32 % 9),
+                        _ => next() as u32 % 70_000,
+                    };
+                    bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
+                }
+                3 => bytes.truncate(at.max(1)),
+                _ => bytes.extend(std::iter::repeat_n(next() as u8, (next() % 64) as usize)),
+            }
+        }
+        fs::write(&candidate, &bytes).unwrap();
+        match import_vwbz(&candidate, &destination, ImportLimits::default()) {
+            Ok(restored) => {
+                assert_eq!(
+                    restored.project().state_hash().unwrap(),
+                    expected,
+                    "round {round}: an accepted archive is not the original project"
+                );
+                drop(restored);
+                fs::remove_dir_all(&destination).unwrap();
+                accepted += 1;
+            }
+            Err(_) => {
+                assert!(
+                    !destination.exists(),
+                    "round {round}: a refused import published a project"
+                );
+                refused += 1;
+            }
+        }
+        clean_staging(&work);
+    }
+    assert!(
+        refused > 2_000,
+        "most mutations should be refused: {refused}"
+    );
+    assert!(accepted + refused == 3_000);
+}
