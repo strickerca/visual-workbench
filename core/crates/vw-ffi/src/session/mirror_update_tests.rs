@@ -643,3 +643,96 @@ async fn a_failed_update_never_turns_the_phone_into_a_host() {
     sync_and_compare(&host, &mirror, "an edit after the rebuild").await;
     mirror.close().await.unwrap();
 }
+
+/// The PC's project, opened as the PC opens it.
+fn host_of(host: &HostSync, path: &Path) -> Arc<ProjectSession> {
+    let store = ProjectStore::create_authenticated_checkpoint(
+        path,
+        &host.host().checkpoint_bytes().unwrap(),
+        &pc(),
+        &pc(),
+        1,
+    )
+    .unwrap();
+    ProjectSession::from_store(
+        store,
+        BlobStore::new(path).unwrap(),
+        SessionPermit::acquire().unwrap(),
+    )
+    .unwrap()
+}
+/// What a phone `behind` transactions behind asks for.
+fn request_behind(host: &HostSync, behind: u64) -> pb::SyncRequest {
+    let revision = host.host().revision().unwrap();
+    let since = revision.host_seq - behind;
+    let state_hash = host
+        .host()
+        .accepted_transactions()
+        .find(|(_, ack)| ack.host_seq == since)
+        .map(|(_, ack)| ack.state_hash.clone())
+        .unwrap();
+    pb::SyncRequest {
+        since_host_seq: since,
+        project_id: uid(1),
+        state_hash,
+        max_transactions: 256,
+    }
+}
+
+/// The PC answers a phone's request from its store: the same batch the
+/// in-memory host would send, for a phone one, three or ten updates behind,
+/// and a checkpoint for a base it does not know.
+#[tokio::test]
+async fn the_pc_answers_a_request_with_what_the_phone_lacks() {
+    let temp = tempfile::tempdir().unwrap();
+    let host = pc_with(40);
+    let session = host_of(&host, &temp.path().join("pc"));
+    for behind in [1, 3, 10] {
+        let request = request_behind(&host, behind);
+        let answered = sync::respond(&session, request.clone()).await.unwrap();
+        let expected = host.respond(&request).unwrap();
+        assert_eq!(answered.batch, expected.batch, "{behind} behind");
+        assert!(answered.checkpoint.is_none());
+        assert_eq!(answered.batch.txns.len() as u64, behind);
+    }
+    let mut unknown = request_behind(&host, 2);
+    unknown.state_hash[0] ^= 1;
+    let answered = sync::respond(&session, unknown.clone()).await.unwrap();
+    let expected = host.respond(&unknown).unwrap();
+    assert_eq!(answered.batch, expected.batch);
+    assert_eq!(answered.checkpoint, expected.checkpoint);
+    assert!(answered.checkpoint.is_some());
+    session.close().await.unwrap();
+}
+
+/// What answering one sync request costs the PC as the project grows.
+/// Run: cargo test -p vw-ffi --lib host_response_cost -- --ignored --nocapture
+#[tokio::test]
+#[ignore = "measurement; prints a table"]
+async fn host_response_cost() {
+    let sizes: Vec<u64> = std::env::var("VW_BENCH_SIZES")
+        .ok()
+        .map(|sizes| {
+            sizes
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect()
+        })
+        .unwrap_or_else(|| vec![2000, 8000]);
+    println!("strokes | the PC answers a phone one update behind");
+    for strokes in sizes {
+        let temp = tempfile::tempdir().unwrap();
+        let host = pc_with(strokes);
+        let session = host_of(&host, &temp.path().join("pc"));
+        let request = request_behind(&host, 1);
+        let mut times = Vec::new();
+        for _ in 0..7 {
+            let started = Instant::now();
+            let answered = sync::respond(&session, request.clone()).await.unwrap();
+            times.push(started.elapsed());
+            assert_eq!(answered.batch.txns.len(), 1);
+        }
+        println!("{strokes:>7} | {:>10.3} ms", median(&mut times));
+        session.close().await.unwrap();
+    }
+}

@@ -471,6 +471,27 @@ impl HostSequencer {
         self.records.get(id).map(|record| record.accepted_at_ms)
     }
 
+    /// The state hash of revision `seq`, when this host has reached it.
+    pub fn revision_hash(&self, seq: u64) -> Option<&StateHash> {
+        self.revisions.get(&seq)
+    }
+
+    /// The transactions accepted after revision `seq`, in host order, each
+    /// with its acknowledgement and receipt time. Nothing before them is
+    /// read.
+    pub fn accepted_after(
+        &self,
+        seq: u64,
+    ) -> impl Iterator<Item = (&v1::Transaction, &v1::TxnAck, i64)> {
+        let start = usize::try_from(seq).unwrap_or(usize::MAX);
+        self.order
+            .get(start..)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(|(id, _)| self.records.get(id))
+            .map(|record| (&record.transaction, &record.ack, record.accepted_at_ms))
+    }
+
     /// Borrow accepted journal bindings without deriving inverse previews.
     /// Entries are keyed by transaction ID; consumers needing host order sort
     /// by the acknowledgement's sequence.

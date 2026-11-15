@@ -112,7 +112,8 @@ pub(crate) async fn respond(
     request: pb::SyncRequest,
 ) -> SessionResult<vw_net::SyncResponse> {
     call(project, move |s| {
-        Ok(vw_net::HostSync::from_store(s.store()?)?.respond(&request)?)
+        // From the store's own state: a request costs what it sends.
+        Ok(vw_net::respond(s.store()?.host(), &request)?)
     })
     .await
 }
