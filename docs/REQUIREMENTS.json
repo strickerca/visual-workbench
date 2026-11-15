@@ -5972,9 +5972,14 @@
       "scenarios": [
         "A14"
       ],
-      "evidence": [],
-      "impl_status": "not_started",
-      "verify_status": "not_tested",
+      "evidence": [
+        "Stage 6 — simulation half shown on loopback: an automatic link moves to a returning better carrier and off a dead one within 2 s with every edit accepted exactly once; switched off by default. Hardware half (A14 on the S23 and laptop, including tethering, DHCP and discovery time) remains open."
+      ],
+      "verified_by": [
+        "core/crates/vw-ffi/tests/sessions.rs::a_better_carrier_takes_over_and_a_dead_route_fails_over_without_losing_or_repeating_edits"
+      ],
+      "impl_status": "in_progress",
+      "verify_status": "partial",
       "owner_decision": "default-accepted",
       "v1_note": "new"
     },

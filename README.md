@@ -20,6 +20,7 @@ open blockers.
 | --- | --- | --- | --- |
 | Markup core: canvas, pen, shapes, text, undo, export | Yes | Yes | Partly; pen feel and latency not measured |
 | Pairing by QR or code, encrypted link, sync, offline edits | Yes | Yes | Partly |
+| Connecting without typing an address after pairing (switched off by default) | Yes | Yes, on one machine over real encryption | No; Windows discovery and USB/Wi-Fi switching times untested |
 | Capture, masks, instruction packages, local MCP tools | Yes | Yes | Partly |
 | Image edit through an image model | Yes | Yes, against recorded responses | No live run yet |
 | Remote pen editing in Paint | Yes | Yes, on a Windows build machine without Paint or a pen | Not yet accepted |
@@ -35,10 +36,10 @@ Requirements by phase, generated from `docs/REQUIREMENTS.json`:
 | 0 Hardware truth and setup | 12 | 9 | 0 | 9 |
 | 1 Markup core | 43 | 38 | 1 | 26 |
 | 2 First wins | 46 | 41 | 0 | 29 |
-| 3 Precision, capture, sync | 39 | 31 | 0 | 31 |
+| 3 Precision, capture, sync | 39 | 32 | 0 | 31 |
 | 4 Remote edit | 15 | 8 | 0 | 15 |
 | 5 Verification and release | 20 | 13 | 0 | 18 |
-| **All phases** | **175** | **140** | **1** | **128** |
+| **All phases** | **175** | **141** | **1** | **128** |
 
 14 deferred requirements are not counted. An automated test proves the software behaves as written; it is not a device result.
 <!-- requirements-status:end -->
