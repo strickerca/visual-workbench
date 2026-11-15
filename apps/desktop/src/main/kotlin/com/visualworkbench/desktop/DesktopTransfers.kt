@@ -167,7 +167,7 @@ internal fun transferMessage(error: Exception): String = when (error) {
         TransferFailureKind.Depth -> "This format would reduce sample depth. Choose PNG 16 bit or explicitly allow depth reduction."
         TransferFailureKind.EncodedLimit -> "The encoded file exceeds the transfer byte limit. Choose a different format or region."
         TransferFailureKind.ScratchLimit -> "The export exceeds its 400 MB scratch budget. Choose a smaller region."
-        TransferFailureKind.Backpressure -> "The native transfer queue is busy. Retry after current work finishes."
+        TransferFailureKind.Backpressure -> "Another transfer is still running. Try again when it has finished."
         TransferFailureKind.ImageCodecUnavailable -> "An installed AVIF decoder is unavailable. The original is unchanged."
         TransferFailureKind.Unsupported -> "This source or format is not supported by the current transfer pipeline."
         TransferFailureKind.Invalid -> "The transfer request is invalid or its source changed. Prepare it again."
@@ -175,7 +175,7 @@ internal fun transferMessage(error: Exception): String = when (error) {
         TransferFailureKind.Cancelled -> "Transfer cancelled."
         TransferFailureKind.Closed -> "The project closed before this transfer finished."
     }
-    else -> "The handoff could not finish. The original and existing destination were preserved."
+    else -> "The transfer could not finish. The original and any existing file at the destination are unchanged."
 }
 
 /** Read only top-level receipt fields. A framed receipt can also contain nested
@@ -183,7 +183,7 @@ internal fun transferMessage(error: Exception): String = when (error) {
 internal fun completeExport(request: ExportRequest, result: FileExportResult): CompletedExport {
     if (!request.matches(result.revision) ||
         !Regex("[0-9a-f]{64}").matches(result.blake3) || result.encodedBytes == 0uL)
-        throw HandoffFailure("The export receipt does not match the captured revision.")
+        throw HandoffFailure("The export does not match the version of the image it was prepared from. Export it again.")
     if (result.metadataJson.length > 65536)
         throw HandoffFailure("The export receipt exceeds its limit.")
     val fields = try {

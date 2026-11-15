@@ -127,7 +127,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
         if(giantChoiceRequiresRetirement(giantChoice,choice,forceReplace)){
             giantChoice=null;giantOwner.invalidate()
             try{giantOwner.detach()}catch(cancel:CancellationException){throw cancel}
-            catch(_:Exception){update{it.copy(giantActive=true,giantReady=false,giantIssue="The previous tiled renderer could not retire. Its resources remain reserved; reopen after recovery.")};return}
+            catch(_:Exception){update{it.copy(giantActive=true,giantReady=false,giantIssue="The previous large-image view did not close cleanly, so its memory is still held. Restart the app, then reopen the project.")};return}
         }
         fun current()=!closing&&project===p&&generation==epoch&&refreshTicket==ticket&&mutable.value.document===doc
         if(!current())return
@@ -266,7 +266,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
                     installed=true
                 }
             }catch(cancel:CancellationException){throw cancel}
-            catch(_:Exception){streamRoot.value=streamRoot.value.copy(issue="The stream could not open. Retire this receiver before trying again.")}
+            catch(_:Exception){streamRoot.value=streamRoot.value.copy(issue="The live view could not open. Close it, then try again.")}
             finally{if(!installed)try{closeCaptureStream()}catch(_:Exception){streamRoot.value=streamRoot.value.copy(opening=false,cleanupPending=true)}}
         }
         receiverWork=work;work.start()
@@ -300,7 +300,7 @@ class EditorController internal constructor(private val scope:CoroutineScope,val
                 }
             }
         }catch(error:Throwable){streamRoot.value=streamRoot.value.copy(opening=false,cleanupPending=true,
-            issue="Stream retirement is incomplete. Keep this project open and retry cleanup.");throw error}
+            issue="The live view has not finished closing. Keep this project open and try closing it again.");throw error}
         finally{streamDepartures--}
         }
     }
@@ -888,7 +888,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
                 finish(true)
                 if (request.path.fileName.toString().endsWith(".mp4", true)) {
                     val p = project ?: throw HandoffFailure("Open a project before attaching an MP4 asset.")
-                    val files = p as? WorkbenchFileTransfers ?: throw HandoffFailure("File transfers are unavailable in this core binding.")
+                    val files = p as? WorkbenchFileTransfers ?: throw HandoffFailure("File transfers are not available in this build of the app.")
                     val info = p.info(); val now = System.currentTimeMillis()
                     files.attachFile(AttachFileOptions(core.newId(now.toULong()), info.deviceId, info.nextLamport, now,
                         input.toString(), workspace.directory.toString(), FileAssetKind.Mp4))
@@ -911,11 +911,11 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         if (job == null) finish(false) else job.invokeOnCompletion { finish(false) }
         return job
     }
-    private suspend fun createImported(input:Path,work:Path,title:String){if(documents.state.value.descriptor!=null){documents.settle();documentOwner.discardDraw()};val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Streaming import is unavailable in this core binding.");val kind=if('.' in title)ordinaryImportKind(title.substringAfterLast('.'))else OrdinaryImportKind.Image;if(kind==OrdinaryImportKind.Unsupported||kind==OrdinaryImportKind.PdfCompatibleAi)throw HandoffFailure("This source needs a supported image or document import route.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{createOrdinaryImageProject(kind,streaming,CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination);if(project!==value)throw HandoffFailure("The imported image could not be adopted. The source remains unchanged.")}
+    private suspend fun createImported(input:Path,work:Path,title:String){if(documents.state.value.descriptor!=null){documents.settle();documentOwner.discardDraw()};val streaming=core as? WorkbenchStreamingCore?:throw HandoffFailure("Importing this kind of file is not available in this build of the app.");val kind=if('.' in title)ordinaryImportKind(title.substringAfterLast('.'))else OrdinaryImportKind.Image;if(kind==OrdinaryImportKind.Unsupported||kind==OrdinaryImportKind.PdfCompatibleAi)throw HandoffFailure("This source needs a supported image or document import route.");val time=System.currentTimeMillis();val id=core.newId(time.toULong());val destination=location.path.toAbsolutePath().resolve("$id.vwb");withContext(Dispatchers.IO){Files.createDirectories(location.path)};val value=try{createOrdinaryImageProject(kind,streaming,CreateFileProject(destination.toString(),id,core.newId(time.toULong()),core.newId(time.toULong()),deviceId,title.take(256),input.toString(),work.toString(),time))}catch(error:CoreFailure){if(error.kind==CoreFailureKind.Raster)throw HandoffFailure("Image import refused. Images over 50 MP, unsupported profiles and sources exceeding the 256 MiB memory budget are not accepted; the original was not resized.");throw error};attach(value,destination);if(project!==value)throw HandoffFailure("The imported image could not be adopted. The source remains unchanged.")}
     fun showPaste(){if(!mutable.value.busy&&!frames.state.value.blocksInput)update{it.copy(pasteOpen=true)}}
     fun dismissPaste(){update{it.copy(pasteOpen=false)}}
     fun pasteImage(assumeSrgb:Boolean,epoch:Long=generation){if(streamDraftOnly){report("The annotation editor cannot replace its borrowed project.");return};update{it.copy(pasteOpen=false)};transfer(epoch){val image=handoff.paste(assumeSrgb);val workspace=transferFiles.create();try{val input=workspace.stage(image.png);createImported(input,workspace.directory,"Pasted image")}finally{workspace.close()}}}
-    fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image, PDF-compatible AI or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension!="mp4"&&ordinaryImportKind(extension)==OrdinaryImportKind.Unsupported){report("This drop supports admitted images, embedded RAW previews, flattened PSD/PSB composites, PDF-compatible AI and ordinary MP4 assets.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
+    fun acceptDrop(paths:List<Path>,onStaged:(Boolean)->Unit={}):Job?{if(paths.size!=1){report("Drop one image, PDF-compatible AI or MP4 file at a time.");onStaged(false);return null};val path=paths.single();val extension=path.fileName.toString().substringAfterLast('.',"").lowercase();if(extension!="mp4"&&ordinaryImportKind(extension)==OrdinaryImportKind.Unsupported){report("You can drop images, RAW files (their embedded preview is used), flattened PSD/PSB files, PDF-compatible AI files and ordinary MP4 videos here.");onStaged(false);return null};return importFile(ImportRequest(generation,path.toAbsolutePath().normalize()),onStaged,retainAcceptedDrop=true)}
     fun open(path:Path,epoch:Long=generation){if(streamDraftOnly){report("The annotation editor cannot replace its borrowed project.");return};task(epoch){attach(core.open(path.toAbsolutePath().toString()),path)}}
     suspend fun close(){if(streamDraftOnly)disposeStreamEditor()else retireEditor()}
     private suspend fun retireEditor(){closing=true;closeCaptureStream();frames.beginDeparture();workflows.beginDeparture();giantOwner.invalidate();transferJob?.cancel();sessionWork?.cancel();viewportJob?.cancel();cancelInput();withContext(NonCancellable){edits.withLock{live.close();changes?.cancelAndJoin();changes=null;discardExport();frames.close();workflows.close();rotation.close();semanticEditor.detach();instructionEditor.detach();erasers.detach();selections.detach();retireAi();detachGiant();documentOwner.close();closePrecision();if(!streamDraftOnly)project?.close();project=null;generation++;refreshTicket++;update{EditorState(view=it.view.copy(peer=null),projectEpoch=generation,canvasFocused=it.canvasFocused)}}}}
@@ -930,7 +930,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         if(!closing&&project!=null&&generation==epoch&&frames.state.value.departing&&
             !frames.state.value.retirementPending)scope.launch{edits.withLock{
                 if(!closing&&project!=null&&generation==epoch&&frames.state.value.departing){
-                    try{frames.detach();bindWorkflows(false)}catch(_:Exception){report("Output-frame retirement is incomplete. Retry closing the project.")}
+                    try{frames.detach();bindWorkflows(false)}catch(_:Exception){report("An export frame has not finished closing. Try closing the project again.")}
                 }
             }}
     }}}
@@ -1233,7 +1233,7 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
                     "The saved output frame or original changed. Reopen the project and prepare this export again."
                 WorkflowFailureKind.Invalid -> "The saved output frame or selected source rectangle is invalid. Review the frame and export area."
                 WorkflowFailureKind.Limit,WorkflowFailureKind.Memory,WorkflowFailureKind.Backpressure ->
-                    "Output-frame projection exceeds its work or memory allowance. Choose a smaller region or retry when work settles."
+                    "This export frame needs more memory or work than is allowed. Choose a smaller area, or try again when other work has finished."
                 else -> "The saved output frame could not be verified for export. The original is unchanged."
             })
         }
@@ -1242,21 +1242,21 @@ if(preparedDrag?.first?.request?.matches(next)==false){preparedDrag?.second?.clo
         if(!projected.matches(p.info()))throw HandoffFailure("The project changed while resolving its saved output frame.")
         return projected
     }
-    private fun transferApi():WorkbenchFileTransfers=project as? WorkbenchFileTransfers?:throw HandoffFailure("File export is unavailable in this core binding.")
+    private fun transferApi():WorkbenchFileTransfers=project as? WorkbenchFileTransfers?:throw HandoffFailure("Saving files is not available in this build of the app.")
     private fun fileOptions(request:ExportRequest,workspace:TransferWorkspace)=FileExportOptions(request.options(),workspace.output.toString(),workspace.directory.toString())
     fun checkExport(request:ExportRequest){transfer(request.epoch){val projected=projectedExport(request);val workspace=transferFiles.create();try{val result=transferApi().preflightFile(fileOptions(projected,workspace));if(!projected.matches(result.revision))throw HandoffFailure("The project changed during preflight. Check it again.");requireCurrent(request);requireCurrent(projected);update{it.copy(exportCheck=ExportCheck(request,result),message="Format preflight passed for ${projected.width} × ${projected.height} output pixels. Marked geometry and result assets are checked again during export.")}}finally{workspace.close()}}}
     private suspend fun prepareExport(request:ExportRequest):CachedExport{
         val projected=projectedExport(request)
         cachedExport?.takeIf{it.receipt.request==projected}?.let{update{state->state.copy(exportReceipt=it.receipt)};return it}
         discardExport();val workspace=transferFiles.create();var retained=false
-        try{val api=transferApi();val options=fileOptions(projected,workspace);val preflight=api.preflightFile(options);if(!projected.matches(preflight.revision))throw HandoffFailure("The project changed during preflight.");requireCurrent(request);requireCurrent(projected);update{it.copy(exportCheck=ExportCheck(request,preflight))};val result=api.exportTransfer(options);val completed=completeExport(projected,result);requireCurrent(request);requireCurrent(projected);if(withContext(Dispatchers.IO){Files.size(workspace.output).toULong()}!=completed.bytes)throw HandoffFailure("The completed export size differs from its receipt.");val cached=CachedExport(workspace,completed);cachedExport=cached;retained=true;update{it.copy(exportReceipt=completed)};return cached}finally{if(!retained)workspace.close()}
+        try{val api=transferApi();val options=fileOptions(projected,workspace);val preflight=api.preflightFile(options);if(!projected.matches(preflight.revision))throw HandoffFailure("The project changed during preflight.");requireCurrent(request);requireCurrent(projected);update{it.copy(exportCheck=ExportCheck(request,preflight))};val result=api.exportTransfer(options);val completed=completeExport(projected,result);requireCurrent(request);requireCurrent(projected);if(withContext(Dispatchers.IO){Files.size(workspace.output).toULong()}!=completed.bytes)throw HandoffFailure("The exported file's size does not match what was prepared. Export it again.");val cached=CachedExport(workspace,completed);cachedExport=cached;retained=true;update{it.copy(exportReceipt=completed)};return cached}finally{if(!retained)workspace.close()}
     }
     fun prepareExportFile(request:ExportRequest){transfer(request.epoch){val cached=prepareExport(request);report("${cached.receipt.revision} prepared at ${cached.receipt.width} × ${cached.receipt.height} px.")}}
     fun saveExport(request:ExportRequest,path:Path){val destination=path.toAbsolutePath().normalize();transfer(request.epoch){val cached=prepareExport(request);publishExport(cached.workspace.output,destination,cached.receipt.bytes){request.matches(mutable.value)};report("${cached.receipt.revision} saved at ${cached.receipt.width} × ${cached.receipt.height} px.")}}
     fun copyExport(request:ExportRequest){transfer(request.epoch){if(!request.settings.encoding.png)throw HandoffFailure("Clipboard copy requires a PNG export. Choose PNG 8 or 16 bit.");val cached=prepareExport(request);requireCurrent(request);handoff.copy(cached.workspace.output,cached.receipt);report("${cached.receipt.revision} copied as PNG, plus a plain bitmap for older Windows apps.")}}
     fun prepareDragExport(request:ExportRequest){transfer(request.epoch){if(!request.settings.encoding.png)throw HandoffFailure("File drag requires PNG. Choose PNG 8 or 16 bit.");val cached=prepareExport(request);requireCurrent(request);val lease=handoff.stage(cached.workspace.output,cached.receipt);var adopted=false;try{requireCurrent(request);preparedDrag?.second?.close();preparedDrag=cached.receipt to lease;adopted=true;update{it.copy(dragPrepared=true,exportOpen=false,message="PNG drag prepared. Drag the button to the destination; nothing is sent automatically.")}}finally{if(!adopted)lease.close()}}}
     internal fun takePreparedDrag():DesktopDragFile?{val offer=preparedDrag?:return null;if(!offer.first.request.matches(mutable.value)){offer.second.close();preparedDrag=null;update{it.copy(dragPrepared=false)};return null};preparedDrag=null;update{it.copy(dragPrepared=false)};return offer.second}
-    fun cancelTransfer(){transferJob?.cancel();report("Cancelling transfer; waiting for native work to release its files.")}
+    fun cancelTransfer(){transferJob?.cancel();report("Cancelling; waiting for the files to be released.")}
     init {
         scope.launch { rotation.state.collect{value->
             if(!value.active&&!value.busy){rotationDisplay.set(null);rotationPhysical=null}
@@ -1276,7 +1276,7 @@ private fun backgroundFailureMessage(kind:CoreFailureKind):String=when(kind){
     CoreFailureKind.Cancelled->"Image display was cancelled. Retry when current work finishes."
     CoreFailureKind.Storage->"Image display could not read project storage. Check the saved project and retry."
     CoreFailureKind.Unsupported->"This original uses an image feature that cannot be displayed here."
-    CoreFailureKind.Worker->"Image display could not finish in its worker. Retry the image display."
+    CoreFailureKind.Worker->"The image could not be displayed. Try showing it again."
     CoreFailureKind.Stroke->"Image display could not finish because of a drawing failure. Retry the image display."
     CoreFailureKind.ImageCodecUnavailable->"An installed AVIF decoder is unavailable. Color conversion cannot enable a missing decoder."
     CoreFailureKind.Raster->"The original could not be displayed because of a source, color, decoding or image-processing failure. If the image is untagged, choose sRGB explicitly."

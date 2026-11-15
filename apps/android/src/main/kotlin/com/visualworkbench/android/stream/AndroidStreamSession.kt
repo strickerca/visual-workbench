@@ -117,7 +117,7 @@ internal class AndroidStreamSession private constructor(
             val state = annotation.state.value
             input.block(operation?.isActive == true || state.saving || state.saveRetry || state.saved != null || state.editorFailed)
             request()
-        } catch (_: Exception) { mutableIssue.value = "This stream attachment has retired. Close it before reconnecting." }
+        } catch (_: Exception) { mutableIssue.value = "This live view has ended. Close it before connecting again." }
     }
     fun background() {
         foreground = false
@@ -176,7 +176,7 @@ internal class AndroidStreamSession private constructor(
                         input.detach(); lifecycle.activate(); request()
                         mutableIssue.value = "A displayed frame is not ready to freeze. Wait for live capture, then touch again."
                     } catch (_: Exception) {
-                        input.block(true); mutableIssue.value = "This stream attachment has retired. Close it before reconnecting."
+                        input.block(true); mutableIssue.value = "This live view has ended. Close it before connecting again."
                     }
                 } else mutableIssue.value = if (borrowed) "The frozen editor could not open. Discard this draft or close the stream."
                     else "The displayed frame could not freeze. Retry this exact frame or close the stream."
@@ -204,7 +204,7 @@ internal class AndroidStreamSession private constructor(
                 lifecycle.save(confirmedDegraded)
                 mutableIssue.value = null
             } catch (cancel: CancellationException) { throw cancel }
-            catch (_: Exception) { mutableIssue.value = "Save did not return a durable receipt. Retry the same Save before resuming." }
+            catch (_: Exception) { mutableIssue.value = "The save was not confirmed. Save again before you continue." }
             finally { request() }
         }
     }
@@ -223,7 +223,7 @@ internal class AndroidStreamSession private constructor(
                 if (foreground) input.block(false) else lifecycle.pause()
                 request()
             } catch (cancel: CancellationException) { throw cancel }
-            catch (_: Exception) { mutableIssue.value = "Draft retirement did not finish. Retry discarding or closing; live capture stays stopped." }
+            catch (_: Exception) { mutableIssue.value = "The draft has not finished closing. Try discarding or closing it again; live capture stays stopped." }
         }
     }
     fun retryDisplay() { request() }

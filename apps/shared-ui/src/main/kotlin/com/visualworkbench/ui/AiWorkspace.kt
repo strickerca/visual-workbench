@@ -67,7 +67,7 @@ private fun <B : AiDisplayImage> AiControls(controller: AiEditorController<B>, s
         if (showSettings) AiSettings(service, settings, onKeys, state.idle)
         state.context?.let { context ->
             Text("Source ${context.width} × ${context.height} · ${context.bitDepth}-bit · ${context.changeSelections.size} Change masks")
-            Text("Native includes all visible Change masks and role-tagged instructions. Original bytes remain immutable.", style = MaterialTheme.typography.caption)
+            Text("Native sends all visible Change masks and the instructions with their roles. The original image is never altered.", style = MaterialTheme.typography.caption)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max=180.dp)) {
                 items(context.instructions,key={it.id}) { entry -> Text("${entry.role}: ${entry.text}",style=MaterialTheme.typography.caption) }
             }
@@ -83,7 +83,7 @@ private fun <B : AiDisplayImage> AiControls(controller: AiEditorController<B>, s
         AiSmallInput("Estimate source", provenance, { provenance = it.take(1024) }, enabled)
         AiSmallInput("Verified on · YYYY-MM-DD", verified, { verified = it.take(10) }, enabled)
         AiSmallInput("Expires on · YYYY-MM-DD", expires, { expires = it.take(10) }, enabled)
-        } else Text("FLUX.1 Fill uses the explicit per-image price and dated provenance in the provider configuration.", style = MaterialTheme.typography.caption)
+        } else Text("FLUX.1 Fill uses the per-image price, and the date it was recorded, from the provider settings.", style = MaterialTheme.typography.caption)
         Text("Feather ${feather.toInt()} px")
         Slider(feather, { feather = it }, valueRange = 0f..64f, steps = 63, enabled = enabled)
         AiCheck("Allow an 8-bit provider copy of a 16-bit source", depth, { depth = it }, enabled)
@@ -119,7 +119,7 @@ private fun <B : AiDisplayImage> AiControls(controller: AiEditorController<B>, s
                     settings.configuration?.fingerprint == review.configurationFingerprint) {
                 Text(if (state.attempted) "Send attempt used" else "Send · ${cost?.let(::aiMoney).orEmpty()}")
             }
-            if (readiness?.providerReady == false) Text("This provider's protected credential and live transport capability are unavailable. Offline review remains available; Send is disabled.", style = MaterialTheme.typography.caption)
+            if (readiness?.providerReady == false) Text("This provider's saved key or its live connection is not available. You can still review offline; Send is switched off.", style = MaterialTheme.typography.caption)
             if(state.attempted){
                 TextButton({controller.recoverCandidate()},enabled=state.idle){Text("Reload paid candidate · no Send")}
                 Text("Keep this project open until you save or explicitly discard the candidate. An unsaved candidate cannot survive final app/process disposal.",style=MaterialTheme.typography.caption)
@@ -150,7 +150,7 @@ private fun <B : AiDisplayImage> AiControls(controller: AiEditorController<B>, s
             }
         }
         state.receipt?.let { receipt ->
-            Text("Result saved at revision ${receipt.revision.hostSeq}. Original, response, composite and acceptance assets remain separate.")
+            Text("Result saved at revision ${receipt.revision.hostSeq}. The original, the provider's response, the combined image and your acceptance are kept as separate files.")
             Row { TextButton({ controller.savedStatus(receipt.resultId, true) }, enabled = state.idle) { Text("Accept saved Result") }
                 TextButton({ controller.savedStatus(receipt.resultId, false) }, enabled = state.idle) { Text("Reject / hide") } }
         }

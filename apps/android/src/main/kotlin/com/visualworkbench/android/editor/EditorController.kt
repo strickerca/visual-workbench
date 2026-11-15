@@ -2941,7 +2941,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             is GiantImageFailure -> when (error.kind) {
                 GiantImageFailureKind.Limit, GiantImageFailureKind.Memory, GiantImageFailureKind.Backpressure ->
                     "This large JPEG exceeds the available tile, memory or scratch-storage allowance. Its source was not reduced."
-                GiantImageFailureKind.Unsupported -> "This device's tiled producer supports JPEG originals only. Choose regular import for a supported smaller image."
+                GiantImageFailureKind.Unsupported -> "On this device very large images can only be opened from JPEG files. Use regular import for a smaller image in another format."
                 GiantImageFailureKind.Storage -> "The large JPEG could not be saved safely. Check free space and try again."
                 GiantImageFailureKind.Cancelled -> "Large-JPEG import was canceled."
                 else -> "The large JPEG could not be verified or opened. Existing projects are unchanged."
