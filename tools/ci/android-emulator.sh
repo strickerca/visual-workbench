@@ -36,6 +36,11 @@ step "start emulator"
 export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 mkdir -p "$ANDROID_AVD_HOME"
 echo no | "$avdmanager" create avd --force -n vw-ci -k "$ANDROID_EMULATOR_IMAGE" -d pixel_6 >/dev/null
+# The on-screen tests use coordinates written for the S23 Ultra's screen, so
+# give the emulator the same pixel size (1440 x 3088).
+config="$ANDROID_AVD_HOME/vw-ci.avd/config.ini"
+sed -i '/^hw\.lcd\.\(width\|height\|density\)=/d' "$config"
+printf 'hw.lcd.width=1440\nhw.lcd.height=3088\nhw.lcd.density=480\n' >>"$config"
 "$ANDROID_HOME/emulator/emulator" -avd vw-ci -no-window -no-audio -no-boot-anim -no-snapshot \
   -gpu swiftshader_indirect -memory 4096 -cores 4 -camera-back none >"${TMPDIR:-/tmp}/vw-emulator.log" 2>&1 &
 emulator_pid=$!
@@ -53,6 +58,13 @@ done
 "$adb" shell input keyevent 82 || true
 
 step "instrumented tests: $classes"
+status=0
 bash apps/gradlew -p apps :android:connectedDebugAndroidTest -PvwEmulatorAbi=x86_64 \
   "-Pandroid.testInstrumentationRunnerArguments.class=$classes" \
-  -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers="${VW_GRADLE_WORKERS:-2}"
+  -x :desktop:packageConnectionRuntime --console=plain --no-daemon --no-parallel --max-workers="${VW_GRADLE_WORKERS:-2}" || status=$?
+if [ "$status" -ne 0 ]; then
+  step "the tests' own progress lines (for diagnosis)"
+  "$adb" shell wm size || true
+  "$adb" logcat -d -s VW_EDITOR_TEST:I | tail -n 60 || true
+fi
+exit "$status"
