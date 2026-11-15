@@ -100,6 +100,17 @@ impl Upkeeping {
     }
 }
 
+/// What one sync update from the host changed: every entity its
+/// transactions touched, and how much queued work they acknowledged.
+#[derive(Debug, Clone, Default)]
+pub struct HostBatch {
+    pub touched: Touched,
+    pub removed: usize,
+}
+
+/// The size a sync batch may have, as a device checks it (`vw_net`).
+const HOST_BATCH_BYTES: usize = 8 * 1024 * 1024 - 256;
+
 /// How much the next open would gain from a checkpoint written now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CheckpointNeed {
@@ -647,6 +658,192 @@ impl ProjectStore {
         observer(CommitStage::Committed);
         Ok(removed)
     }
+    /// Take in one ordinary sync update from the host this project mirrors:
+    /// the transactions it accepted since this store's revision. Each is
+    /// decided again by this build's engine and kept with the host's
+    /// acknowledgement when it gives the same revision and state hash, as an
+    /// open decides a stored log; the notices are the host's. The log rows,
+    /// the rows of the entities they touched, their conflict records and the
+    /// removal of the exactly matching queued work happen in one SQLite
+    /// transaction, so the work follows the update, not the history.
+    ///
+    /// The checks are those a device makes of a batch (`vw_net`
+    /// `SyncReceiver::receive`): it comes from the host, belongs to this
+    /// project, starts at this store's revision, continues it without a gap
+    /// and ends where it says it does. A batch that names a checkpoint is
+    /// not taken here (`install_authenticated_checkpoint`). On any refusal
+    /// the store and the database are as they were.
+    pub fn receive_host_batch(
+        &mut self,
+        batch: &v1::SyncBatch,
+        authenticated_host: &DeviceId,
+        now_ms: i64,
+    ) -> Result<HostBatch, StoreError> {
+        if now_ms < 0 || authenticated_host != self.host.host_device() {
+            return Err(StoreError::Invalid("host batch identity/time"));
+        }
+        let previous = self.host.revision()?;
+        let revision = batch
+            .revision
+            .as_ref()
+            .ok_or(StoreError::Invalid("host batch revision"))?;
+        if batch.project_id.as_ref() != Some(&self.project().id.to_proto())
+            || batch.encoded_len() > HOST_BATCH_BYTES
+            || batch.txns.len() > 256
+            || !batch.checkpoint_asset_id.is_empty()
+            || batch.checkpoint_size != 0
+            || revision.state_hash.len() != 32
+            || revision.host_seq < previous.host_seq
+            || batch.base.as_ref() != Some(&previous)
+        {
+            return Err(StoreError::Invalid("host batch"));
+        }
+        let mut entries = Vec::with_capacity(batch.txns.len());
+        let mut expected = previous.host_seq;
+        for entry in &batch.txns {
+            let txn = entry
+                .txn
+                .as_ref()
+                .ok_or(StoreError::Invalid("host batch transaction"))?;
+            let ack = entry
+                .ack
+                .as_ref()
+                .ok_or(StoreError::Invalid("host batch acknowledgement"))?;
+            expected = expected
+                .checked_add(1)
+                .ok_or(StoreError::Invalid("host batch continuity"))?;
+            if entry.host_seq != expected
+                || entry.host_seq > revision.host_seq
+                || ack.txn_id != txn.txn_id
+                || ack.host_seq != entry.host_seq
+                || ack.state_hash != entry.state_hash
+            {
+                return Err(StoreError::Invalid("host batch continuity"));
+            }
+            entries.push((txn, bounded_encode(txn)?, ack, entry.accepted_at_ms));
+        }
+        if (batch.complete && expected != revision.host_seq)
+            || (!batch.complete && (batch.txns.is_empty() || expected >= revision.host_seq))
+        {
+            return Err(StoreError::Invalid("host batch completion"));
+        }
+        let conflicts_before = self.host.conflicts().len();
+        let Self {
+            host,
+            connection,
+            seal,
+            cost,
+            log,
+            ..
+        } = self;
+        let decided = host.replay_with(
+            entries
+                .iter()
+                .map(|(txn, _, ack, accepted_at)| ((*txn).clone(), *accepted_at, (*ack).clone())),
+            |host, touched| -> Result<(LogSeal, ReplayCost, LogSpan, HostBatch), StoreError> {
+                if batch.complete && &host.revision()? != revision {
+                    return Err(StoreError::Invalid("host batch completion"));
+                }
+                let mut sealed = seal.clone();
+                let (mut replay, mut span) = (*cost, *log);
+                let mut all = Touched::default();
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+                let mut removed = 0;
+                for ((txn, bytes, ack, accepted_at), touched) in entries.iter().zip(touched) {
+                    let seq = sql_u64(ack.host_seq)?;
+                    let base = txn
+                        .base_revision
+                        .as_ref()
+                        .ok_or(StoreError::Invalid("base revision"))?;
+                    for op in &txn.ops {
+                        sql_u64(
+                            op.op_id
+                                .as_ref()
+                                .ok_or(StoreError::Invalid("op ID"))?
+                                .lamport,
+                        )?;
+                        // Keep originals introduced and removed again, as a
+                        // checkpoint's log rows do.
+                        if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
+                            super::projections::persist_asset(&tx, asset)?;
+                        }
+                    }
+                    let hash: [u8; 32] = ack
+                        .state_hash
+                        .as_slice()
+                        .try_into()
+                        .map_err(|_| StoreError::Invalid("host batch hash"))?;
+                    let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
+                    let ack_bytes = bounded_encode(*ack)?;
+                    sealed = sealed.with_row(seq, bytes, &hash, *accepted_at, &ack_bytes);
+                    tx.prepare("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")?
+                        .execute(params![seq,uuid(txn.txn_id.as_ref())?,txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bytes,hash,txn.created_at_wall_ms,accepted_at,ack_bytes])?;
+                    // The exactly matching queued work is acknowledged.
+                    let id = uuid(txn.txn_id.as_ref())?;
+                    let queued: Option<Vec<u8>> = tx
+                        .query_row("SELECT txn FROM pending_txns WHERE txn_id=?1", [&id], |row| {
+                            row.get(0)
+                        })
+                        .optional()?;
+                    if let Some(queued) = queued {
+                        if &queued != bytes {
+                            return Err(StoreError::Invalid(
+                                "pending checkpoint transaction collision",
+                            ));
+                        }
+                        removed += tx.execute(
+                            "DELETE FROM pending_txns WHERE txn_id=?1 AND txn=?2",
+                            params![id, bytes],
+                        )?;
+                    }
+                    replay.add(host, touched, bytes.len());
+                    span.add(bytes.len());
+                    all.extend(touched);
+                }
+                write_seal(&tx, &sealed)?;
+                super::projections::persist_touched(
+                    &tx,
+                    host.project(),
+                    &all,
+                    sql_u64(host.revision()?.host_seq)?,
+                    now_ms,
+                )?;
+                for conflict in &host.conflicts()[conflicts_before..] {
+                    write_conflict(&tx, conflict)?;
+                }
+                tx.commit()?;
+                Ok((
+                    sealed,
+                    replay,
+                    span,
+                    HostBatch {
+                        touched: all,
+                        removed,
+                    },
+                ))
+            },
+        )?;
+        let Some((sealed, replay, span, received)) = decided else {
+            return Err(StoreError::EngineMismatch);
+        };
+        *seal = sealed;
+        *cost = replay;
+        *log = span;
+        Ok(received)
+    }
+
+    /// What undoing the accepted transaction `target` would change in the
+    /// project as it is now, for a replica that shows it to `device`; see
+    /// `HostSequencer::inverse_preview`. Nothing is changed or written.
+    pub fn inverse_preview(
+        &mut self,
+        target: &Id,
+        device: &DeviceId,
+    ) -> Result<vw_ops::InversePreview, StoreError> {
+        Ok(self.host.inverse_preview(target, device)?)
+    }
+
     /// Number of accepted operations replayed from the log on this open.
     pub const fn replayed_transactions(&self) -> u64 {
         self.replayed_transactions

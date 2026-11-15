@@ -353,6 +353,26 @@ impl Drop for Recorded<'_> {
     }
 }
 
+/// The same for several transactions recorded one after another: they are
+/// taken back newest first.
+struct RecordedAll<'a> {
+    host: &'a mut HostSequencer,
+    undos: Vec<Undo>,
+}
+impl Drop for RecordedAll<'_> {
+    fn drop(&mut self) {
+        while let Some(undo) = self.undos.pop() {
+            self.host.revert(undo);
+        }
+    }
+}
+
+/// What undoing an accepted transaction would change in the project as it
+/// is now, as `HostSnapshot` holds it for every accepted transaction. Opaque:
+/// only a replica of the same project can use it.
+#[derive(Debug, Clone)]
+pub struct InversePreview(pub(crate) Vec<Change>);
+
 enum Admission {
     Duplicate(Acceptance),
     New(DeviceId, Id),
@@ -894,6 +914,51 @@ impl HostSequencer {
         accepted_at_ms: i64,
         stored: &v1::TxnAck,
     ) -> Result<Option<Touched>, OpsError> {
+        Ok(self
+            .replay_one(transaction, accepted_at_ms, stored)?
+            .map(|(touched, _)| touched))
+    }
+
+    /// `replay` for several transactions in host order, kept only if all of
+    /// them are decided as stored and `persist` then succeeds. `persist` sees
+    /// the host as it will be and what each transaction touched. Otherwise,
+    /// also when `persist` unwinds, the host is exactly as before the call:
+    /// `None` when this engine decides one of them differently, the error
+    /// when one is not a transaction the host could have accepted at all.
+    pub fn replay_with<T, E: From<OpsError>>(
+        &mut self,
+        entries: impl IntoIterator<Item = (v1::Transaction, i64, v1::TxnAck)>,
+        persist: impl FnOnce(&Self, &[Touched]) -> Result<T, E>,
+    ) -> Result<Option<T>, E> {
+        let mut recorded = RecordedAll {
+            host: self,
+            undos: Vec::new(),
+        };
+        let mut touched = Vec::new();
+        for (transaction, accepted_at_ms, stored) in entries {
+            match recorded
+                .host
+                .replay_one(transaction, accepted_at_ms, &stored)?
+            {
+                Some((entry, undo)) => {
+                    touched.push(entry);
+                    recorded.undos.push(undo);
+                }
+                None => return Ok(None),
+            }
+        }
+        let value = persist(&*recorded.host, &touched)?;
+        recorded.undos.clear();
+        Ok(Some(value))
+    }
+
+    /// One transaction of `replay`, with the way to take it back out.
+    fn replay_one(
+        &mut self,
+        transaction: v1::Transaction,
+        accepted_at_ms: i64,
+        stored: &v1::TxnAck,
+    ) -> Result<Option<(Touched, Undo)>, OpsError> {
         let author = DeviceId::try_from(transaction.device_id.clone())?;
         let (device, id) = match self.admit(&transaction, &author)? {
             // A stored transaction is never a retry of an earlier one.
@@ -924,7 +989,58 @@ impl HostSequencer {
             record.ack.notices.clone_from(&stored.notices);
         }
         self.cross_check_len();
-        Ok(Some(touched))
+        Ok(Some((touched, undo)))
+    }
+
+    /// What undoing the accepted transaction `target` would change now, for
+    /// a replica of this host that shows it to `device`: what `snapshot` has
+    /// for it in `HostSnapshot::inverse_previews`, for this one transaction
+    /// alone. It is tried on the project and taken back out; the host is as
+    /// before. A transaction `device` did not make has none.
+    pub fn inverse_preview(
+        &mut self,
+        target: &Id,
+        device: &DeviceId,
+    ) -> Result<InversePreview, OpsError> {
+        let record = self.records.get(target).ok_or(OpsError::NotFound)?;
+        if record.transaction.device_id != device.as_str() {
+            return Err(OpsError::UndoOwnership);
+        }
+        let Self {
+            host_device,
+            project,
+            sequence,
+            revisions,
+            records,
+            writes,
+            tombstones,
+            seen_ops,
+            gestures,
+            cancelled,
+            order,
+            ..
+        } = self;
+        let view = View {
+            host_device,
+            sequence: *sequence,
+            revisions,
+            records,
+            order,
+            writes,
+            tombstones,
+            seen_ops,
+            gestures,
+            cancelled,
+        };
+        let undo = v1::UndoTransaction {
+            target_txn_id: Some(target.to_proto()),
+        };
+        Ok(InversePreview(view.inverse(
+            project,
+            &undo,
+            device,
+            &mut Vec::new(),
+        )?))
     }
 
     /// What `submit` would answer, without accepting anything, and the length

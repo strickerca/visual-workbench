@@ -89,9 +89,21 @@ pub(crate) async fn cancel_gesture(
     })
     .await
 }
+/// What a mirror asks its host for: everything after its revision. The
+/// store holds the revision every update was taken in at.
 pub(crate) async fn request(project: &ProjectSession) -> SessionResult<pb::SyncRequest> {
     call(project, |s| {
-        Ok(s.remote.as_ref().ok_or(SessionError::Invalid)?.request()?)
+        if s.replica.is_none() {
+            return Err(SessionError::Invalid);
+        }
+        let store = s.store()?;
+        let revision = store.revision().map_err(|_| SessionError::Storage)?;
+        Ok(pb::SyncRequest {
+            since_host_seq: revision.host_seq,
+            project_id: Some(store.project().id.to_proto()),
+            state_hash: revision.state_hash,
+            max_transactions: 256,
+        })
     })
     .await
 }
@@ -137,6 +149,8 @@ pub(crate) async fn submit(
     })
     .await
 }
+/// Install a whole verified checkpoint the host sent: the store takes the
+/// new log rows and rewrites its rows, and the replica is rebuilt from it.
 fn persist(
     s: &mut ProjectState,
     remote: vw_net::SyncReceiver,
@@ -151,27 +165,136 @@ fn persist(
     // accepted journal and removes only exact acknowledged outbox entries.
     s.history = crate::editor::History::restore(s.store()?)?;
     s.replica = Some(replica);
-    s.remote = Some(remote);
+    // The store is the mirror from here on; the receiver was only needed
+    // for this checkpoint.
+    s.remote = None;
+    publish(s)
+}
+fn publish(s: &mut ProjectState) -> SessionResult<()> {
     let info = s.info()?;
     s.events.publish(crate::ChangeKind::Committed, info);
     s.changed.notify_one();
     Ok(())
 }
+fn store_error(error: vw_store::StoreError) -> SessionError {
+    match error {
+        vw_store::StoreError::Invalid(_)
+        | vw_store::StoreError::EngineMismatch
+        | vw_store::StoreError::Operation(_) => SessionError::Invalid,
+        _ => SessionError::Storage,
+    }
+}
+/// The replica built again from the store, as an open builds it: the
+/// fallback for an update the replica could not follow step by step.
+pub(super) fn rebuild_replica(s: &ProjectState) -> SessionResult<vw_ops::Replica> {
+    let store = s.store()?;
+    let host = vw_ops::HostSequencer::from_checkpoint_bytes(
+        &store.checkpoint_bytes().map_err(store_error)?,
+    )
+    .map_err(|_| SessionError::Storage)?;
+    let mut replica = vw_ops::Replica::new(
+        store.local_device().map_err(|_| SessionError::Storage)?,
+        host.snapshot().map_err(|_| SessionError::Storage)?,
+    )
+    .map_err(|_| SessionError::Storage)?;
+    replica
+        .queue_recovered_batch(store.pending().map_err(|_| SessionError::Storage)?)
+        .map_err(|_| SessionError::Storage)?;
+    Ok(replica)
+}
+fn follow_history(s: &mut ProjectState, batch: &pb::SyncBatch) -> SessionResult<()> {
+    for entry in &batch.txns {
+        let (Some(txn), Some(ack)) = (entry.txn.as_ref(), entry.ack.as_ref()) else {
+            return Err(SessionError::Invalid);
+        };
+        s.history.accept(
+            txn,
+            &vw_ops::Acceptance {
+                ack: ack.clone(),
+                conflicts: Vec::new(),
+                duplicate: false,
+            },
+        )?;
+    }
+    let floor = s
+        .store()?
+        .conflict_review_lamport_floor()
+        .map_err(|_| SessionError::Storage)?;
+    s.history.next_lamport = s.history.next_lamport.max(floor);
+    Ok(())
+}
+/// Take in one sync update from the host. A batch of accepted transactions
+/// is decided again on the store's own copy of the host's state and stored
+/// with the rows it touched; the replica takes the same entities over and
+/// replays the work still waiting on top. The work follows what the update
+/// changed. A batch naming a checkpoint is checked by a receiver built for
+/// it, and the checkpoint follows (`checkpoint`).
 pub(crate) async fn receive(
     project: &ProjectSession,
     batch: pb::SyncBatch,
     peer: DeviceId,
 ) -> SessionResult<bool> {
     call(project, move |s| {
-        let mut remote = s.remote.as_ref().ok_or(SessionError::Invalid)?.clone();
-        let snapshot = remote.receive(batch, &peer)?;
-        if let Some(snapshot) = snapshot {
-            persist(s, remote, snapshot)?;
-            Ok(true)
-        } else {
-            s.remote = Some(remote);
-            Ok(false)
+        let store = s.store()?;
+        if s.replica.is_none()
+            || &peer != store.host_device()
+            || batch.project_id.as_ref() != Some(&store.project().id.to_proto())
+        {
+            return Err(SessionError::Authentication);
         }
+        if !batch.checkpoint_asset_id.is_empty() {
+            let host = vw_ops::HostSequencer::from_checkpoint_bytes(
+                &store.checkpoint_bytes().map_err(store_error)?,
+            )
+            .map_err(|_| SessionError::Storage)?;
+            let mut remote = vw_net::SyncReceiver::new(host);
+            if remote.receive(batch, &peer)?.is_some() {
+                return Err(SessionError::Invalid);
+            }
+            s.remote = Some(remote);
+            return Ok(false);
+        }
+        let local = store.local_device().map_err(|_| SessionError::Storage)?;
+        s.remote = None;
+        let received = s
+            .store_mut()?
+            .receive_host_batch(&batch, &peer, now()?)
+            .map_err(store_error)?;
+        let accepted = batch
+            .txns
+            .iter()
+            .filter_map(|entry| entry.txn.as_ref())
+            .collect::<Vec<_>>();
+        let replica = s.replica.take().ok_or(SessionError::Invalid)?;
+        let mut previews = std::collections::BTreeMap::new();
+        for target in replica.previews_needed(&accepted) {
+            // One the host does not have for this device is refused as an
+            // undo of another device's work, as before.
+            if let Ok(preview) = s.store_mut()?.inverse_preview(&target, &local) {
+                previews.insert(target, preview);
+            }
+        }
+        let store = s.store()?;
+        let advanced = replica.advance(
+            store.project(),
+            store.revision().map_err(|_| SessionError::Storage)?,
+            &accepted,
+            &received.touched,
+            previews,
+        );
+        s.replica = Some(match advanced {
+            Ok(replica) => replica,
+            Err(_) => rebuild_replica(s)?,
+        });
+        // The undo history takes the accepted transactions in host order,
+        // as the host's own history does; anything it cannot take that way
+        // is ordered again from the whole journal.
+        let followed = follow_history(s, &batch);
+        if followed.is_err() {
+            s.history = crate::editor::History::restore(s.store()?)?;
+        }
+        publish(s)?;
+        Ok(true)
     })
     .await
 }
@@ -181,7 +304,7 @@ pub(crate) async fn checkpoint(
     peer: DeviceId,
 ) -> SessionResult<()> {
     call(project, move |s| {
-        let mut remote = s.remote.as_ref().ok_or(SessionError::Invalid)?.clone();
+        let mut remote = s.remote.take().ok_or(SessionError::Invalid)?;
         let snapshot = remote.install_checkpoint(&bytes, &peer)?;
         persist(s, remote, snapshot)
     })

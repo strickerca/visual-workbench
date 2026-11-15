@@ -10,7 +10,7 @@ mod replica;
 mod undo;
 pub use draft::Touched;
 pub use gesture::GestureStore;
-pub use host::{Acceptance, HostSequencer, HostSnapshot};
+pub use host::{Acceptance, HostSequencer, HostSnapshot, InversePreview};
 pub use replica::{PendingTransaction, Replica};
 pub use undo::UndoManager;
 

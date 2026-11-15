@@ -182,6 +182,19 @@ impl ProjectState {
             }
             return self.info();
         }
+        // An undo of accepted work needs what undoing it changes now, which
+        // the replica asks of the host's state in the store when it is used.
+        if let Some(target) = replica.inverse_needed(txn) {
+            let device = DeviceId::try_from(txn.device_id.clone())?;
+            if let Ok(preview) = self
+                .store
+                .as_mut()
+                .ok_or(CoreError::Closed)?
+                .inverse_preview(&target, &device)
+            {
+                replica.provide_inverse(target, preview);
+            }
+        }
         // The edit goes into the visible project in place. Only a refusal by
         // the undo history or the outbox takes it back out, which replays the
         // remaining queue; nothing is copied when the edit is kept.

@@ -78,6 +78,17 @@ macro_rules! for_each_collection {
 pub(crate) use for_each_collection;
 
 impl Touched {
+    /// Add everything `other` names.
+    pub fn extend(&mut self, other: &Self) {
+        macro_rules! union {
+            ($field:ident, $key:ty, $value:ty) => {
+                self.$field.extend(other.$field.iter().cloned());
+            };
+        }
+        for_each_collection!(union);
+        self.created = self.created.saturating_add(other.created);
+    }
+
     /// The entities a kept draft touched.
     pub(crate) fn of(originals: &Originals) -> Self {
         let mut touched = Self::default();

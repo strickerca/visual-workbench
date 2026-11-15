@@ -5,6 +5,8 @@ mod discovery;
 mod integration;
 mod link;
 #[cfg(test)]
+mod mirror_update_tests;
+#[cfg(test)]
 mod offline_recovery_tests;
 mod pairing;
 mod preview;
