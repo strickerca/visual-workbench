@@ -2,6 +2,8 @@
 //! duplicated metadata, before a response is accumulated or lowered to Kotlin.
 use crate::*;
 pub(crate) const MAX_RESPONSE: usize = 64 * 1024 * 1024;
+/// The fixed part every display item counts, before its strings and arrays.
+pub(crate) const MIN_ITEM: usize = 1024;
 fn add(total: &mut usize, value: usize) -> Result<()> {
     *total = total
         .checked_add(value)
@@ -35,7 +37,7 @@ pub(crate) fn info_bytes(info: &ProjectInfo) -> Result<usize> {
     Ok(n)
 }
 pub(crate) fn item_bytes(item: &RenderItem) -> Result<usize> {
-    let mut n = 1024;
+    let mut n = MIN_ITEM;
     for s in [&item.object_id, &item.layer_id, &item.layer_blend] {
         string(&mut n, s)?;
     }
@@ -105,9 +107,12 @@ pub(crate) fn document_changes_bytes(document: &DocumentSnapshotChanges) -> Resu
         add(&mut n, 256)?;
         string(&mut n, &change.object_id)?;
         string(&mut n, &change.layer_blend)?;
-        if let Some(item) = &change.item {
-            add(&mut n, item_bytes(item)?)?;
-        }
+        // Sent or kept, an entry counts what its item counts in a complete
+        // read: the caller holds the kept ones too.
+        add(
+            &mut n,
+            usize::try_from(change.cost).map_err(|_| CoreError::Backpressure)?,
+        )?;
     }
     Ok(())
 }

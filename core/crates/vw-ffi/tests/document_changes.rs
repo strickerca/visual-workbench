@@ -70,6 +70,7 @@ fn identity() -> Transform {
 #[derive(Default)]
 struct Held {
     strokes: BTreeMap<String, (Vec<u8>, RenderItem)>,
+    costs: BTreeMap<String, u64>,
 }
 impl Held {
     fn known(&self) -> Vec<KnownStroke> {
@@ -78,6 +79,7 @@ impl Held {
             .map(|(object_id, (digest, _))| KnownStroke {
                 object_id: object_id.clone(),
                 digest: digest.clone(),
+                cost: self.costs[object_id],
             })
             .collect()
     }
@@ -86,6 +88,7 @@ impl Held {
         let mut items = Vec::new();
         let mut kept = Vec::new();
         let mut next = BTreeMap::new();
+        let mut costs = BTreeMap::new();
         for change in &changes.items {
             let item = match &change.item {
                 Some(item) => {
@@ -102,6 +105,10 @@ impl Held {
                         .get(&change.object_id)
                         .expect("kept a stroke the caller never held");
                     assert_eq!(held, digest, "kept under a digest the caller did not send");
+                    assert_eq!(
+                        change.cost, self.costs[&change.object_id],
+                        "a kept stroke counts what it counted when it was sent"
+                    );
                     kept.push(change.object_id.clone());
                     let mut item = item.clone();
                     item.layer_opacity = change.layer_opacity;
@@ -116,13 +123,16 @@ impl Held {
                 is_stroke,
                 "only strokes carry a digest"
             );
+            assert!(change.cost >= 1024, "every entry counts at least its fixed part");
             if let Some(digest) = &change.digest {
                 assert_eq!(digest.len(), 32);
                 next.insert(change.object_id.clone(), (digest.clone(), item.clone()));
+                costs.insert(change.object_id.clone(), change.cost);
             }
             items.push(item);
         }
         self.strokes = next;
+        self.costs = costs;
         (items, kept)
     }
 }
@@ -378,6 +388,7 @@ async fn a_wrong_or_malformed_digest_never_keeps_a_stroke() {
     stranger.push(KnownStroke {
         object_id: wide_id(0x60, 99),
         digest: vec![7; 32],
+        cost: 4096,
     });
     assert_eq!(
         project
@@ -392,21 +403,36 @@ async fn a_wrong_or_malformed_digest_never_keeps_a_stroke() {
         vec![KnownStroke {
             object_id: first.clone(),
             digest: vec![0; 31],
+            cost: 4096,
         }],
         vec![KnownStroke {
             object_id: "not-an-id".into(),
             digest: vec![0; 32],
+            cost: 4096,
         }],
         vec![
             KnownStroke {
                 object_id: first.clone(),
                 digest: vec![0; 32],
+                cost: 4096,
             },
             KnownStroke {
                 object_id: first.clone(),
                 digest: vec![1; 32],
+                cost: 4096,
             },
         ],
+        // A cost no item can have: below its fixed part, or above a whole response.
+        vec![KnownStroke {
+            object_id: first.clone(),
+            digest: vec![0; 32],
+            cost: 1023,
+        }],
+        vec![KnownStroke {
+            object_id: first.clone(),
+            digest: vec![0; 32],
+            cost: 64 * 1024 * 1024 + 1,
+        }],
     ] {
         assert!(matches!(
             project
@@ -415,6 +441,58 @@ async fn a_wrong_or_malformed_digest_never_keeps_a_stroke() {
             Err(CoreError::Invalid)
         ));
     }
+    project.close().await.unwrap();
+}
+
+/// A kept stroke is not sent again, but the caller still holds it. It counts
+/// toward the size limit exactly what it counted when it was sent, so the
+/// changes read refuses a document at the same point a complete read does and
+/// cannot let it grow past that.
+#[tokio::test]
+async fn kept_strokes_count_toward_the_same_size_limit_as_a_complete_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = create_image_project(create(&dir.path().join("project")), cancel())
+        .await
+        .unwrap();
+    let mut held = Held::default();
+    for number in 0..3 {
+        draw_stroke(&project, number).await;
+    }
+    same_as_full(&project, &mut held).await;
+    // Every stroke kept: the answer still accounts for all of them in full.
+    let kept = project
+        .document_snapshot_changes(id(2), held.known(), cancel())
+        .await
+        .unwrap();
+    assert!(kept.items.iter().all(|change| change.item.is_none()));
+    let full = project.document_snapshot(id(2), cancel()).await.unwrap();
+    let complete: u64 = kept.items.iter().map(|change| change.cost).sum();
+    let sent_once: u64 = held.costs.values().sum();
+    assert_eq!(complete, sent_once);
+    assert!(complete >= full.render.items.len() as u64 * 1024);
+    // The caller says its strokes fill the limit between them: refused with
+    // the error a complete read gives for a document that large.
+    let mut heavy = held.known();
+    for stroke in &mut heavy {
+        stroke.cost = 30 * 1024 * 1024;
+    }
+    assert!(matches!(
+        project
+            .document_snapshot_changes(id(2), heavy, cancel())
+            .await,
+        Err(CoreError::Backpressure)
+    ));
+    // Two of them fit, as they would in a complete read.
+    let mut two = held.known();
+    two.truncate(2);
+    for stroke in &mut two {
+        stroke.cost = 30 * 1024 * 1024;
+    }
+    let fits = project
+        .document_snapshot_changes(id(2), two, cancel())
+        .await
+        .unwrap();
+    assert_eq!(fits.items.iter().filter(|c| c.item.is_none()).count(), 2);
     project.close().await.unwrap();
 }
 
