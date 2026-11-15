@@ -54,6 +54,9 @@ done
 # A fresh emulator shows a one-time "Viewing full screen" panel over the first
 # full-screen app; that belongs to the emulator, not to the app.
 "$adb" shell settings put secure immersive_mode_confirmations confirmed || true
+# The on-screen tests write the canvas's lifecycle to the log; keep enough of it
+# that the lines of an early test are still there when the run ends.
+"$adb" logcat -G 16M || true
 
 # On a software-rendered emulator the system's own launcher is slow enough to
 # get an "isn't responding" dialog. It stays in front for the whole run and
@@ -98,6 +101,12 @@ step "result summary"
 if [ "$status" -ne 0 ]; then
   # The app's own warnings and errors, to tell an emulator limit from a defect.
   "$adb" logcat -d -v brief '*:W' | grep -iE "visualworkbench|VW_|vw_core|AndroidRuntime" | tail -n 40 || true
+  # For each failed screen check: the canvas's own account from that test's
+  # start to the failure, and the platform's lines about stalled drawing.
+  echo "--- canvas lifecycle of each failed screen check ---"
+  "$adb" logcat -d -v time -s VW_CANVAS_LIFE:I | awk '/ test_begin /{n=0} {b[n++]=$0} / present_failed /{for(i=0;i<n;i++)print b[i]; n=0}' | tail -n 400 || true
+  echo "--- platform lines about drawing ---"
+  "$adb" logcat -d -v time '*:I' | grep -E "dequeueBuffer failed|SurfaceSyncGroup|BufferPool|LowLatencyCanvas|Davey|Skipped [0-9]+ frames|queue stalled" | tail -n 60 || true
   echo "--- focused window during the tests (changes only) ---"
   tail -n 60 "$focus_log" || true
   echo "focus samples taken: $(cat "$focus_log.count" 2>/dev/null || echo 0)"
