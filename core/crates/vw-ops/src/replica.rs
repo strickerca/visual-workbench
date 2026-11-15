@@ -476,16 +476,21 @@ impl Replica {
     /// host's, and the remaining work is replayed over it, refused work
     /// staying blocked. Only the entities the accepted transactions touched
     /// and those the pending work changed are copied, so the work follows
-    /// what changed. On an error the replica is gone; build it again from
-    /// the host (`new`) with the durable outbox.
+    /// what changed. When no work is left waiting, what is shown is the
+    /// host's project, and its hash has to be the host's state hash.
+    ///
+    /// On an error the replica keeps its old revision. It is then behind
+    /// its host: it refuses new work, whose base is the host's revision,
+    /// until it is built again from the host (`new`) with the durable
+    /// outbox; what it shows may be partly moved on meanwhile.
     pub fn advance(
-        mut self,
+        &mut self,
         project: &Project,
         revision: v1::Revision,
         accepted: &[&v1::Transaction],
         touched: &Touched,
         previews: BTreeMap<Id, InversePreview>,
-    ) -> Result<Self, OpsError> {
+    ) -> Result<(), OpsError> {
         if project.id != self.authoritative.id
             || revision.host_seq < self.revision.host_seq
             || revision.state_hash.len() != 32
@@ -500,7 +505,7 @@ impl Replica {
         // one: only what pending work changed.
         let mut reset = touched.clone();
         let mut remaining = Vec::with_capacity(self.pending.len());
-        for pending in std::mem::take(&mut self.pending) {
+        for pending in &self.pending {
             let id = Id::from_proto(pending.transaction.txn_id.as_ref())?;
             if let Some(changes) = self.inverse_previews.get(&id) {
                 patch::touched_by(changes, &mut reset);
@@ -511,11 +516,11 @@ impl Replica {
                         return Err(OpsError::IdCollision);
                     }
                 }
-                None => remaining.push(pending),
+                None => remaining.push(pending.clone()),
             }
         }
-        // The authoritative project takes what the host changed, and the
-        // visible one is put back to it wherever the two differ.
+        // Nothing has changed so far. From here the projects move on; the
+        // revision moves last.
         copy_entities(project, &mut self.authoritative, touched, None);
         let mut replaced = Originals::default();
         copy_entities(project, &mut self.visible, &reset, Some(&mut replaced));
@@ -540,6 +545,12 @@ impl Replica {
             }
         }
         let (hash, _) = self.hasher.hash(&self.visible)?;
+        // With nothing waiting, what is shown is the authoritative copy,
+        // which has to be the host's project: a copy that is not, for one
+        // taken in from a wrong list of touched entities, is refused here.
+        if remaining.is_empty() && hash.bytes().as_slice() != revision.state_hash {
+            return Err(OpsError::RevisionMismatch);
+        }
         #[cfg(feature = "cross-check")]
         {
             assert!(
@@ -562,7 +573,7 @@ impl Replica {
         self.inverse_previews = inverses;
         self.authoritative_inverses = authoritative_inverses;
         self.visible_hash = hash;
-        Ok(self)
+        Ok(())
     }
 
     fn install(&mut self, replayed: Replayed) {

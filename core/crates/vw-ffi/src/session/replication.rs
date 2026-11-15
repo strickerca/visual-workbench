@@ -112,7 +112,8 @@ pub(crate) async fn respond(
     request: pb::SyncRequest,
 ) -> SessionResult<vw_net::SyncResponse> {
     call(project, move |s| {
-        Ok(vw_net::HostSync::from_store(s.store()?)?.respond(&request)?)
+        // From the store's own state: a request costs what it sends.
+        Ok(vw_net::respond(s.store()?.host(), &request)?)
     })
     .await
 }
@@ -153,7 +154,7 @@ pub(crate) async fn submit(
 /// new log rows and rewrites its rows, and the replica is rebuilt from it.
 fn persist(
     s: &mut ProjectState,
-    remote: vw_net::SyncReceiver,
+    remote: &vw_net::SyncReceiver,
     snapshot: vw_ops::HostSnapshot,
 ) -> SessionResult<()> {
     let mut replica = s.replica.as_ref().ok_or(SessionError::Invalid)?.clone();
@@ -163,18 +164,31 @@ fn persist(
     remote.persist(s.store.as_mut().ok_or(SessionError::Closed)?, now()?)?;
     // Publication follows the single SQLite transaction which installs the
     // accepted journal and removes only exact acknowledged outbox entries.
-    s.history = crate::editor::History::restore(s.store()?)?;
     s.replica = Some(replica);
     // The store is the mirror from here on; the receiver was only needed
     // for this checkpoint.
     s.remote = None;
-    publish(s)
+    let history = crate::editor::History::restore(s.store()?);
+    finish(s, history.map(Some))
 }
-fn publish(s: &mut ProjectState) -> SessionResult<()> {
+/// Publish what the project is now. Whatever else failed, the store and the
+/// replica have moved on and the application is told so.
+fn finish(
+    s: &mut ProjectState,
+    history: crate::Result<Option<crate::editor::History>>,
+) -> SessionResult<()> {
+    let outcome = match history {
+        Ok(Some(history)) => {
+            s.history = history;
+            Ok(())
+        }
+        Ok(None) => Ok(()),
+        Err(error) => Err(SessionError::from(error)),
+    };
     let info = s.info()?;
     s.events.publish(crate::ChangeKind::Committed, info);
     s.changed.notify_one();
-    Ok(())
+    outcome
 }
 fn store_error(error: vw_store::StoreError) -> SessionError {
     match error {
@@ -184,9 +198,31 @@ fn store_error(error: vw_store::StoreError) -> SessionError {
         _ => SessionError::Storage,
     }
 }
+/// Make a failure of the step-by-step path happen, for the tests of what
+/// follows one: projects stored here fail to advance and to be rebuilt.
+#[cfg(test)]
+pub(super) static FAILING: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+#[cfg(test)]
+fn failing(s: &ProjectState) -> SessionResult<()> {
+    let root = s.store()?.root_path().to_path_buf();
+    if FAILING
+        .lock()
+        .map_err(|_| SessionError::Worker)?
+        .contains(&root)
+    {
+        return Err(SessionError::Storage);
+    }
+    Ok(())
+}
+#[cfg(not(test))]
+#[allow(clippy::unnecessary_wraps)]
+const fn failing(_: &ProjectState) -> SessionResult<()> {
+    Ok(())
+}
 /// The replica built again from the store, as an open builds it: the
 /// fallback for an update the replica could not follow step by step.
 pub(super) fn rebuild_replica(s: &ProjectState) -> SessionResult<vw_ops::Replica> {
+    failing(s)?;
     let store = s.store()?;
     let host = vw_ops::HostSequencer::from_checkpoint_bytes(
         &store.checkpoint_bytes().map_err(store_error)?,
@@ -201,6 +237,49 @@ pub(super) fn rebuild_replica(s: &ProjectState) -> SessionResult<vw_ops::Replica
         .queue_recovered_batch(store.pending().map_err(|_| SessionError::Storage)?)
         .map_err(|_| SessionError::Storage)?;
     Ok(replica)
+}
+/// Move the replica on with the update the store took in. It has to stand
+/// where the store stood before the update; one that is behind, after an
+/// earlier failure, is not moved but built again.
+fn advance_replica(
+    s: &mut ProjectState,
+    previous: &pb::Revision,
+    batch: &pb::SyncBatch,
+    touched: &vw_ops::Touched,
+) -> SessionResult<()> {
+    failing(s)?;
+    let local = s
+        .store()?
+        .local_device()
+        .map_err(|_| SessionError::Storage)?;
+    let ProjectState { store, replica, .. } = s;
+    let store = store.as_mut().ok_or(SessionError::Closed)?;
+    let replica = replica.as_mut().ok_or(SessionError::Invalid)?;
+    if replica.revision() != previous {
+        return Err(SessionError::Invalid);
+    }
+    let accepted = batch
+        .txns
+        .iter()
+        .filter_map(|entry| entry.txn.as_ref())
+        .collect::<Vec<_>>();
+    let mut previews = std::collections::BTreeMap::new();
+    for target in replica.previews_needed(&accepted) {
+        // One the host does not have for this device is refused as an undo
+        // of another device's work, as before.
+        if let Ok(preview) = store.inverse_preview(&target, &local) {
+            previews.insert(target, preview);
+        }
+    }
+    replica
+        .advance(
+            store.project(),
+            store.revision().map_err(|_| SessionError::Storage)?,
+            &accepted,
+            touched,
+            previews,
+        )
+        .map_err(|_| SessionError::Invalid)
 }
 fn follow_history(s: &mut ProjectState, batch: &pb::SyncBatch) -> SessionResult<()> {
     for entry in &batch.txns {
@@ -229,6 +308,11 @@ fn follow_history(s: &mut ProjectState, batch: &pb::SyncBatch) -> SessionResult<
 /// replays the work still waiting on top. The work follows what the update
 /// changed. A batch naming a checkpoint is checked by a receiver built for
 /// it, and the checkpoint follows (`checkpoint`).
+///
+/// Once the store has taken an update in, the replica is never left out:
+/// it follows, or is built again, or, should even that fail, stays as it
+/// was, behind the store, refusing new edits until the next update builds
+/// it again. The application is told what the project is in every case.
 pub(crate) async fn receive(
     project: &ProjectSession,
     batch: pb::SyncBatch,
@@ -254,46 +338,31 @@ pub(crate) async fn receive(
             s.remote = Some(remote);
             return Ok(false);
         }
-        let local = store.local_device().map_err(|_| SessionError::Storage)?;
+        let previous = store.revision().map_err(|_| SessionError::Storage)?;
         s.remote = None;
         let received = s
             .store_mut()?
             .receive_host_batch(&batch, &peer, now()?)
             .map_err(store_error)?;
-        let accepted = batch
-            .txns
-            .iter()
-            .filter_map(|entry| entry.txn.as_ref())
-            .collect::<Vec<_>>();
-        let replica = s.replica.take().ok_or(SessionError::Invalid)?;
-        let mut previews = std::collections::BTreeMap::new();
-        for target in replica.previews_needed(&accepted) {
-            // One the host does not have for this device is refused as an
-            // undo of another device's work, as before.
-            if let Ok(preview) = s.store_mut()?.inverse_preview(&target, &local) {
-                previews.insert(target, preview);
+        // The store has moved on.
+        if advance_replica(s, &previous, &batch, &received.touched).is_err() {
+            match rebuild_replica(s) {
+                Ok(replica) => s.replica = Some(replica),
+                Err(error) => {
+                    let restored = crate::editor::History::restore(s.store()?);
+                    finish(s, restored.map(Some))?;
+                    return Err(error);
+                }
             }
         }
-        let store = s.store()?;
-        let advanced = replica.advance(
-            store.project(),
-            store.revision().map_err(|_| SessionError::Storage)?,
-            &accepted,
-            &received.touched,
-            previews,
-        );
-        s.replica = Some(match advanced {
-            Ok(replica) => replica,
-            Err(_) => rebuild_replica(s)?,
-        });
         // The undo history takes the accepted transactions in host order,
         // as the host's own history does; anything it cannot take that way
         // is ordered again from the whole journal.
-        let followed = follow_history(s, &batch);
-        if followed.is_err() {
-            s.history = crate::editor::History::restore(s.store()?)?;
-        }
-        publish(s)?;
+        let history = match follow_history(s, &batch) {
+            Ok(()) => Ok(None),
+            Err(_) => crate::editor::History::restore(s.store()?).map(Some),
+        };
+        finish(s, history)?;
         Ok(true)
     })
     .await
@@ -304,9 +373,11 @@ pub(crate) async fn checkpoint(
     peer: DeviceId,
 ) -> SessionResult<()> {
     call(project, move |s| {
-        let mut remote = s.remote.take().ok_or(SessionError::Invalid)?;
+        // A copy: should the install fail, the announced checkpoint can be
+        // sent again without announcing it again.
+        let mut remote = s.remote.as_ref().ok_or(SessionError::Invalid)?.clone();
         let snapshot = remote.install_checkpoint(&bytes, &peer)?;
-        persist(s, remote, snapshot)
+        persist(s, &remote, snapshot)
     })
     .await
 }

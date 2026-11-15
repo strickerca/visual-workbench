@@ -1,6 +1,5 @@
 use crate::{NetError, Result};
-use std::collections::BTreeMap;
-use vw_model::{AssetId, DeviceId, Id};
+use vw_model::{AssetId, DeviceId};
 use vw_ops::{Acceptance, HostSequencer, HostSnapshot};
 use vw_proto::{Message, v1};
 
@@ -11,42 +10,10 @@ pub struct SyncResponse {
 }
 pub struct HostSync {
     host: HostSequencer,
-    journal: BTreeMap<u64, v1::AckedTransaction>,
-    initial: v1::Revision,
 }
 impl HostSync {
     pub fn new(host: HostSequencer) -> Result<Self> {
-        let mut journal = BTreeMap::new();
-        for (txn, ack) in host.accepted_transactions() {
-            let id = Id::from_proto(txn.txn_id.as_ref())?;
-            let accepted_at_ms = host
-                .accepted_at(&id)
-                .ok_or(NetError::Invalid("host receipt"))?;
-            journal.insert(
-                ack.host_seq,
-                v1::AckedTransaction {
-                    host_seq: ack.host_seq,
-                    state_hash: ack.state_hash.clone(),
-                    txn: Some(txn.clone()),
-                    ack: Some(ack.clone()),
-                    accepted_at_ms,
-                },
-            );
-        }
-        let initial = if let Some(first) = journal.values().next() {
-            first
-                .txn
-                .as_ref()
-                .and_then(|t| t.base_revision.clone())
-                .ok_or(NetError::Invalid("initial revision"))?
-        } else {
-            host.revision()?
-        };
-        Ok(Self {
-            host,
-            journal,
-            initial,
-        })
+        Ok(Self { host })
     }
     pub fn from_store(store: &vw_store::ProjectStore) -> Result<Self> {
         Self::new(HostSequencer::from_checkpoint_bytes(
@@ -64,20 +31,7 @@ impl HostSync {
         peer: &DeviceId,
         now_ms: i64,
     ) -> Result<Acceptance> {
-        let accepted = self.host.submit(txn.clone(), peer, now_ms)?;
-        if !accepted.duplicate {
-            self.journal.insert(
-                accepted.ack.host_seq,
-                v1::AckedTransaction {
-                    host_seq: accepted.ack.host_seq,
-                    state_hash: accepted.ack.state_hash.clone(),
-                    txn: Some(txn),
-                    ack: Some(accepted.ack.clone()),
-                    accepted_at_ms: now_ms,
-                },
-            );
-        }
-        Ok(accepted)
+        Ok(self.host.submit(txn, peer, now_ms)?)
     }
     pub fn commit_persisted(
         &mut self,
@@ -98,69 +52,81 @@ impl HostSync {
         Ok(accepted)
     }
     pub fn respond(&self, request: &v1::SyncRequest) -> Result<SyncResponse> {
-        if request.project_id.as_ref() != Some(&self.host.project().id.to_proto())
-            || !(1..=256).contains(&request.max_transactions)
-        {
-            return Err(NetError::Invalid("sync request"));
-        }
-        let known = if request.since_host_seq == self.initial.host_seq {
-            Some(self.initial.state_hash.as_slice())
-        } else {
-            self.journal
-                .get(&request.since_host_seq)
-                .map(|r| r.state_hash.as_slice())
-        };
-        let revision = self.host.revision()?;
-        let mut batch = v1::SyncBatch {
-            project_id: request.project_id.clone(),
-            base: Some(v1::Revision {
-                host_seq: request.since_host_seq,
-                state_hash: request.state_hash.clone(),
-            }),
-            revision: Some(revision.clone()),
-            ..Default::default()
-        };
-        if known != Some(request.state_hash.as_slice()) || request.state_hash.len() != 32 {
-            return self.checkpoint(batch);
-        }
-        for (_, entry) in self
-            .journal
-            .range((
-                std::ops::Bound::Excluded(request.since_host_seq),
-                std::ops::Bound::Unbounded,
-            ))
-            .take(request.max_transactions as usize)
-        {
-            batch.txns.push(entry.clone());
-            if batch.encoded_len() > SYNC_BYTES {
-                batch.txns.pop();
-                if batch.txns.is_empty() {
-                    return self.checkpoint(batch);
-                }
-                break;
+        respond(&self.host, request)
+    }
+}
+
+/// What the host answers a device's sync request with, read from its
+/// sequencing state as it is: the transactions after the base the device
+/// names, up to the request's count and the batch size, or a checkpoint
+/// when the host does not know that base. A host that keeps its state in a
+/// store answers from the store's own (`ProjectStore::host`), so a request
+/// costs what it sends, not a copy of the history.
+pub fn respond(host: &HostSequencer, request: &v1::SyncRequest) -> Result<SyncResponse> {
+    if request.project_id.as_ref() != Some(&host.project().id.to_proto())
+        || !(1..=256).contains(&request.max_transactions)
+    {
+        return Err(NetError::Invalid("sync request"));
+    }
+    // Every revision the host reached, revision zero included, is a base it
+    // knows.
+    let known = host
+        .revision_hash(request.since_host_seq)
+        .map(|hash| hash.bytes());
+    let revision = host.revision()?;
+    let mut batch = v1::SyncBatch {
+        project_id: request.project_id.clone(),
+        base: Some(v1::Revision {
+            host_seq: request.since_host_seq,
+            state_hash: request.state_hash.clone(),
+        }),
+        revision: Some(revision.clone()),
+        ..Default::default()
+    };
+    if known.as_ref().map(<[u8; 32]>::as_slice) != Some(request.state_hash.as_slice())
+        || request.state_hash.len() != 32
+    {
+        return checkpoint(host, batch);
+    }
+    for (txn, ack, accepted_at_ms) in host
+        .accepted_after(request.since_host_seq)
+        .take(request.max_transactions as usize)
+    {
+        batch.txns.push(v1::AckedTransaction {
+            host_seq: ack.host_seq,
+            state_hash: ack.state_hash.clone(),
+            txn: Some(txn.clone()),
+            ack: Some(ack.clone()),
+            accepted_at_ms,
+        });
+        if batch.encoded_len() > SYNC_BYTES {
+            batch.txns.pop();
+            if batch.txns.is_empty() {
+                return checkpoint(host, batch);
             }
+            break;
         }
-        batch.complete = batch
-            .txns
-            .last()
-            .map_or(request.since_host_seq, |t| t.host_seq)
-            == revision.host_seq;
-        Ok(SyncResponse {
-            batch,
-            checkpoint: None,
-        })
     }
-    fn checkpoint(&self, mut batch: v1::SyncBatch) -> Result<SyncResponse> {
-        let bytes = self.host.checkpoint_bytes()?;
-        batch.txns.clear();
-        batch.complete = true;
-        batch.checkpoint_asset_id = AssetId::hash(&bytes).to_string();
-        batch.checkpoint_size = bytes.len() as u64;
-        Ok(SyncResponse {
-            batch,
-            checkpoint: Some(bytes),
-        })
-    }
+    batch.complete = batch
+        .txns
+        .last()
+        .map_or(request.since_host_seq, |t| t.host_seq)
+        == revision.host_seq;
+    Ok(SyncResponse {
+        batch,
+        checkpoint: None,
+    })
+}
+fn checkpoint(host: &HostSequencer, mut batch: v1::SyncBatch) -> Result<SyncResponse> {
+    let bytes = host.checkpoint_bytes()?;
+    batch.txns.clear();
+    batch.complete = true;
+    batch.checkpoint_asset_id = AssetId::hash(&bytes).to_string();
+    batch.checkpoint_size = bytes.len() as u64;
+    Ok(SyncResponse {
+        batch,
+        checkpoint: Some(bytes),
+    })
 }
 
 #[derive(Clone)]

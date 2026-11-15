@@ -41,6 +41,37 @@ pub struct Touched {
     /// How many of all these entities the transaction created. Deciding a
     /// new entity again costs less than deciding a change to an existing one.
     pub created: usize,
+    /// What deciding the transaction took, beyond the entities themselves.
+    pub work: Work,
+}
+
+/// What deciding one transaction took, counted while it was decided, so
+/// that what deciding it again will take can be estimated from it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Work {
+    /// Canonical bytes serialized afresh: the entries of the entities that
+    /// changed. Deciding, journaling and checking an entity each pass over
+    /// about this much.
+    pub serialized: usize,
+    /// About how many JSON values those bytes hold.
+    pub values: usize,
+    /// Canonical bytes hashed: from the first change to the end.
+    pub hashed: usize,
+    /// Journal entries an undo compared with what other devices did since.
+    pub compared: usize,
+    /// Objects and groups whose references were looked through, because
+    /// something they may refer to changed.
+    pub scanned: usize,
+}
+
+impl Work {
+    fn add(&mut self, other: Self) {
+        self.serialized = self.serialized.saturating_add(other.serialized);
+        self.values = self.values.saturating_add(other.values);
+        self.hashed = self.hashed.saturating_add(other.hashed);
+        self.compared = self.compared.saturating_add(other.compared);
+        self.scanned = self.scanned.saturating_add(other.scanned);
+    }
 }
 
 impl Touched {
@@ -87,10 +118,11 @@ impl Touched {
         }
         for_each_collection!(union);
         self.created = self.created.saturating_add(other.created);
+        self.work.add(other.work);
     }
 
-    /// The entities a kept draft touched.
-    pub(crate) fn of(originals: &Originals) -> Self {
+    /// The entities a kept draft touched, and what deciding it took.
+    pub(crate) fn of(originals: &Originals, work: Work) -> Self {
         let mut touched = Self::default();
         macro_rules! keys {
             ($field:ident, $key:ty, $value:ty) => {
@@ -103,6 +135,7 @@ impl Touched {
             };
         }
         for_each_collection!(keys);
+        touched.work = work;
         touched
     }
 }

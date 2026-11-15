@@ -19,7 +19,7 @@ pub use frame::{Frame, HEADER_BYTES, channel_for, decode_frame, encode_frame, pa
 pub use session::{
     ConnectionEvent, ConnectionMachine, ConnectionState, InputGuard, LocalHello, Receive, Session,
 };
-pub use sync::{HostSync, SyncReceiver, SyncResponse};
+pub use sync::{HostSync, SyncReceiver, SyncResponse, respond};
 
 /// Closed remote status codes. Free text is never carried as capture/control data.
 pub fn remote_reason_allowed(reason: &str) -> bool {

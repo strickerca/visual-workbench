@@ -484,3 +484,99 @@ fn a_replica_always_knows_the_hash_of_what_it_shows() {
         host.revision().unwrap().state_hash
     );
 }
+
+/// A replica moved on step by step from a wrong list of what the host's
+/// transactions touched is not the host's project: with nothing waiting
+/// that is seen in its hash, and the step is refused with the replica left
+/// at its old revision, where it refuses new work.
+#[test]
+fn a_replica_advanced_from_a_wrong_touched_set_is_refused() {
+    let owner = device(1);
+    let phone = device(2);
+    let mut host = fixture();
+    let snapshot = host.snapshot().unwrap();
+    let mut replica = vw_ops::Replica::new(phone.clone(), snapshot).unwrap();
+    let before = replica.revision().clone();
+    let txn = transaction(
+        host.revision().unwrap(),
+        &owner,
+        7,
+        CLOCK as i64 + 7,
+        vec![create_in(70, 3, &owner)],
+    );
+    let (_, touched) = host
+        .submit_with(txn.clone(), &owner, CLOCK as i64, |_, _, touched| {
+            Ok::<_, OpsError>(touched.clone())
+        })
+        .unwrap();
+    let touched = touched.unwrap();
+    assert!(touched.objects.contains(&id(70)));
+    // Told nothing was touched, the shown project lacks the new object.
+    let wrong = Touched::default();
+    let refused = replica.advance(
+        host.project(),
+        host.revision().unwrap(),
+        &[&txn],
+        &wrong,
+        Default::default(),
+    );
+    assert!(matches!(refused, Err(OpsError::RevisionMismatch)));
+    assert_eq!(replica.revision(), &before);
+    // Behind its host, it refuses work made on the host's revision.
+    let own = transaction(
+        host.revision().unwrap(),
+        &phone,
+        8,
+        CLOCK as i64 + 8,
+        vec![create_in(80, 3, &phone)],
+    );
+    assert!(replica.queue(own).is_err());
+    // From the right list, a fresh replica takes the step, and shows what a
+    // snapshot shows.
+    let mut fresh = vw_ops::Replica::new(phone.clone(), {
+        let earlier = fixture();
+        earlier.snapshot().unwrap()
+    })
+    .unwrap();
+    fresh
+        .advance(
+            host.project(),
+            host.revision().unwrap(),
+            &[&txn],
+            &touched,
+            Default::default(),
+        )
+        .unwrap();
+    let rebuilt = vw_ops::Replica::new(phone, host.snapshot().unwrap()).unwrap();
+    assert!(fresh.project() == rebuilt.project());
+    assert_eq!(fresh.state_hash(), rebuilt.state_hash());
+    assert_eq!(fresh.revision(), rebuilt.revision());
+}
+
+/// Trying a transaction takes it back out even when what inspects the host
+/// meanwhile unwinds.
+#[test]
+#[allow(clippy::panic)]
+fn a_trial_that_unwinds_leaves_the_host_byte_identical() {
+    let owner = device(1);
+    let mut host = fixture();
+    let before = host.checkpoint_bytes().unwrap();
+    let length = host.canonical_len();
+    let txn = transaction(
+        host.revision().unwrap(),
+        &owner,
+        9,
+        CLOCK as i64 + 9,
+        vec![create_in(90, 3, &owner)],
+    );
+    let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        host.check_with(txn.clone(), &owner, CLOCK as i64, |_| -> u8 {
+            panic!("inspection failed")
+        })
+    }));
+    assert!(unwound.is_err());
+    assert!(host.checkpoint_bytes().unwrap() == before);
+    assert_eq!(host.canonical_len(), length);
+    // The same transaction is still free to be accepted.
+    host.submit(txn, &owner, CLOCK as i64).unwrap();
+}
