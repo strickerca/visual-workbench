@@ -5,9 +5,9 @@ import kotlinx.coroutines.CompletableDeferred
 /** Main-confined release bookkeeping for one canvas surface's renderer generations.
  *
  * A generation is one AndroidX renderer with its buffer pools and scene slot. No
- * generation is allocated while any release is still settling, or while the
- * surface is reporting a new size to the scene's owner. Releases that
- * overlap in time form one batch; [joined] completes only after every release of
+ * generation is allocated while any release is still settling, or between the
+ * surface taking a new size and the scene's owner having been told it. Releases
+ * that overlap in time form one batch; [joined] completes only after every release of
  * the batch has settled and then fails with the batch's first failure. */
 internal class CanvasGenerations {
     private val releases = LinkedHashSet<CompletableDeferred<Unit>>()
@@ -16,21 +16,23 @@ internal class CanvasGenerations {
     private var viewportChanges = 0
     val releasing: Boolean get() = releases.isNotEmpty()
     val releaseCount: Int get() = releases.size
-    /** The surface is reporting a new size to the scene's owner right now. */
+    /** The surface has a new size that the scene's owner has not finished taking. */
     val viewportChanging: Boolean get() = viewportChanges > 0
 
     /** A fresh generation needs no current one, no release still settling and no
      * viewport change under way (see [whileViewportChanges]). */
     fun canCreate(hasCurrent: Boolean): Boolean = !hasCurrent && releases.isEmpty() && viewportChanges == 0
 
-    /** Runs [report], which tells the scene's owner the surface's new size. The
-     * owner may publish on the way (it cancels the tool in hand first), and such a
+    /** Runs [step], one step of the surface taking a new size: cancelling the input
+     * in hand, or telling the scene's owner the size. Either makes the owner
+     * publish before it has the new size (it cancels the tool first), and such a
      * scene still carries the previous viewport: a generation created from it would
-     * draw its first frame laid out for the old size. So none is created until
-     * [report] returns; the caller then creates one from the newest scene. */
-    fun <T> whileViewportChanges(report: () -> T): T {
+     * draw its first frame laid out for the old size, and on a surface that had
+     * none it would be kept while a second one is built. So none is created until
+     * every step has returned; the caller then creates one from the newest scene. */
+    fun <T> whileViewportChanges(step: () -> T): T {
         viewportChanges++
-        try { return report() } finally { viewportChanges-- }
+        try { return step() } finally { viewportChanges-- }
     }
 
     /** Registers an actual renderer release. The token completes on Main once the
@@ -176,4 +178,65 @@ internal class CanvasLifeHistory(private val capacity: Int) {
     }
 
     fun snapshot(): List<String> = synchronized(lines) { lines.toList() }
+}
+
+/** Lifecycle diagnostics only: which per-frame lines of one canvas generation are
+ * written. Hovering, panning and zooming publish a saved-frame scene per input
+ * sample, so writing each would flood the log and the in-memory history. After
+ * each lifecycle event ([again]) the next [frames] saved frames and [requests]
+ * frame requests are written in full; beyond that they are only counted, and at
+ * most one summary per [summaryMs] reports the counts. Frames are numbered from 1
+ * in the order they start and, separately, in the order they complete; both
+ * orders agree, so a frame whose start was written also has its completion
+ * written. The caller holds the generation's lock. */
+internal class CanvasLifeBudget(private val frames: Int, private val requests: Int, private val summaryMs: Long) {
+    private var framesUntil = frames
+    private var requestsLeft = requests
+    private var quietRequests = 0
+    private var quietGranted = 0
+    private var quietFrames = 0
+    private var inkFrames = 0
+    private var lastSummaryMs: Long? = null
+    init { require(frames >= 0 && requests >= 0 && summaryMs > 0) }
+
+    /** A lifecycle event: frames after [started] and the next requests are written
+     * again. Returns the counts gathered since the last summary, if any. */
+    fun again(started: Int, nowMs: Long): String? {
+        framesUntil = maxOf(framesUntil, started + frames); requestsLeft = requests
+        return takeSummary(nowMs)
+    }
+
+    /** Whether the frame numbered [number] (by start or by completion) is written. */
+    fun frameWritten(number: Int): Boolean = number <= framesUntil
+
+    /** A frame request; true when it is written, false when it is only counted. */
+    fun request(granted: Boolean): Boolean {
+        if (requestsLeft > 0) { requestsLeft--; return true }
+        quietRequests++; if (granted) quietGranted++
+        return false
+    }
+
+    /** A saved frame completed without being written. */
+    fun quietFrame() { quietFrames++ }
+
+    /** An ink frame was drawn; ink frames are only ever counted. */
+    fun inkFrame() { inkFrames++ }
+
+    /** Ink frames since the last written count, then zero. */
+    fun takeInk(): Int = inkFrames.also { inkFrames = 0 }
+
+    /** The counts, once at least [summaryMs] has passed since the last summary and
+     * something was counted; null otherwise. */
+    fun summaryDue(nowMs: Long): String? {
+        val last = lastSummaryMs
+        if (last != null && nowMs - last < summaryMs) return null
+        return takeSummary(nowMs)
+    }
+
+    private fun takeSummary(nowMs: Long): String? {
+        if (quietRequests == 0 && quietFrames == 0 && inkFrames == 0) return null
+        val line = "quiet_requests=$quietRequests quiet_granted=$quietGranted quiet_frames=$quietFrames ink_frames=${takeInk()}"
+        quietRequests = 0; quietGranted = 0; quietFrames = 0; lastSummaryMs = nowMs
+        return line
+    }
 }

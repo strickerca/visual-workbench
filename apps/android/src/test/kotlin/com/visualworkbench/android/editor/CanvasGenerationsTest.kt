@@ -1,5 +1,6 @@
 package com.visualworkbench.android.editor
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.junit.Assert.*
 import org.junit.Test
@@ -242,6 +243,148 @@ class CanvasReplacementTest {
     }
 }
 
+/** The order in which a surface takes a size, run on the real bookkeeping with a
+ * stand-in for everything else. [Surface] follows CanvasSurface step for step
+ * wherever a generation can be created (attach, surfaceCreated, surfaceChanged,
+ * surfaceDestroyed, publish, ensureRenderer, resize). [Owner] follows the
+ * controller wherever it publishes: cancelling the tool publishes, and taking a
+ * viewport cancels the tool first, then takes the size, then publishes. The
+ * owner outlives an activity, so after a recreation it still holds the camera
+ * for the previous canvas. A scene is named by the viewport it was laid out for. */
+class CanvasSizeChangeOrderTest {
+    private class Owner(private var camera: String) {
+        var sink: ((String) -> Unit)? = null
+        fun publish() { sink?.invoke(camera) }
+        fun cancelTool() = publish()
+        fun viewport(size: String) { cancelTool(); camera = size; publish() }
+    }
+
+    private class Surface(private val owner: Owner, private val inputCancelHeld: Boolean = true) {
+        val generations = CanvasGenerations()
+        val replacement = CanvasReplacement<Int>()
+        val actions = mutableListOf<CanvasReplacement.ResizeAction>()
+        /** The scene each generation started from, in order of creation. */
+        val firstScenes = mutableListOf<String>()
+        var ownerAllowsCreation = true
+        private var attached = false
+        private var size: String? = null
+        private var latest: String? = null
+        private var current: Int? = null
+        private val settling = mutableListOf<CompletableDeferred<Unit>>()
+
+        fun attach() { attached = true; owner.sink = ::publish; owner.publish(); ensureRenderer() }
+        fun surfaceCreated() { ensureRenderer() }
+        fun surfaceChanged(newSize: String) {
+            val changed = size != newSize
+            size = newSize
+            if (changed) {
+                if (inputCancelHeld) generations.whileViewportChanges { cancelInput() } else cancelInput()
+                resize(newSize)
+            }
+            ensureRenderer()
+        }
+        fun surfaceDestroyed() { size = null; cancelInput(); retireRenderer() }
+        fun ownerAllowsCreationNow() { ownerAllowsCreation = true; ensureRenderer() }
+        fun releasesSettle() {
+            for (release in settling.toList()) { release.complete(Unit); generations.settled(release); ensureRenderer() }
+            settling.clear()
+        }
+
+        private fun cancelInput() { owner.cancelTool() }
+        private fun publish(scene: String) { latest = scene; if (current == null) ensureRenderer() }
+        private fun ensureRenderer() {
+            if (!attached || !ownerAllowsCreation || size == null || latest == null || !generations.canCreate(current != null)) return
+            firstScenes += checkNotNull(latest); current = firstScenes.size
+        }
+        private fun retireRenderer() {
+            replacement.clearDeferred()
+            if (replacement.take() != null) settling += generations.beginRelease()
+            if (current != null) { settling += generations.beginRelease(); current = null }
+        }
+        private fun reportViewport(newSize: String) { generations.whileViewportChanges { owner.viewport(newSize) } }
+        private fun resize(newSize: String) {
+            val action = replacement.resizeAction(current != null, giant = false, releasing = generations.releasing)
+            actions += action
+            when (action) {
+                CanvasReplacement.ResizeAction.RetireAll -> { retireRenderer(); reportViewport(newSize) }
+                CanvasReplacement.ResizeAction.Defer -> reportViewport(newSize)
+                CanvasReplacement.ResizeAction.Replace -> {
+                    replacement.keep(checkNotNull(current), awaitRedraw = true); current = null
+                    reportViewport(newSize)
+                    ensureRenderer()
+                    if (current == null) current = replacement.restore()
+                }
+            }
+        }
+    }
+
+    @Test fun theFirstSurfaceOfARecreatedActivityStartsOneGenerationFromTheSceneForItsOwnSize() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated()
+        assertTrue("nothing starts before the surface has a size", surface.firstScenes.isEmpty())
+        surface.surfaceChanged("1500x1080")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.RetireAll), surface.actions)
+        assertEquals(listOf("1500x1080"), surface.firstScenes)
+        assertNull("nothing is kept: there was nothing to replace", surface.replacement.kept)
+    }
+
+    /** The order before the cancel was held: the size was assigned, the cancel
+     * published the owner's old-size scene, and that started a first generation
+     * which the size change then kept while it built a second. */
+    @Test fun cancellingTheInputOutsideTheHoldStartedAGenerationForTheOldSizeAndThenASecond() {
+        val surface = Surface(Owner(camera = "1080x1500"), inputCancelHeld = false)
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1500x1080")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.Replace), surface.actions)
+        assertEquals(listOf("1080x1500", "1500x1080"), surface.firstScenes)
+        assertEquals(1, surface.replacement.kept)
+    }
+
+    @Test fun aSurfaceThatComesBackStartsOneGenerationAgain() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceDestroyed(); surface.releasesSettle()
+        surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.RetireAll, CanvasReplacement.ResizeAction.RetireAll), surface.actions)
+        assertEquals(listOf("1080x1500", "1080x1500"), surface.firstScenes)
+        assertNull(surface.replacement.kept)
+    }
+
+    @Test fun aSurfaceThatComesBackBeforeItsReleaseSettledStartsOneGenerationOnceItHas() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceDestroyed()
+        surface.surfaceCreated(); surface.surfaceChanged("1080x1100")
+        assertEquals(listOf("1080x1500"), surface.firstScenes)
+        surface.releasesSettle()
+        assertEquals(listOf("1080x1500", "1080x1100"), surface.firstScenes)
+    }
+
+    @Test fun aSurfaceWhoseOwnerStillWaitsForThePreviousCanvasStartsOneGenerationWhenAllowed() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.ownerAllowsCreation = false
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1500x1080")
+        assertTrue(surface.firstScenes.isEmpty())
+        surface.ownerAllowsCreationNow()
+        assertEquals(listOf("1500x1080"), surface.firstScenes)
+    }
+
+    @Test fun aLaterSizeChangeStillKeepsTheGenerationAndStartsOneSuccessorForTheNewSize() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceChanged("1080x1100")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.RetireAll, CanvasReplacement.ResizeAction.Replace), surface.actions)
+        assertEquals(listOf("1080x1500", "1080x1100"), surface.firstScenes)
+        assertEquals(1, surface.replacement.kept)
+    }
+
+    @Test fun aSurfaceChangeThatKeepsTheSizeTouchesNothing() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceChanged("1080x1500")
+        assertEquals(1, surface.actions.size); assertEquals(1, surface.firstScenes.size)
+    }
+}
+
 class CanvasRedrawHandshakeTest {
     private class Scheduler {
         val scheduled = mutableListOf<Pair<Runnable, Long>>()
@@ -323,4 +466,61 @@ class CanvasLifeHistoryTest {
     }
 
     @Test(expected = IllegalArgumentException::class) fun needsRoomForOneLine() { CanvasLifeHistory(0) }
+}
+
+class CanvasLifeBudgetTest {
+    @Test fun aNewGenerationWritesItsFirstFramesAndRequestsThenCounts() {
+        val budget = CanvasLifeBudget(frames = 3, requests = 2, summaryMs = 1_000)
+        assertEquals(listOf(true, true, true, false, false), (1..5).map(budget::frameWritten))
+        assertEquals(listOf(true, true, false, false), List(4) { budget.request(granted = true) })
+    }
+
+    @Test fun hoverAtTwoHundredSamplesASecondWritesOneSummaryASecond() {
+        val budget = CanvasLifeBudget(frames = 8, requests = 16, summaryMs = 1_000)
+        repeat(16) { budget.request(granted = true) }
+        repeat(8) { budget.frameWritten(it + 1) }
+        val summaries = mutableListOf<String>()
+        var frame = 8
+        for (sample in 0 until 600) { // three seconds, one sample every 5 ms
+            val now = 10_000L + sample * 5
+            if (!budget.request(granted = sample % 2 == 0)) budget.summaryDue(now)?.let(summaries::add)
+            if (sample % 2 == 0 && !budget.frameWritten(++frame)) { budget.quietFrame(); budget.summaryDue(now)?.let(summaries::add) }
+        }
+        assertEquals(3, summaries.size)
+        assertEquals("quiet_requests=1 quiet_granted=1 quiet_frames=0 ink_frames=0", summaries.first())
+        assertTrue(summaries[1], summaries[1].startsWith("quiet_requests=200 quiet_granted=100 quiet_frames=100 "))
+    }
+
+    @Test fun aLifecycleEventWritesTheNextFramesAgainAndHandsOverWhatWasCounted() {
+        val budget = CanvasLifeBudget(frames = 2, requests = 1, summaryMs = 1_000)
+        budget.request(granted = true)
+        assertFalse(budget.request(granted = false)); budget.quietFrame(); budget.inkFrame(); budget.inkFrame()
+        assertFalse(budget.frameWritten(3))
+        assertEquals("quiet_requests=1 quiet_granted=0 quiet_frames=1 ink_frames=2", budget.again(started = 2, nowMs = 50))
+        assertTrue(budget.frameWritten(3)); assertTrue(budget.frameWritten(4)); assertFalse(budget.frameWritten(5))
+        assertTrue(budget.request(granted = true))
+        assertNull("nothing new was counted", budget.again(started = 4, nowMs = 60))
+        assertTrue("the event re-opened the requests", budget.request(granted = false))
+    }
+
+    /** A frame's start and completion are numbered in the same order, so a frame
+     * whose start line was written also has its completion line written, even when
+     * the next event arrives between them. */
+    @Test fun aFrameWhoseStartWasWrittenHasItsCompletionWritten() {
+        val budget = CanvasLifeBudget(frames = 1, requests = 0, summaryMs = 1_000)
+        assertTrue(budget.frameWritten(1))
+        budget.again(started = 1, nowMs = 0)
+        assertTrue(budget.frameWritten(1)); assertTrue(budget.frameWritten(2))
+    }
+
+    @Test fun inkFramesAreCountedOnceWhereverTheyAreWritten() {
+        val budget = CanvasLifeBudget(frames = 1, requests = 0, summaryMs = 1_000)
+        repeat(5) { budget.inkFrame() }
+        assertEquals(5, budget.takeInk()); assertEquals(0, budget.takeInk())
+        budget.inkFrame()
+        assertEquals("quiet_requests=0 quiet_granted=0 quiet_frames=0 ink_frames=1", budget.summaryDue(0))
+        assertNull(budget.summaryDue(5_000))
+    }
+
+    @Test(expected = IllegalArgumentException::class) fun aSummaryGapMustBePositive() { CanvasLifeBudget(1, 1, 0) }
 }
