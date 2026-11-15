@@ -24,7 +24,7 @@ open blockers.
 | Capture, masks, instruction packages, local MCP tools | Yes | Yes | Partly |
 | Image edit through an image model | Yes | Yes, against recorded responses | No live run yet |
 | Remote pen editing in Paint | Yes | Yes, on a Windows build machine without Paint or a pen | Not yet accepted |
-| Installers (MSI and APK) | Yes | APK can be built on request (`build-apps` workflow); MSI not yet | App image and APK installed and launched once; MSI install not yet accepted |
+| App packages (Windows app folder, APK; MSI) | Yes | Windows app folder and APK are built as downloads by the `build-apps` workflow; MSI not yet | App image and APK installed and launched once from the laptop's build; the downloads and the MSI not yet |
 
 No product gate (G0–G5) has been recorded yet.
 
@@ -91,7 +91,10 @@ workspace and the desktop app on Windows. Nothing merges into `main` unless
 Three more workflows run beside it: `emulator` runs the on-screen Android tests
 on a headless emulator (informational; no pen, software screen), `weekly-scan`
 checks the pinned libraries for newly published vulnerabilities, and
-`build-apps` builds a downloadable Android package on request.
+`build-apps` builds both apps as downloads (Actions tab → build-apps → a run →
+Artifacts): the Android package, and the Windows app as a folder to unzip and
+start with `VisualWorkbenchDev.exe`. The Android package is signed with a
+throwaway key, so it installs on a phone that does not have the app yet.
 
 ## Repository map
 
