@@ -124,7 +124,7 @@ pub(crate) fn upgrade(connection: &mut Connection) -> Result<(), StoreError> {
     tx.execute_batch(MIGRATION_2)?;
     crate::projections::persist(&tx, host.project(), 0, time)?;
     write_snapshot(&tx, &host, time)?;
-    replay_log(&tx, &mut host, 0, false)?;
+    replay_log(&tx, &mut host, 0, false, None)?;
     // Verify every pre-existing snapshot against independent historical replay.
     let snapshots = tx
         .prepare("SELECT host_seq,state,state_hash FROM snapshots ORDER BY host_seq")?
@@ -176,10 +176,9 @@ pub(crate) fn upgrade(connection: &mut Connection) -> Result<(), StoreError> {
     for record in host.conflicts() {
         write_conflict(&tx, record)?;
     }
-    // Keep revision zero plus the fully restored latest checkpoint. Old draft
-    // snapshots with no sequencing state cannot safely act as restore points.
+    // Keep the revision-zero checkpoint written above: the log replays from
+    // it. Old draft snapshots with no sequencing state cannot act as one.
     tx.execute("DELETE FROM snapshots WHERE host_seq>0", [])?;
-    write_snapshot(&tx, &host, time)?;
     for txn in crate::database::validate_pending(&tx, host.project())? {
         for op in txn.ops {
             if let Some(vw_proto::v1::op::Kind::AddAsset(asset)) = op.kind {
