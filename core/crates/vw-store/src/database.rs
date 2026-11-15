@@ -111,8 +111,11 @@ pub enum CheckpointNeed {
     /// Replaying would at least double the next open: write it when the
     /// project has been left alone for a while.
     Overdue,
-    /// Replaying would take at least five seconds and twice as long as the
-    /// rest of the open: write it at the next moment nothing else is waiting.
+    /// Replaying would take at least five seconds and four times as long as
+    /// the rest of the open: write it at the next moment nothing else is
+    /// waiting, although someone is working. Writing one holds the project
+    /// up for about as long as an open takes, so this is the backstop for
+    /// work that never pauses, not the usual way.
     Urgent,
 }
 
@@ -1361,7 +1364,7 @@ fn checkpoint_need(tail: &ReplayCost, log: &LogSpan) -> CheckpointNeed {
         CheckpointNeed::None
     } else if tail.micros < whole {
         CheckpointNeed::Due
-    } else if tail.micros < CHECKPOINT_URGENT_MICROS || tail.micros < whole.saturating_mul(2) {
+    } else if tail.micros < CHECKPOINT_URGENT_MICROS || tail.micros < whole.saturating_mul(4) {
         CheckpointNeed::Overdue
     } else {
         CheckpointNeed::Urgent

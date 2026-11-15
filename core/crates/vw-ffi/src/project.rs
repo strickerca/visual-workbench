@@ -107,13 +107,15 @@ const QUIET_LOOKS: u32 = 2;
 /// is open, so that an application that is killed, or never closes the
 /// project, does not leave the next open with all of it to replay.
 ///
-/// A checkpoint takes as long as the history is large and nothing else in
-/// the project runs meanwhile, so it is written when that disturbs least:
-/// once it is overdue and the project has been left alone for ten seconds,
-/// or, when it is urgent, as soon as nothing is waiting. Never while a
-/// stroke is being drawn, whose save would wait for it, and never for a
-/// history of strokes, which needs none. Closing writes one that is merely
-/// due.
+/// A checkpoint takes as long as the history is large (four seconds at 8,000
+/// strokes) and nothing else in the project runs meanwhile, so it is written
+/// when that disturbs least: once it is overdue and the project has been
+/// left alone for ten seconds. Work that never pauses that long is held up
+/// for one only when it is urgent, which bounds what a kill can leave to
+/// replay at about four times what opening the project takes anyway. Never
+/// while a stroke is being drawn, whose save would wait for it, and never
+/// for a history of strokes, which needs none. Closing writes one that is
+/// merely due.
 struct CheckpointUpkeep {
     drawing: Arc<AtomicUsize>,
     /// The revision at the last look, and how many looks it has stayed.
