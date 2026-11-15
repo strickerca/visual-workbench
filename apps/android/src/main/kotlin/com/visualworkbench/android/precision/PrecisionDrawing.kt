@@ -6,6 +6,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import com.visualworkbench.android.editor.CanvasScene
 import com.visualworkbench.android.editor.EditorDrawing
+import com.visualworkbench.android.editor.visibleDocumentRect
 import com.visualworkbench.shared.*
 
 /** Reuses the same immutable saved/wet paths and source bitmap. No screenshot,
@@ -13,14 +14,22 @@ import com.visualworkbench.shared.*
 internal object PrecisionDrawing {
     fun draw(canvas:Canvas,scene:CanvasScene) {
         EditorDrawing.draw(canvas,scene)
+        drawPanes(canvas,scene,onlyVisible=false)
+    }
+    /** The lens and loupe panes and the mini-map, over an already drawn scene.
+     * With [onlyVisible], saved objects that cannot touch a pane are left out
+     * of it; a pane shows a small part of the document. */
+    fun drawPanes(canvas:Canvas,scene:CanvasScene,onlyVisible:Boolean) {
         val frame=scene.precision
         for(pane in listOfNotNull(frame.lens,frame.loupe)) {
             val r=pane.rectangle
             canvas.save()
             try {
                 canvas.clipRect(r.x.toFloat(),r.y.toFloat(),(r.x+r.width).toFloat(),(r.y+r.height).toFloat())
-                EditorDrawing.draw(canvas,scene.copy(matrix=pane.matrix,camera=scene.camera.copy(scale=pane.scale),
-                    selected=null,hover=null,peerViewport=emptyList(),precision=PrecisionFrame(),smoothBackground=pane.smooth))
+                val inside=scene.copy(matrix=pane.matrix,camera=scene.camera.copy(scale=pane.scale),
+                    selected=null,hover=null,peerViewport=emptyList(),precision=PrecisionFrame(),smoothBackground=pane.smooth)
+                val visible=if(onlyVisible)visibleDocumentRect(pane.matrix,r)else null
+                if(visible==null)EditorDrawing.draw(canvas,inside)else EditorDrawing.drawVisible(canvas,inside,visible)
             } finally {canvas.restore()}
             val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply {color=if(pane.editable)0xff74e5c2.toInt() else 0xffecc769.toInt();style=Paint.Style.STROKE;strokeWidth=2*scene.density}
             canvas.drawRect(RectF(r.x.toFloat(),r.y.toFloat(),(r.x+r.width).toFloat(),(r.y+r.height).toFloat()),paint)

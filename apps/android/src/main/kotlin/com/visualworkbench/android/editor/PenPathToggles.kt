@@ -8,6 +8,8 @@ package com.visualworkbench.android.editor
 internal enum class PenPathToggle(val key: String, val title: String, val effect: String) {
     CanvasQuickRefresh("canvasQuickRefresh", "Canvas: quick refresh after a save",
         "After each saved stroke or edit only what changed is read back, instead of rebuilding every stroke in the document. The more strokes a document has, the more this saves between one stroke and the next."),
+    CanvasInkOnly("canvasInkOnly", "Canvas: draw only the new stroke",
+        "While a pen or marker stroke is in progress, the finished picture of the document is kept and only the new stroke is drawn over it, instead of redrawing every object for every pen sample. Highlighter strokes and strokes under another layer are drawn the old way."),
     CanvasInkBeforeSave("canvasInkBeforeSave", "Canvas: next stroke starts while the last one saves",
         "Ink for a new stroke no longer waits until the stroke before it is saved and refreshed, also not during the occasional slow recovery checkpoint, and a pen-down is no longer dropped while instructions are re-read after a save. Strokes are still saved in the order they were drawn."),
     RemoteLongBatches("remoteLongBatches", "Remote pen: keep drawing through a hitch",

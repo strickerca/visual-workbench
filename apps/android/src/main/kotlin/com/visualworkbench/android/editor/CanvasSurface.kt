@@ -71,6 +71,8 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         var resizeFrom: SurfaceControlCompat? = null
         /** Diagnostics only: the pen sample time of the last drawn ink frame. */
         @Volatile var frontSampleMs = 0L
+        /** Developer switch only, drawing thread only: the kept picture an ink frame draws over. */
+        var wetInk: WetInkLayer? = null
     }
     private class Generation(val renderer: CanvasFrontBufferedRenderer<Frame>, val session: RenderSession)
     private data class Frame(val session: RenderSession, val dry: Boolean, val inputMs: Long,
@@ -276,7 +278,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision;currentSession.giantFrontDrawn=it.giantFrame }
                 } ?: return
                 val drawStarted = System.nanoTime()
-                drawOwned(canvas,snapshot,currentSession)
+                // Developer switch: draw the kept picture and only the stroke in
+                // progress. Any scene it cannot draw exactly falls through.
+                if (!(snapshot.keepDryPicture && (currentSession.wetInk ?: WetInkLayer().also { currentSession.wetInk = it }).draw(canvas, snapshot)))
+                    drawOwned(canvas,snapshot,currentSession)
                 // Timing only: two clock reads and a bounded array write.
                 currentSession.frontSampleMs = snapshot.wetSampleMs
                 controller.diagnostics.pen.inkDrawn(snapshot.wetSampleMs, snapshot.wetStartMs, SystemClock.uptimeMillis(), System.nanoTime() - drawStarted)
@@ -430,6 +435,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     var readerClosed=false
                     try{
                         release.reached(CanvasRetirementMilestone.ReaderCloseRunning)
+                        owned.wetInk?.discard();owned.wetInk=null
                         owned.documentReader?.close();owned.documentReader=null
                         readerClosed=true
                         release.reached(CanvasRetirementMilestone.ReaderClosed)

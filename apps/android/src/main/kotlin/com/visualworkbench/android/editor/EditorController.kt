@@ -565,6 +565,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sceneRevision = 0L
     private var background: Bitmap? = null
     private var objects = emptyList<DrawObject>()
+    private var savedIdsOf: List<DrawObject>? = null
+    private var savedIdsKept: Set<String> = emptySet()
     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
         set(value) { if (field != value) interruptAirInput(clearView = !applyingAirView); field = value }
     private var cameraFitted = false
@@ -1648,7 +1650,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         try { closing.step(EditorCloseStage.ProjectStorage) { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() } }
                         finally {
                             document = null; info = null
-                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); selected = null; transientShape = null
+                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); savedIdsOf = null; savedIdsKept = emptySet(); selected = null; transientShape = null
                             transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
                         }
                     }
@@ -2027,12 +2029,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         aiResults.request()
         val resultFrame=aiFrame()
-        val savedIds = objects.mapTo(HashSet()) { it.item.objectId }
+        // Developer switch: the saved objects change only on a refresh, so their
+        // id set is kept between samples and, with no peer preview replacing any
+        // of them, the list itself is published instead of an equal copy.
+        val keepDry = preferences.penPath[PenPathToggle.CanvasInkOnly]
+        val savedIds = if (keepDry && savedIdsOf === objects) savedIdsKept
+            else objects.mapTo(HashSet<String>()) { it.item.objectId }.also { if (keepDry) { savedIdsOf = objects; savedIdsKept = it } }
         val admittedPeers=peerObjects.filter{aiAdmitResultPreview(doc,it.item)}
         val peerById = admittedPeers.associateBy { it.item.objectId }
         // Existing objects keep their canonical stacking position. Local
         // transforms and erasures below still override the remote replacement.
-        val visibleObjects = objects.map { peerById[it.item.objectId] ?: it }
+        val visibleObjects = if (keepDry && admittedPeers.isEmpty()) objects else objects.map { peerById[it.item.objectId] ?: it }
         val localProvisional = (strokes.mapNotNull { it.drawing } + pendingPreviews.values).filter { it.item.objectId !in savedIds } + listOfNotNull(transientShape)
         val localIds = localProvisional.mapTo(HashSet()) { it.item.objectId }
         val provisional = localProvisional + admittedPeers.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
@@ -2054,7 +2061,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
             aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle(),
-            wetSampleMs=inked?.lastTime?:0L,wetStartMs=inked?.start?.timeMs?:0L)
+            wetSampleMs=inked?.lastTime?:0L,wetStartMs=inked?.start?.timeMs?:0L,keepDryPicture=keepDry)
         scene = next
         if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
