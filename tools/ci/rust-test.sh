@@ -7,3 +7,8 @@ step "workspace tests"
 cargo test --workspace --exclude vw-sim --locked
 step "simulator tests (release)"
 cargo test --release --locked -p vw-sim
+# Speed budget: saving one stroke into a 2,000-stroke document must stay under
+# 10 ms (it measures about 0.6 ms). Fails on any return to work that grows
+# with the size of the document.
+step "stroke-save speed budget"
+VW_BENCH_STROKES=2000 VW_BENCH_BUDGET_MS=10 cargo bench -p vw-ffi --bench commit --locked
