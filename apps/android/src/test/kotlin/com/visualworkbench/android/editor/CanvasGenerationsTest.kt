@@ -467,3 +467,60 @@ class CanvasLifeHistoryTest {
 
     @Test(expected = IllegalArgumentException::class) fun needsRoomForOneLine() { CanvasLifeHistory(0) }
 }
+
+class CanvasLifeBudgetTest {
+    @Test fun aNewGenerationWritesItsFirstFramesAndRequestsThenCounts() {
+        val budget = CanvasLifeBudget(frames = 3, requests = 2, summaryMs = 1_000)
+        assertEquals(listOf(true, true, true, false, false), (1..5).map(budget::frameWritten))
+        assertEquals(listOf(true, true, false, false), List(4) { budget.request(granted = true) })
+    }
+
+    @Test fun hoverAtTwoHundredSamplesASecondWritesOneSummaryASecond() {
+        val budget = CanvasLifeBudget(frames = 8, requests = 16, summaryMs = 1_000)
+        repeat(16) { budget.request(granted = true) }
+        repeat(8) { budget.frameWritten(it + 1) }
+        val summaries = mutableListOf<String>()
+        var frame = 8
+        for (sample in 0 until 600) { // three seconds, one sample every 5 ms
+            val now = 10_000L + sample * 5
+            if (!budget.request(granted = sample % 2 == 0)) budget.summaryDue(now)?.let(summaries::add)
+            if (sample % 2 == 0 && !budget.frameWritten(++frame)) { budget.quietFrame(); budget.summaryDue(now)?.let(summaries::add) }
+        }
+        assertEquals(3, summaries.size)
+        assertEquals("quiet_requests=1 quiet_granted=1 quiet_frames=0 ink_frames=0", summaries.first())
+        assertTrue(summaries[1], summaries[1].startsWith("quiet_requests=200 quiet_granted=100 quiet_frames=100 "))
+    }
+
+    @Test fun aLifecycleEventWritesTheNextFramesAgainAndHandsOverWhatWasCounted() {
+        val budget = CanvasLifeBudget(frames = 2, requests = 1, summaryMs = 1_000)
+        budget.request(granted = true)
+        assertFalse(budget.request(granted = false)); budget.quietFrame(); budget.inkFrame(); budget.inkFrame()
+        assertFalse(budget.frameWritten(3))
+        assertEquals("quiet_requests=1 quiet_granted=0 quiet_frames=1 ink_frames=2", budget.again(started = 2, nowMs = 50))
+        assertTrue(budget.frameWritten(3)); assertTrue(budget.frameWritten(4)); assertFalse(budget.frameWritten(5))
+        assertTrue(budget.request(granted = true))
+        assertNull("nothing new was counted", budget.again(started = 4, nowMs = 60))
+        assertTrue("the event re-opened the requests", budget.request(granted = false))
+    }
+
+    /** A frame's start and completion are numbered in the same order, so a frame
+     * whose start line was written also has its completion line written, even when
+     * the next event arrives between them. */
+    @Test fun aFrameWhoseStartWasWrittenHasItsCompletionWritten() {
+        val budget = CanvasLifeBudget(frames = 1, requests = 0, summaryMs = 1_000)
+        assertTrue(budget.frameWritten(1))
+        budget.again(started = 1, nowMs = 0)
+        assertTrue(budget.frameWritten(1)); assertTrue(budget.frameWritten(2))
+    }
+
+    @Test fun inkFramesAreCountedOnceWhereverTheyAreWritten() {
+        val budget = CanvasLifeBudget(frames = 1, requests = 0, summaryMs = 1_000)
+        repeat(5) { budget.inkFrame() }
+        assertEquals(5, budget.takeInk()); assertEquals(0, budget.takeInk())
+        budget.inkFrame()
+        assertEquals("quiet_requests=0 quiet_granted=0 quiet_frames=0 ink_frames=1", budget.summaryDue(0))
+        assertNull(budget.summaryDue(5_000))
+    }
+
+    @Test(expected = IllegalArgumentException::class) fun aSummaryGapMustBePositive() { CanvasLifeBudget(1, 1, 0) }
+}

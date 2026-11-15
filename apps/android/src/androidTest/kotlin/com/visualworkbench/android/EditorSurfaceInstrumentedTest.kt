@@ -28,8 +28,10 @@ import kotlin.math.abs
 @RunWith(AndroidJUnit4::class)
 class EditorSurfaceInstrumentedTest {
     @get:Rule val testName = TestName()
-    /** Uptime at which the running test switched the canvas's lifecycle diagnostics on. */
+    /** Uptime at which the running test began, and whether it runs the canvas with
+     * its lifecycle log on (diagnostics) or off (the shipping path). */
     private var lifeSinceMs = 0L
+    private var lifecycleLog = false
 
     private fun ready(activity: MainActivity): Boolean = !activity.editor.busy && activity.editor.pending == 0 &&
         !activity.editor.instructionEditor.state.value.busy && !activity.editor.semanticEditor.state.value.busy
@@ -198,17 +200,21 @@ class EditorSurfaceInstrumentedTest {
         if (!lastPresented || blackSamples > 0 || bandSamples > 0) {
             // The canvas's own account of the same seconds (fixed words and numbers):
             // what it was asked to draw, what it drew and when each frame was handed
-            // over, so that a late picture can be told from a lost one.
-            var state = "canvas-unavailable"
-            scenario.onActivity { state = canvas(it.window.decorView)?.lifeState() ?: state }
+            // over, so that a late picture can be told from a lost one. Reading it
+            // must never replace the presentation failure itself.
+            val state = try {
+                var read = "canvas-unavailable"
+                scenario.onActivity { read = canvas(it.window.decorView)?.lifeState() ?: read }
+                read
+            } catch (error: Throwable) { "canvas-state-unreadable cause=${error.javaClass.simpleName}" }
             CanvasLife.line("canvas_state $state")
             CanvasLife.line("present_failed phase=$phase samples=$samples black_samples=$blackSamples black_band_samples=$bandSamples " +
                 "check_began_t=$start")
-            val events = CanvasLife.recent()
-                .filter { (it.substringAfter("t=", "").substringBefore(' ').toLongOrNull() ?: 0L) >= lifeSinceMs }.takeLast(160)
-            fail("Canvas presentation failed: $summary canvas: $state\n" +
-                "canvas events of this test, oldest first (t is uptime in ms; this check began at t=$start):\n" +
-                events.joinToString("\n"))
+            val events = if (!lifecycleLog) "canvas lifecycle log off in this test (its twin with the log on records it)"
+                else "canvas events of this test, oldest first (t is uptime in ms; this check began at t=$start):\n" +
+                    CanvasLife.recent().filter { (it.substringAfter("t=", "").substringBefore(' ').toLongOrNull() ?: 0L) >= lifeSinceMs }
+                        .takeLast(160).joinToString("\n")
+            fail("Canvas presentation failed: $summary canvas: $state\n$events")
         }
     }
 
@@ -256,14 +262,15 @@ class EditorSurfaceInstrumentedTest {
             try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
     }
-    private fun withCanvas(body: (ActivityScenario<MainActivity>, String) -> Unit) {
+    /** [lifecycleLog]: the canvases made for this test write their lifecycle lines
+     * (VW_CANVAS_LIFE) and a presentation failure quotes them. That log changes the
+     * canvas's timing, so the presentation tests also run with it off, as shipped. */
+    private fun withCanvas(lifecycleLog: Boolean = false, body: (ActivityScenario<MainActivity>, String) -> Unit) {
         var ownedProject: String? = null
         var storageClosed = false
         var primaryFailure: Throwable? = null
-        // Diagnostics only: the canvas made for this test writes its lifecycle lines
-        // (VW_CANVAS_LIFE); a presentation failure quotes them.
-        lifeSinceMs = SystemClock.uptimeMillis(); CanvasLife.forced = true
-        CanvasLife.line("test_begin name=${testName.methodName}")
+        lifeSinceMs = SystemClock.uptimeMillis(); this.lifecycleLog = lifecycleLog; CanvasLife.forced = lifecycleLog
+        CanvasLife.line("test_begin name=${testName.methodName} lifecycle_log=${if (lifecycleLog) "on" else "off"}")
         try {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             try {
@@ -334,7 +341,12 @@ class EditorSurfaceInstrumentedTest {
         }
     }
 
-    @Test fun textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore() = withCanvas { scenario, _ ->
+    @Test fun textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore() = textSelectionAndRecreation(lifecycleLog = false)
+
+    /** The same steps, deadlines and checks, with the canvas lifecycle log on. */
+    @Test fun textSelectionMoveResizeEraserUndoAndActivityRecreationWithLifecycleLog() = textSelectionAndRecreation(lifecycleLog = true)
+
+    private fun textSelectionAndRecreation(lifecycleLog: Boolean) = withCanvas(lifecycleLog) { scenario, _ ->
         gesture(scenario, EditorTool.Rectangle, listOf(Point(420.0, 260.0), Point(600.0, 420.0)))
         val created = arrayOf("")
         scenario.onActivity { created[0] = requireNotNull(it.editor.document).render.items.single().objectId }
@@ -369,7 +381,12 @@ class EditorSurfaceInstrumentedTest {
         scenario.onActivity { assertEquals(3, it.editor.document?.render?.items?.size) }
     }
 
-    @Test fun eraserResizeAndRecreationPresentCanvasPixels() = withCanvas { scenario, _ ->
+    @Test fun eraserResizeAndRecreationPresentCanvasPixels() = eraserResizeAndRecreation(lifecycleLog = false)
+
+    /** The same steps, deadlines and checks, with the canvas lifecycle log on. */
+    @Test fun eraserResizeAndRecreationPresentCanvasPixelsWithLifecycleLog() = eraserResizeAndRecreation(lifecycleLog = true)
+
+    private fun eraserResizeAndRecreation(lifecycleLog: Boolean) = withCanvas(lifecycleLog) { scenario, _ ->
         gesture(scenario, EditorTool.Pen, listOf(Point(260.0, 100.0), Point(330.0, 115.0), Point(420.0, 145.0)))
         assertPresented(scenario, "baseline")
         // Eraser controls take layout space below the weighted canvas: an actual SurfaceView resize.
