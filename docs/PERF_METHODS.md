@@ -189,18 +189,32 @@ granted.
 | --- | --- | --- | --- |
 | 1 | none (canvas baseline) | every "Canvas:" line; take the PERF-001 camera measurement once | — |
 | 2 | Canvas: quick refresh after a save | "saved to canvas refreshed" falls | erase part of a stroke, undo, redo, move a selection, hide and show a layer, close and reopen: same picture |
-| 3 | Canvas: next stroke starts while the last one saves | "pen-down to stroke accepted", "pen-down to first ink" fall | count the strokes, undo ten (last first), reopen |
+| 3 | Canvas: next stroke starts while the last one saves | "pen-down to stroke accepted", "pen-down to first ink" fall | count the strokes, undo ten (last first), reopen; on a page with no Highlighter layer make two quick highlighter strokes: one Highlighter layer, not two; draw a stroke and at once add a rectangle, then undo twice: the rectangle goes first |
 | 4 | Canvas: draw only the new stroke | "time to draw one ink frame", "ink drawn", "frame ready" fall | magnifier open and closed, after zoom and rotate, dark theme, a lower layer, highlighter; no flicker at pen-up |
 | 5 | — | PERF-001 camera measurement again with what stayed on | — |
 | 6 | none (remote baseline) | both "Remote:" lines; pauses in five minutes of drawing | — |
 | 7 | Remote pen: samples at the pen's own rate | "pen sample to sent" falls by several ms | if input pauses more often, decide together with step 9 |
 | 8 | Remote pen: exact sample times | by eye: the ghost line's tip wobbles less | — |
-| 9 | Remote pen: keep drawing through a hitch | fewer pauses in five minutes | no disconnect |
+| 9 | Remote pen: keep drawing through a hitch | fewer pauses in five minutes | no disconnect; after a hitch the line in Paint catches up within a frame or two |
 | 10 | Remote pen: fewer, typed calls to the core | "pen sample to sent" same or lower | drawing in Paint looks the same |
 | 11 | Remote view: show each frame sooner | "pen sample to frame that shows it" falls by 2–4 ms | the remote picture starts and runs as before |
 | 12 | everything that stayed on | both exercises again, ten minutes of mixed drawing | battery temperature |
 
 Remote switches take effect the next time the remote view is opened.
+
+With step 7 or 9 on, the phone hands the PC at most eight pen samples within
+one display frame, which is the most it can get with the switches off. Step 9
+admits a longer burst only while its oldest sample is under 50 ms old, as
+before: about 12 samples from a 240 Hz pen, 16 from a 480 Hz pen (about 24
+with step 10). A longer hitch still pauses input.
+
+The ink timings ("ink drawn", "frame ready", "time to draw one ink frame",
+"pen-down to first ink") count a frame only when it shows a pen sample for
+the first time.
+
+Optional hand check for step 3 with both devices: lock the active layer on the
+PC, then draw on the phone. Ink may appear briefly and then stop with the same
+message as with the switch off.
 
 Leave a switch on when the tool says `leave_on`, nothing else got worse and
 its hand check passed. Switch it back off when the tool says `switch_back_off`
