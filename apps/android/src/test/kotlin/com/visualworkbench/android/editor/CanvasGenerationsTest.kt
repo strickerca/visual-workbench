@@ -20,6 +20,54 @@ class CanvasGenerationsTest {
         assertTrue(generations.canCreate(hasCurrent = false))
     }
 
+    @Test fun noGenerationIsCreatedWhileTheSurfaceReportsItsNewSize() {
+        val generations = CanvasGenerations()
+        assertFalse(generations.viewportChanging)
+        val result = generations.whileViewportChanges {
+            assertTrue(generations.viewportChanging)
+            assertFalse(generations.canCreate(hasCurrent = false))
+            // The owner may fit the page inside its size update: a report within a report.
+            generations.whileViewportChanges { assertFalse(generations.canCreate(hasCurrent = false)) }
+            assertFalse(generations.canCreate(hasCurrent = false))
+            "reported"
+        }
+        assertEquals("reported", result)
+        assertFalse(generations.viewportChanging)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    @Test fun aSizeReportThatFailsStillReopensCreation() {
+        val generations = CanvasGenerations()
+        val failure = IllegalStateException("the owner refused the size")
+        try { generations.whileViewportChanges<Unit> { throw failure }; fail("the failure must reach the caller") }
+        catch (error: IllegalStateException) { assertSame(failure, error) }
+        assertFalse(generations.viewportChanging)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    /** The surface's sequence on a size change, with the owner's actual order: it
+     * cancels the tool in hand, which publishes a scene still laid out for the old
+     * size, then takes the new size and publishes the scene for it. */
+    @Test fun aSuccessorStartsFromTheSceneForTheNewSizeNotFromOnePublishedOnTheWay() {
+        val generations = CanvasGenerations()
+        var latest = "old size"; var firstSceneOfSuccessor: String? = null
+        fun ensure() { if (firstSceneOfSuccessor == null && generations.canCreate(hasCurrent = false)) firstSceneOfSuccessor = latest }
+        fun publish(scene: String) { latest = scene; ensure() }
+        generations.whileViewportChanges { publish("old size, tool cancelled"); publish("new size") }
+        assertNull("nothing is created from inside the report", firstSceneOfSuccessor)
+        ensure()
+        assertEquals("new size", firstSceneOfSuccessor)
+    }
+
+    @Test fun aReleaseStillSettlingKeepsCreationClosedAfterTheSizeReport() {
+        val generations = CanvasGenerations()
+        val retired = generations.beginRelease()
+        generations.whileViewportChanges { assertFalse(generations.canCreate(hasCurrent = false)) }
+        assertFalse(generations.canCreate(hasCurrent = false))
+        retired.complete(Unit); generations.settled(retired)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
     @Test fun nothingReleasedJoinsImmediately() {
         val joined = CanvasGenerations().joined()
         assertTrue(joined.isCompleted); assertNull(failureOf(joined))
@@ -236,4 +284,43 @@ class CanvasRedrawHandshakeTest {
         scheduler.scheduled.single().first.run()
         assertEquals(1, finished); assertEquals(0, handshake.waiting)
     }
+
+    @Test fun onlyTheFallbackReportsItselfWithTheNumberOfRedrawsItReleased() {
+        val scheduler = Scheduler(); val reported = mutableListOf<Int>(); var finished = 0
+        val handshake = CanvasRedrawHandshake(scheduler::schedule, scheduler::unschedule, 750) { reported += it }
+        handshake.request({ finished++ }, presented = false); handshake.request({ finished++ }, presented = false)
+        scheduler.scheduled.single().first.run()
+        assertEquals(listOf(2), reported); assertEquals(2, finished)
+        // A first committed frame, a destroyed surface or a detached window finish without it.
+        handshake.request({ finished++ }, presented = false)
+        handshake.finish()
+        handshake.request({ finished++ }, presented = true)
+        assertEquals(listOf(2), reported); assertEquals(4, finished)
+    }
+}
+
+class CanvasLifeHistoryTest {
+    @Test fun keepsOnlyTheNewestLinesOldestFirst() {
+        val history = CanvasLifeHistory(3)
+        assertTrue(history.snapshot().isEmpty())
+        for (line in 1..5) history.add("line $line")
+        assertEquals(listOf("line 3", "line 4", "line 5"), history.snapshot())
+    }
+
+    @Test fun aSnapshotDoesNotChangeWhenLinesFollow() {
+        val history = CanvasLifeHistory(2)
+        history.add("first"); val taken = history.snapshot(); history.add("second"); history.add("third")
+        assertEquals(listOf("first"), taken)
+        assertEquals(listOf("second", "third"), history.snapshot())
+    }
+
+    @Test fun linesFromSeveralThreadsAreAllKept() {
+        val history = CanvasLifeHistory(8_000)
+        val writers = (1..4).map { writer -> Thread { repeat(1_000) { history.add("writer $writer line $it") } } }
+        writers.forEach { it.start() }; writers.forEach { it.join() }
+        val lines = history.snapshot()
+        assertEquals(4_000, lines.size); assertEquals(4_000, lines.toSet().size)
+    }
+
+    @Test(expected = IllegalArgumentException::class) fun needsRoomForOneLine() { CanvasLifeHistory(0) }
 }

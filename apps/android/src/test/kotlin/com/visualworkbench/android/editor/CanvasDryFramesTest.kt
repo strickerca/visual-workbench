@@ -84,6 +84,32 @@ class CanvasDryFramesTest {
         assertNull(frames.request())
     }
 
+    @Test fun diagnosticsCountDrawsInFlightAndAnOutstandingRequest() {
+        val frames = CanvasDryFrames()
+        assertEquals(0, frames.inFlight); assertFalse(frames.requestPending)
+        val request = checkNotNull(frames.request())
+        assertTrue(frames.requestPending)
+        frames.drawStarted(emptyList()); frames.drawStarted(listOf(request))
+        assertEquals(2, frames.inFlight)
+        frames.drawCompleted()
+        assertEquals(1, frames.inFlight); assertTrue(frames.requestPending)
+        frames.drawCompleted()
+        assertEquals(0, frames.inFlight); assertFalse(frames.requestPending)
+    }
+
+    /** The library rebuilds a generation in place on a size change and can drop the
+     * completion of a draw that was under way. Nothing here recovers from that (the
+     * surface replaces the generation); the diagnostics must keep showing it. */
+    @Test fun aCompletionThatNeverArrivesStaysVisibleAsADrawInFlight() {
+        val frames = CanvasDryFrames()
+        val request = checkNotNull(frames.request())
+        frames.drawStarted(listOf(request))
+        // The library's own redraw after the rebuild starts and completes normally.
+        frames.drawStarted(emptyList()); frames.drawCompleted()
+        assertEquals(1, frames.inFlight); assertTrue(frames.requestPending)
+        assertNull(frames.request())
+    }
+
     @Test fun manyPublicationsCoalesceToTheLatestSceneAfterActualCompletion() {
         val renderer = FiniteRenderer(reopenOnRecording = false)
         renderer.publish(1); renderer.drain()
