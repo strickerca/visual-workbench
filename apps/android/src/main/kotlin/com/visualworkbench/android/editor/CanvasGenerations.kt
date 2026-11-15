@@ -5,18 +5,33 @@ import kotlinx.coroutines.CompletableDeferred
 /** Main-confined release bookkeeping for one canvas surface's renderer generations.
  *
  * A generation is one AndroidX renderer with its buffer pools and scene slot. No
- * generation is allocated while any release is still settling. Releases that
+ * generation is allocated while any release is still settling, or while the
+ * surface is reporting a new size to the scene's owner. Releases that
  * overlap in time form one batch; [joined] completes only after every release of
  * the batch has settled and then fails with the batch's first failure. */
 internal class CanvasGenerations {
     private val releases = LinkedHashSet<CompletableDeferred<Unit>>()
     private var batch: CompletableDeferred<Unit>? = null
     private var batchFailure: Throwable? = null
+    private var viewportChanges = 0
     val releasing: Boolean get() = releases.isNotEmpty()
     val releaseCount: Int get() = releases.size
+    /** The surface is reporting a new size to the scene's owner right now. */
+    val viewportChanging: Boolean get() = viewportChanges > 0
 
-    /** A fresh generation needs no current one and no release still settling. */
-    fun canCreate(hasCurrent: Boolean): Boolean = !hasCurrent && releases.isEmpty()
+    /** A fresh generation needs no current one, no release still settling and no
+     * viewport change under way (see [whileViewportChanges]). */
+    fun canCreate(hasCurrent: Boolean): Boolean = !hasCurrent && releases.isEmpty() && viewportChanges == 0
+
+    /** Runs [report], which tells the scene's owner the surface's new size. The
+     * owner may publish on the way (it cancels the tool in hand first), and such a
+     * scene still carries the previous viewport: a generation created from it would
+     * draw its first frame laid out for the old size. So none is created until
+     * [report] returns; the caller then creates one from the newest scene. */
+    fun <T> whileViewportChanges(report: () -> T): T {
+        viewportChanges++
+        try { return report() } finally { viewportChanges-- }
+    }
 
     /** Registers an actual renderer release. The token completes on Main once the
      * release callback has closed the generation's reader; then call [settled]. */

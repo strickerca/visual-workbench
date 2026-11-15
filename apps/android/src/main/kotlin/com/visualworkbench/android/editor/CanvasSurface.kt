@@ -49,7 +49,11 @@ import java.util.concurrent.TimeUnit
  * leaves. A further resize before the successor presents rebuilds both
  * generations in place, transiently up to four pool sets; later resizes are
  * deferred into one coalesced replacement. Giant mode keeps break-before-make so
- * its single surface reservation is never shared. */
+ * its single surface reservation is never shared.
+ *
+ * A generation always starts from the scene for the surface's current size: while
+ * the controller is being told a new size, the scenes it publishes on the way are
+ * only remembered, and the generation is created after it returns. */
 internal class CanvasSurface(context: Context, val controller: EditorController) : SurfaceView(context) {
     private class RenderSession {
         var closed = false
@@ -176,13 +180,19 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if (dry) current.renderMultiBufferedLayer(listOf(frame)) else current.renderFrontBufferedLayer(frame)
     }
 
+    /** Main: tells the controller the surface's new size. No generation starts from
+     * a scene it publishes on the way (see [CanvasGenerations.whileViewportChanges]). */
+    private fun reportViewport(width: Int, height: Int, density: Float) {
+        generations.whileViewportChanges { controller.viewport(width, height, density) }
+    }
+
     /** Main, for an actual SurfaceView size change. */
     private fun resize(width: Int, height: Int) {
         val density = resources.displayMetrics.density
         val current = renderer; val currentSession = session
         when (replacement.resizeAction(current != null && currentSession != null, controller.giantMode, generations.releasing)) {
             CanvasReplacement.ResizeAction.RetireAll -> {
-                retireRenderer(CanvasRetirementReason.SurfaceChanged); controller.viewport(width, height, density)
+                retireRenderer(CanvasRetirementReason.SurfaceChanged); reportViewport(width, height, density)
             }
             CanvasReplacement.ResizeAction.Defer -> {
                 // A replacement is still settling. Presented generations resize in
@@ -196,7 +206,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     // The kept generation redraws again: restart its bounded fallback.
                     main.removeCallbacks(keptFallback); main.postDelayed(keptFallback, KEPT_REDRAW_FALLBACK_MS)
                 }
-                controller.viewport(width, height, density); keptFollowsLatest()
+                reportViewport(width, height, density); keptFollowsLatest()
             }
             CanvasReplacement.ResizeAction.Replace -> {
                 val keptGeneration = Generation(checkNotNull(current), checkNotNull(currentSession))
@@ -205,7 +215,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                 awaitResizeRedraw(keptGeneration.session)
                 replacement.keep(keptGeneration, awaitRedraw = true)
                 renderer = null; session = null
-                controller.viewport(width, height, density) // Its publish creates the successor from the new viewport.
+                // The controller cancels the tool in hand, and publishes, before it
+                // takes the new size. The successor is created after it returns, so
+                // its first frame is the scene for the new viewport, not that one.
+                reportViewport(width, height, density)
                 ensureRenderer()
                 val successor = session ?: run { restoreKept(); return }
                 keptFollowsLatest()

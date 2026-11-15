@@ -20,6 +20,54 @@ class CanvasGenerationsTest {
         assertTrue(generations.canCreate(hasCurrent = false))
     }
 
+    @Test fun noGenerationIsCreatedWhileTheSurfaceReportsItsNewSize() {
+        val generations = CanvasGenerations()
+        assertFalse(generations.viewportChanging)
+        val result = generations.whileViewportChanges {
+            assertTrue(generations.viewportChanging)
+            assertFalse(generations.canCreate(hasCurrent = false))
+            // The owner may fit the page inside its size update: a report within a report.
+            generations.whileViewportChanges { assertFalse(generations.canCreate(hasCurrent = false)) }
+            assertFalse(generations.canCreate(hasCurrent = false))
+            "reported"
+        }
+        assertEquals("reported", result)
+        assertFalse(generations.viewportChanging)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    @Test fun aSizeReportThatFailsStillReopensCreation() {
+        val generations = CanvasGenerations()
+        val failure = IllegalStateException("the owner refused the size")
+        try { generations.whileViewportChanges<Unit> { throw failure }; fail("the failure must reach the caller") }
+        catch (error: IllegalStateException) { assertSame(failure, error) }
+        assertFalse(generations.viewportChanging)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    /** The surface's sequence on a size change, with the owner's actual order: it
+     * cancels the tool in hand, which publishes a scene still laid out for the old
+     * size, then takes the new size and publishes the scene for it. */
+    @Test fun aSuccessorStartsFromTheSceneForTheNewSizeNotFromOnePublishedOnTheWay() {
+        val generations = CanvasGenerations()
+        var latest = "old size"; var firstSceneOfSuccessor: String? = null
+        fun ensure() { if (firstSceneOfSuccessor == null && generations.canCreate(hasCurrent = false)) firstSceneOfSuccessor = latest }
+        fun publish(scene: String) { latest = scene; ensure() }
+        generations.whileViewportChanges { publish("old size, tool cancelled"); publish("new size") }
+        assertNull("nothing is created from inside the report", firstSceneOfSuccessor)
+        ensure()
+        assertEquals("new size", firstSceneOfSuccessor)
+    }
+
+    @Test fun aReleaseStillSettlingKeepsCreationClosedAfterTheSizeReport() {
+        val generations = CanvasGenerations()
+        val retired = generations.beginRelease()
+        generations.whileViewportChanges { assertFalse(generations.canCreate(hasCurrent = false)) }
+        assertFalse(generations.canCreate(hasCurrent = false))
+        retired.complete(Unit); generations.settled(retired)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
     @Test fun nothingReleasedJoinsImmediately() {
         val joined = CanvasGenerations().joined()
         assertTrue(joined.isCompleted); assertNull(failureOf(joined))
