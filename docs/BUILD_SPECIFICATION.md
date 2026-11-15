@@ -273,7 +273,7 @@ Full records are in `DECISIONS.md`.
 ### 4.5 Storage (D5)
 
 - **Project folder `<name>.vwb/`**
-  - `project.sqlite` in WAL mode (draft schema in `contracts/storage.sql`): meta, devices, assets, documents, captures, layers, objects (current state), op_log, pending_txns (phone), snapshots (every 500 transactions or 5 minutes), instructions, semantic_snapshots, packages, results, conflicts, settings.
+  - `project.sqlite` in WAL mode (draft schema in `contracts/storage.sql`): meta, devices, assets, documents, captures, layers, objects (current state), op_log, pending_txns (phone), snapshots (recovery checkpoints, at most two: the one the project began with and one later one; the later one is written only when replaying the log would cost more than loading it, at open, while the project is left alone, or at close, never by a save), instructions, semantic_snapshots, packages, results, conflicts, settings.
   - `blobs/<2 hex>/<2 hex>/<AssetId>`: originals and AI outputs.
   - `cache/`: derived pyramids; deletable.
 - Originals are never modified or deleted automatically.
