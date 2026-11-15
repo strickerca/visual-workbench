@@ -85,7 +85,6 @@ ask at stage boundaries.
 | Coordination and every other stage of either track | Main session | Its current level |
 | Improvement stages 5 (core engine), 6 (connect without typing) and 7 (pen path) | Delegated agent | `xhigh` |
 | Independent review of a slice's code diff | Fresh agent | `high` |
-| Anything | | Never `max` |
 
 ## Builds and devices
 
