@@ -7,6 +7,10 @@ import android.view.MotionEvent
 import android.view.Surface
 import com.visualworkbench.shared.*
 import com.visualworkbench.android.diagnostics.inputDeviceCapability
+import com.visualworkbench.android.diagnostics.PenPathMetrics
+import com.visualworkbench.android.diagnostics.PenTiming
+import com.visualworkbench.android.editor.PenPathToggle
+import com.visualworkbench.android.editor.PenPathToggles
 import java.util.concurrent.atomic.AtomicReference
 import java.security.MessageDigest
 import kotlinx.coroutines.*
@@ -37,7 +41,11 @@ internal data class RemoteAccessibilityInputSnapshot(val ready:Boolean,val nativ
 /** Owns every native ticket, duplicated Surface/codec worker, palette and input
  * queue until actual retirement. No callback or predicted sample invents ACK. */
 internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:CoroutineScope,
-    private val measuredTiltCalibration:(Int)->StylusTiltCalibration?={null}):RemoteConsumerOwner {
+    private val measuredTiltCalibration:(Int)->StylusTiltCalibration?={null},
+    /** Developer switches, read once: they apply from the next time the remote view opens. */
+    toggles:PenPathToggles=PenPathToggles(),
+    /** Local timings for the diagnostics screen; durations only. */
+    private val metrics:PenPathMetrics?=null):RemoteConsumerOwner {
     private val job=SupervisorJob(parent.coroutineContext[Job])
     private val scope=CoroutineScope(parent.coroutineContext.minusKey(Job)+job)
     private val decoderMutex=Mutex()
@@ -73,7 +81,9 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             kotlin.math.floor(viewport.left+viewport.width).toInt(),kotlin.math.floor(viewport.top+viewport.height).toInt())
         RemoteAccessibilityInputSnapshot(true,grant,paint,digest,rect,intArrayOf(map.rect.x,map.rect.y,map.rect.width.toInt(),map.rect.height.toInt()),age)
     }
-    val inputClockDescription:String=if(Build.VERSION.SDK_INT>=34)"Nanosecond event fields; uptime alignment bounded to 1 ms" else "Millisecond event precision"
+    val inputClockDescription:String get()=if(Build.VERSION.SDK_INT<34)"Millisecond event precision"
+        else if(sampleClock.exact)"Nanosecond event fields; each sample keeps its own event time"
+        else "Nanosecond event fields; uptime alignment bounded to 1 ms"
     val palette=RemoteEditorPalette(remote,scope)
     private val segments=RemoteGhostSegments(ghost)
     private val echoLedger=RemoteEchoLedger()
@@ -81,7 +91,17 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     val echo:StateFlow<RemoteEchoTiming> = echoMutable.asStateFlow()
     private val mapping=AtomicReference<RemoteRenderMapping?>(null)
     private val nativeTickets=linkedMapOf<ULong,RemoteVideoFrame>()
-    private val input=Channel<TouchAdmission>(8)
+    private val intake=RemotePenIntake(toggles[PenPathToggle.RemoteLongBatches],
+        typed=toggles[PenPathToggle.RemoteTypedBatches]&&remote is RemotePenBatches)
+    private val input=Channel<TouchAdmission>(intake.queueCapacity)
+    private val pacer=if(remoteSendPaced(intake.longBatches,toggles[PenPathToggle.RemoteUnbufferedPen]))RemoteSendPacer() else null
+    /** Developer switch: reservation and sends go through the typed calls, several samples at once. */
+    private val batches=(remote as? RemotePenBatches)?.takeIf{toggles[PenPathToggle.RemoteTypedBatches]}
+    private val sampleClock=RemoteSampleClock(toggles[PenPathToggle.RemoteExactTimes])
+    /** Developer switch: the video decoder picks each frame up the moment it is decoded. */
+    private val quickFrames:Boolean=toggles[PenPathToggle.RemoteQuickFrames]
+    /** Developer switch: the remote surface asks Android for unbatched pen samples during a contact. */
+    val unbufferedPen:Boolean=toggles[PenPathToggle.RemoteUnbufferedPen]
     @Volatile private var borrowedSurface:Surface?=null
     @Volatile private var surfaceOwner:Any?=null
     private var decoder:RemoteHardwareDecoder?=null
@@ -121,38 +141,52 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         }
         scope.launch(Dispatchers.Default) {
             for(item in input){
-                val age=System.nanoTime()-item.sample.sampledLocalNanos
-                if(age !in 0 until 50_000_000L){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
-                val allowed=synchronized(inputFence){enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
+                // Long batches or unbuffered pen only: never hand the computer's eight-slot input queue more than it takes today.
+                if(pacer!=null)while(true){val wait=pacer.acquire(System.nanoTime());if(wait<=0L)break;delay((wait+999_999L)/1_000_000L)}
+                // Typed batches only: whatever else is already waiting goes in the same call,
+                // up to eight samples. A send slot taken for a sample that is not there is given back.
+                val group=if(batches==null)listOf(item)else buildList{add(item);while(size<RemotePenIntake.GROUP){
+                    if(pacer!=null&&pacer.acquire(System.nanoTime())>0L)break
+                    val more=input.tryReceive().getOrNull()
+                    if(more==null){pacer?.giveBack();break}
+                    add(more)}}
+                val now=System.nanoTime()
+                if(group.any{(now-it.sample.sampledLocalNanos) !in 0 until 50_000_000L}){physical.get()?.journal?.pause("input_expired");deactivate("input_expired");continue}
+                val allowed=synchronized(inputFence){enabled&&foregroundActive&&group.all{it.fence==admissionFence&&it.binding==item.binding}&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true}
                 if(!allowed)continue
                 try{
-                    val admission=remote.pen(item.binding,item.sample)
-                    synchronized(inputFence){
-                        if(enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true){
-                            echoLedger.record(admission);echoMutable.value=echoLedger.snapshot(System.nanoTime())
-                            val before=previousActual?.takeIf{it.first==item.binding}?.second
-                            val ghostAccepted=segments.admitted(admission,item.point,item.contact)
-                            val admittedGhost=ghost.snapshot(System.nanoTime()).firstOrNull{it.segment.binding==admission.binding&&admission.sequence in it.segment.firstInputSequence..it.segment.lastInputSequence}?.segment
-                            // Actual native transport admission only; predictions and
-                            // queued MotionEvents never publish a sequence here.
-                            inputObservationMutable.value=RemoteControllerInputObservation(admission,item.sample.phase,ghostAccepted,admittedGhost)
-                            item.trace?.let{t->val s=item.sample
-                                t.journal.admitted(RemotePhysicalJournalRow(admission.sequence,t.event,s.phase,s.hostX,s.hostY,s.pressure,
-                                    t.rawPressure,t.rawTilt,t.rawOrientation,t.rawDistance,s.tiltX,s.tiltY,s.nativePenMask,s.penFlags,
-                                    s.sampledLocalNanos,t.historical,t.origin))}
-                            if(ghostAccepted&&item.contact&&before!=null){
-                                val dt=item.point.localNanos-before.localNanos
-                                if(dt in 1..50_000_000L){val horizon=12_000_000L;val factor=horizon.toFloat()/dt
-                                    val dx=((item.point.x-before.x)*factor).coerceIn(-64f,64f)
-                                    val dy=((item.point.y-before.y)*factor).coerceIn(-64f,64f)
-                                    segments.prediction(item.point.copy(x=item.point.x+dx,y=item.point.y+dy,localNanos=item.point.localNanos+horizon,predicted=true))
-                                }
-                            }
-                            previousActual=if(item.contact)item.binding to item.point else null
-                        }
-                    }
+                    val admissions=if(batches==null)listOf(remote.pen(item.binding,item.sample))else batches.penBatch(item.binding,group.map{it.sample})
+                    for((sent,admission) in group.zip(admissions))admitted(sent,admission)
                 }catch(cancelled:CancellationException){throw cancelled}
                 catch(_:Exception){physical.get()?.journal?.pause("pen_exception");deactivate("owner_pause")}
+            }
+        }
+    }
+    /** One sample the core has sent: timing, ghost ink and the echo ledger, under the input fence. */
+    private fun admitted(item:TouchAdmission,admission:RemoteInputAdmission){
+        metrics?.recordNanos(PenTiming.RemoteSent,System.nanoTime()-item.sample.sampledLocalNanos)
+        synchronized(inputFence){
+            if(enabled&&foregroundActive&&item.fence==admissionFence&&remote.target.value?.let{it.grantActive&&it.binding==item.binding}==true){
+                echoLedger.record(admission);echoMutable.value=echoLedger.snapshot(System.nanoTime())
+                val before=previousActual?.takeIf{it.first==item.binding}?.second
+                val ghostAccepted=segments.admitted(admission,item.point,item.contact)
+                val admittedGhost=ghost.snapshot(System.nanoTime()).firstOrNull{it.segment.binding==admission.binding&&admission.sequence in it.segment.firstInputSequence..it.segment.lastInputSequence}?.segment
+                // Actual native transport admission only; predictions and
+                // queued MotionEvents never publish a sequence here.
+                inputObservationMutable.value=RemoteControllerInputObservation(admission,item.sample.phase,ghostAccepted,admittedGhost)
+                item.trace?.let{t->val s=item.sample
+                    t.journal.admitted(RemotePhysicalJournalRow(admission.sequence,t.event,s.phase,s.hostX,s.hostY,s.pressure,
+                        t.rawPressure,t.rawTilt,t.rawOrientation,t.rawDistance,s.tiltX,s.tiltY,s.nativePenMask,s.penFlags,
+                        s.sampledLocalNanos,t.historical,t.origin))}
+                if(ghostAccepted&&item.contact&&before!=null){
+                    val dt=item.point.localNanos-before.localNanos
+                    if(dt in 1..50_000_000L){val horizon=12_000_000L;val factor=horizon.toFloat()/dt
+                        val dx=((item.point.x-before.x)*factor).coerceIn(-64f,64f)
+                        val dy=((item.point.y-before.y)*factor).coerceIn(-64f,64f)
+                        segments.prediction(item.point.copy(x=item.point.x+dx,y=item.point.y+dy,localNanos=item.point.localNanos+horizon,predicted=true))
+                    }
+                }
+                previousActual=if(item.contact)item.binding to item.point else null
             }
         }
     }
@@ -242,7 +276,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             val configuration=DecoderConfig(decoderScope,frame.config.generation,frame.config.codedWidth,frame.config.codedHeight,frame.config.visibleWidth,frame.config.visibleHeight,frame.config.vps,frame.config.sps,frame.config.pps)
             val ownerReference=AtomicReference<String?>(null)
             val expectedSurfaceEpoch=synchronized(inputFence){surfaceEpoch}
-            when(val result=RemoteHardwareDecoder.open(surface,consumer,configuration){ticket,ptsUs,renderedNanos,callbackNanos->
+            when(val result=RemoteHardwareDecoder.open(surface,consumer,configuration,quickFrames){ticket,ptsUs,renderedNanos,callbackNanos->
                 val expected=ownerReference.get()?:return@open
                 scope.launch(Dispatchers.Default){rendered(expected,expectedSurfaceEpoch,ticket,ptsUs,renderedNanos,callbackNanos)}
             }) {
@@ -315,7 +349,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
                     frame.config.generation,frame.ticket,frame.frameId,frame.ptsUs,renderedNanos,callbackNanos,admission,ack)
                 val target=remote.target.value
                 if(target?.grantActive==true&&inputGrantFence.permits(target.binding)&&target.binding.scope()==frame.config.scope){enabled=true;ghost.activate(target.binding,callbackNanos)}
-                if(ack!=null&&target?.grantActive==true&&target.binding==ack.binding){ghost.acknowledge(ack.binding,ack.lastInputSequenceApplied,ack.frameId,ack.ticket,callbackNanos);echoLedger.acknowledge(ack,callbackNanos)}
+                if(ack!=null&&target?.grantActive==true&&target.binding==ack.binding){ghost.acknowledge(ack.binding,ack.lastInputSequenceApplied,ack.frameId,ack.ticket,callbackNanos);echoLedger.acknowledge(ack,callbackNanos,metrics?.let{m->{nanos:Long->m.recordNanos(PenTiming.RemoteEcho,nanos)}})}
                 echoMutable.value=echoLedger.snapshot(System.nanoTime())
             }
         }catch(_:Exception){active.requestRecovery("NativeTicketRefused");recoverInput();runCatching{remote.requestKeyframe()}}
@@ -329,7 +363,7 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         if(!enabled||!foregroundActive||!target.grantActive||target.binding.scope()!=map.frame.config.scope)return false
         val fence=synchronized(inputFence){admissionFence}
         val batch=mutableListOf<TouchAdmission>()
-        if(event.pointerCount!=1||event.historySize>7)return rejectTouch("pointer_batch")
+        if(event.pointerCount!=1||event.historySize>intake.maxHistory)return rejectTouch("pointer_batch")
         val tool=event.getToolType(0);if(tool!=MotionEvent.TOOL_TYPE_STYLUS&&tool!=MotionEvent.TOOL_TYPE_ERASER)return rejectTouch("tool_type")
         val phase=when(event.actionMasked){MotionEvent.ACTION_DOWN->RemotePenPhase.Down;MotionEvent.ACTION_MOVE->RemotePenPhase.Move;MotionEvent.ACTION_UP->RemotePenPhase.Up;MotionEvent.ACTION_HOVER_ENTER,MotionEvent.ACTION_HOVER_MOVE->RemotePenPhase.Hover;MotionEvent.ACTION_HOVER_EXIT,MotionEvent.ACTION_CANCEL->RemotePenPhase.Leave;else->return rejectTouch("action")}
         synchronized(inputFence){
@@ -362,9 +396,10 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             val point=map.viewport.host(x,y,map.rect)?:return rejectTouch("viewport")
             val sampledUptime=if(Build.VERSION.SDK_INT>=34)eventNanos(event,historical,index) else (if(historical)event.getHistoricalEventTime(index)else event.eventTime)*1_000_000L
             // Align to this phone's System.nanoTime without BOOTTIME. Uptime's
-            // millisecond upper edge conservatively adds at most 1 ms of age.
-            val age=(uptime+1L)*1_000_000L-sampledUptime
-            if(age !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=now-age
+            // millisecond upper edge conservatively adds at most 1 ms of age;
+            // the exact-time switch keeps the sample's own time instead.
+            val timed=sampleClock.sample(sampledUptime,now,uptime)
+            if(timed.ageNanos !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=timed.localNanos
             val pressure=if(historical)event.getHistoricalPressure(0,index)else event.pressure
             if(!pressure.isFinite()||pressure<0)return rejectTouch("pressure")
             val normalized=pressure.coerceAtMost(1f)
@@ -384,15 +419,15 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
         var commandBusy=false
         val admitted=try{synchronized(inputFence){
             if(!enabled||!foregroundActive||fence!=admissionFence||mapping.get()!==map||remote.target.value?.binding!=target.binding)false
-            else if(!remote.reservePen(target.binding,batch.size.toUInt())){
-                commandBusy=true
-                if(phase==RemotePenPhase.Down)suppressedGesture=true
-                false
-            } else{
-                val complete=batch.all{input.trySend(it).isSuccess}
+            else when(intake.admit(batch,{batches?.reservePenBatch(target.binding,it)?:remote.reservePen(target.binding,it)},{input.trySend(it).isSuccess})){
+                RemotePenIntake.Result.Admitted->true
+                RemotePenIntake.Result.CommandBusy->{
+                    commandBusy=true
+                    if(phase==RemotePenPhase.Down)suppressedGesture=true
+                    false
+                }
                 // Seal before the consumer can admit a partially queued prefix.
-                if(!complete){inputGrantFence.invalidate(target.binding);clearInput()}
-                complete
+                RemotePenIntake.Result.Refused->{inputGrantFence.invalidate(target.binding);clearInput();false}
             }
         }
         }catch(_:Exception){return rejectTouch("admission_exception")}

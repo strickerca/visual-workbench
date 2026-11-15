@@ -67,7 +67,46 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject {
+private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchDeferredStrokes {
+    override fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke? {
+        if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
+        if(options.family=="highlighter")return null
+        // One short native call that never touches the project worker. The
+        // handle goes straight to the caller, which owns and disposes it.
+        return try { NativeStroke(handle.beginStrokeDeferred(options.native())) } catch(error:CoreException) { throw mapFailure(error) }
+    }
+    /** The strokes of the snapshot last returned by [documentChanges], each with
+     * the digest the core gave for it. Only an instance still held by the
+     * caller's snapshot is ever named to the core as known. */
+    private class HeldStroke(val item: RenderItem, val digest: ByteArray)
+    private class HeldStrokes(val documentId: String, val strokes: Map<String, HeldStroke>)
+    private val heldStrokes = java.util.concurrent.atomic.AtomicReference<HeldStrokes?>(null)
+    override suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot? {
+        if (documentDescriptor(documentId) != null) return null
+        val held = heldStrokes.get()?.takeIf { it.documentId == documentId }?.strokes.orEmpty()
+        val known = if (previous == null || previous.documentId != documentId) emptyMap()
+            else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
+        return call { cancel ->
+            val d = handle.documentSnapshotChanges(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest) }, cancel)
+            val next = HashMap<String, HeldStroke>(d.items.size)
+            val items = d.items.map { change ->
+                val sent = change.item
+                val item = if (sent != null) nativeRenderItem(sent) else {
+                    // Kept: the core vouches for exactly the bytes named to it.
+                    val kept = known[change.objectId]?.takeIf { it.digest.contentEquals(change.digest) } ?: throw CoreFailure(CoreFailureKind.Worker)
+                    val old = kept.item
+                    if (old.layerOpacity == change.layerOpacity && old.layerBlend == change.layerBlend && old.locked == change.locked) old
+                    else old.copy(layerOpacity = change.layerOpacity, layerBlend = change.layerBlend, locked = change.locked)
+                }
+                change.digest?.let { next[change.objectId] = HeldStroke(item, it) }
+                item
+            }
+            heldStrokes.set(HeldStrokes(documentId, next))
+            DocumentSnapshot(d.documentId, d.title, d.width, d.height, d.bitDepth,
+                d.layers.map { LayerInfo(it.id, it.name, it.visible, it.locked, it.opacity, it.blend) },
+                RenderList(d.revision.common(), items), hasToneAdjustments = d.hasToneAdjustments)
+        }
+    }
     suspend fun <T> withGiantProject(block: suspend (ProjectSession) -> T): T = closeMutex.withLock {
         if (closed.get()) throw GiantImageFailure(GiantImageFailureKind.Closed)
         if (giantOwner != null) giantOwner.call(block) else block(handle)
@@ -161,7 +200,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
     }
     override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke {
         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
-        return acquireNative({handle.beginStroke(NStrokeOptions(options.gestureId,options.transactionId,options.objectId,options.documentId,options.layerId,options.deviceId,options.lamport,options.createdAtMs,options.family,options.width,options.rgba,options.stabilization,options.pressureCurve))},{NativeStroke(it)},{try{it.shutdown()}finally{it.destroy()}})
+        return acquireNative({handle.beginStroke(options.native())},{NativeStroke(it)},{try{it.shutdown()}finally{it.destroy()}})
     }
     override suspend fun edit(options: EditOptions,commands: List<EditCommand>): ProjectInfo = call {
         if ((options.expectedHostSeq == null) != (options.expectedStateHash == null)) throw CoreFailure(CoreFailureKind.Invalid)
@@ -204,7 +243,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
             try { handle.closeSession() }
             catch(error:CoreException) { failure = mapFailure(error) }
             catch(error:Throwable) { failure = error }
-            closed.set(true);documentPasswords.clear();documentPages.clear()
+            closed.set(true);documentPasswords.clear();documentPages.clear();heldStrokes.set(null)
             try { handle.destroy() }
             catch(error:Throwable) {
                 val prior = failure
@@ -232,6 +271,7 @@ private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
         } }
     }
 }
+private fun StrokeOptions.native(): NStrokeOptions = NStrokeOptions(gestureId,transactionId,objectId,documentId,layerId,deviceId,lamport,createdAtMs,family,width,rgba,stabilization,pressureCurve)
 private fun Camera.native(): NCamera = NCamera(center.native(),scale,rotation,viewportWidth,viewportHeight)
 private fun Point.native(): NPoint = NPoint(x,y)
 private fun NPoint.common(): Point = Point(x,y)

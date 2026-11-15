@@ -26,9 +26,12 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable internal fun RemoteEditPanel(remote:WorkbenchRemoteEdit,onDismiss:()->Unit,
+    toggles:com.visualworkbench.android.editor.PenPathToggles=com.visualworkbench.android.editor.PenPathToggles(),
+    metrics:com.visualworkbench.android.diagnostics.PenPathMetrics?=null,
     airActions: @Composable (com.visualworkbench.shared.RemoteEditorPalette, Boolean) -> Unit = { _, _ -> }) {
     val ownerScope=rememberCoroutineScope()
-    val controller=remember(remote){RemoteEditController(remote,ownerScope)}
+    // Developer switches are read when the remote view opens; a change applies to the next opening.
+    val controller=remember(remote){RemoteEditController(remote,ownerScope,toggles=toggles,metrics=metrics)}
     val state by remote.state.collectAsState();val display by controller.display.collectAsState();val echo by controller.echo.collectAsState()
     val context=LocalContext.current
     val lifecycle=remember(context){remoteLifecycleOwner(context)}

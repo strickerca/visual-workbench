@@ -183,22 +183,36 @@ class EditorSurfaceInstrumentedTest {
         // The real input gate also waits for the instruction/semantic refreshes
         // that share the native project worker after an edit.
         await(scenario, "input-ready-$tool", ::ready)
-        scenario.onActivity { activity ->
-            val editor = activity.editor; editor.chooseTool(tool)
-            val surface = requireNotNull(canvas(activity.window.decorView))
-            val snapshot = requireNotNull(editor.scene)
-            val screen = points.map { EditorDrawing.map(snapshot.matrix, it) }
-            val start = SystemClock.uptimeMillis()
-            screen.forEachIndexed { index, p ->
-                val action = when (index) { 0 -> MotionEvent.ACTION_DOWN; screen.lastIndex -> if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP; else -> MotionEvent.ACTION_MOVE }
-                val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = if (finger) MotionEvent.TOOL_TYPE_FINGER else MotionEvent.TOOL_TYPE_STYLUS })
-                val coordinates = arrayOf(MotionEvent.PointerCoords().apply { x = p.x.toFloat(); y = p.y.toFloat(); pressure = .2f + .7f * index / maxOf(1, screen.lastIndex); size = .01f })
-                val event = MotionEvent.obtain(start, start + index * 8, action, 1, properties, coordinates, 0, 0, 1f, 1f, -1, 0,
-                    if (finger) InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_STYLUS, 0)
-                try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
+        // That gate refuses a contact without a message while it is closed, and
+        // the follow-up refresh of the previous edit can close it again between
+        // two main-thread turns. Readiness is therefore re-checked in the very
+        // turn that dispatches the contact, not only in an earlier one.
+        val deadline = SystemClock.uptimeMillis() + 45_000
+        var dispatched = false
+        while (!dispatched) {
+            scenario.onActivity { activity -> if (ready(activity)) { dispatch(activity, tool, points, cancel, finger); dispatched = true } }
+            if (!dispatched) {
+                if (SystemClock.uptimeMillis() >= deadline) fail("Timed out in input-gate-$tool")
+                SystemClock.sleep(5)
             }
         }
         await(scenario, "gesture-$tool", ::ready)
+    }
+    /** Main thread: the whole contact, down to up, in one turn. */
+    private fun dispatch(activity: MainActivity, tool: EditorTool, points: List<Point>, cancel: Boolean, finger: Boolean) {
+        val editor = activity.editor; editor.chooseTool(tool)
+        val surface = requireNotNull(canvas(activity.window.decorView))
+        val snapshot = requireNotNull(editor.scene)
+        val screen = points.map { EditorDrawing.map(snapshot.matrix, it) }
+        val start = SystemClock.uptimeMillis()
+        screen.forEachIndexed { index, p ->
+            val action = when (index) { 0 -> MotionEvent.ACTION_DOWN; screen.lastIndex -> if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP; else -> MotionEvent.ACTION_MOVE }
+            val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = if (finger) MotionEvent.TOOL_TYPE_FINGER else MotionEvent.TOOL_TYPE_STYLUS })
+            val coordinates = arrayOf(MotionEvent.PointerCoords().apply { x = p.x.toFloat(); y = p.y.toFloat(); pressure = .2f + .7f * index / maxOf(1, screen.lastIndex); size = .01f })
+            val event = MotionEvent.obtain(start, start + index * 8, action, 1, properties, coordinates, 0, 0, 1f, 1f, -1, 0,
+                if (finger) InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_STYLUS, 0)
+            try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
+        }
     }
     private fun withCanvas(body: (ActivityScenario<MainActivity>, String) -> Unit) {
         var ownedProject: String? = null

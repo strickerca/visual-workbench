@@ -90,6 +90,27 @@ pub(crate) fn document_bytes(document: &DocumentSnapshot) -> Result<()> {
     }
     Ok(())
 }
+pub(crate) fn document_changes_bytes(document: &DocumentSnapshotChanges) -> Result<()> {
+    let mut n = info_bytes(&document.revision)?;
+    add(&mut n, 128)?;
+    string(&mut n, &document.document_id)?;
+    string(&mut n, &document.title)?;
+    for layer in &document.layers {
+        add(&mut n, 128)?;
+        for value in [&layer.id, &layer.name, &layer.blend] {
+            string(&mut n, value)?;
+        }
+    }
+    for change in &document.items {
+        add(&mut n, 256)?;
+        string(&mut n, &change.object_id)?;
+        string(&mut n, &change.layer_blend)?;
+        if let Some(item) = &change.item {
+            add(&mut n, item_bytes(item)?)?;
+        }
+    }
+    Ok(())
+}
 pub(crate) fn layout_bytes(layout: &vw_raster::TextLayout) -> Result<()> {
     let mut n = 128;
     array(&mut n, layout.glyphs.len(), 256)?;

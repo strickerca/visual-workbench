@@ -14,6 +14,37 @@ class EditorPageRefreshTest {
         assertFalse(admission.accepts(before));assertEquals(7uL,admission.capture().sequence)
         assertFalse(admission.observe(7u));assertTrue(admission.observe(8u))
     }
+    /** The store announces a save from its own thread. When that announcement
+     * lands during the save's own re-read, the read is repeated and its newer
+     * result adopted, instead of leaving the old document on screen. */
+    @Test fun aReadOvertakenByItsOwnSaveEventIsRepeatedAndAdoptsTheNewerResult():Unit=runBlocking {
+        val admission=com.visualworkbench.android.session.RefreshAdmission();admission.observe(3u)
+        var reads=0
+        val adopted=admission.readLatest(3){
+            reads++
+            if(reads==1){assertTrue(admission.observe(4u));"before-save"}else "after-save"
+        }
+        assertEquals("after-save",adopted);assertEquals(2,reads)
+        // Nothing arrived during the read: exactly one read, as before.
+        reads=0
+        assertEquals("only",admission.readLatest(3){reads++;"only"});assertEquals(1,reads)
+    }
+    @Test fun aReadIsNeverRepeatedAcrossNavigationOrAProjectChangeAndStopsAtItsBound():Unit=runBlocking {
+        val admission=com.visualworkbench.android.session.RefreshAdmission()
+        var reads=0
+        assertNull(admission.readLatest(3){reads++;admission.invalidate();"stale-page"});assertEquals(1,reads)
+        reads=0
+        assertNull(admission.readLatest(3){reads++;admission.reset();"stale-project"});assertEquals(1,reads)
+        // A read that reports its owner gone ends the attempts without adoption.
+        reads=0
+        assertNull(admission.readLatest<String>(3){reads++;null});assertEquals(1,reads)
+        // Events on every read: bounded, then left to the queued refresh as before.
+        reads=0;var sequence=10uL
+        assertNull(admission.readLatest(3){reads++;admission.observe(++sequence);"always-overtaken"});assertEquals(3,reads)
+        val before=admission.capture();admission.observe(++sequence)
+        assertTrue(admission.overtaken(before));assertFalse(admission.accepts(before))
+        admission.invalidate();assertFalse(admission.overtaken(before))
+    }
     private val revision=ProjectInfo("project","title","device",1u,false,false,7u,"same-revision",listOf("doc"))
     private fun page(index:UInt):DocumentSnapshot=DocumentSnapshot("doc","title",64u,64u,8u,
         listOf(LayerInfo("layer-$index","page",true,false,1.0,"normal")),RenderList(revision,emptyList()),index)

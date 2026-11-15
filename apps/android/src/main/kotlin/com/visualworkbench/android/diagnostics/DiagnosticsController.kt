@@ -24,6 +24,8 @@ import java.util.UUID
 internal class DiagnosticsController(context: Context, private val scope: CoroutineScope) {
     private val directory = File(context.applicationContext.filesDir, "traces")
     val recorder = TraceRecorder()
+    /** Pen-path timings from the canvas and the remote view: durations and counts only. */
+    val pen = PenPathMetrics()
     var recording by mutableStateOf(false)
         private set
     var samples by mutableStateOf(0)

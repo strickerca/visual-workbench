@@ -98,7 +98,23 @@ internal data class MarkerPaint(val circle: Path, val box: Path?, val label: Pat
         fill(label, style.rgba)
     }
 }
-internal suspend fun prepareEditorObjects(core: WorkbenchCore, items: List<RenderItem>): List<DrawObject> {
+internal enum class PreparedReuse { Rebuild, Same, SameOutline }
+
+/** Whether what was prepared for [earlier] can stand for [item] without
+ * building paths again. The same item instance is the same object. A stroke
+ * whose contours are the same instance differs only in fields the path does
+ * not depend on (its layer's opacity, blend or lock). Everything else is built
+ * again, exactly as when nothing is reused. */
+internal fun preparedReuse(earlier: RenderItem?, item: RenderItem): PreparedReuse = when {
+    earlier == null || earlier.objectId != item.objectId -> PreparedReuse.Rebuild
+    earlier === item -> PreparedReuse.Same
+    earlier.shape is Shape.Stroke && item.shape is Shape.Stroke && earlier.contours === item.contours -> PreparedReuse.SameOutline
+    else -> PreparedReuse.Rebuild
+}
+
+/** [reuse] is the list prepared for the previous snapshot of the same document;
+ * empty builds every object, as before. */
+internal suspend fun prepareEditorObjects(core: WorkbenchCore, items: List<RenderItem>, reuse: List<DrawObject> = emptyList()): List<DrawObject> {
     require(items.size <= 16_384 && items.count { it.shape is Shape.Marker } <= 512)
     val labels = mutableMapOf<String, TextLayout>()
     for (item in items) {
@@ -107,9 +123,16 @@ internal suspend fun prepareEditorObjects(core: WorkbenchCore, items: List<Rende
         require(shape.number in 1u..512u)
         labels[item.objectId] = core.layoutText(shape.number.toString(), "Inter", (max(12.0, item.style.width * 4) * 1.15).toFloat())
     }
+    val earlier = if (reuse.isEmpty()) emptyMap() else reuse.associateBy { it.item.objectId }
     return withContext(Dispatchers.Default) {
         items.map { item ->
             currentCoroutineContext().ensureActive()
+            val prepared = earlier[item.objectId]
+            when (preparedReuse(prepared?.item, item)) {
+                PreparedReuse.Same -> return@map checkNotNull(prepared)
+                PreparedReuse.SameOutline -> return@map checkNotNull(prepared).copy(item = item)
+                PreparedReuse.Rebuild -> Unit
+            }
             val shape = item.shape as? Shape.Marker
             if (shape == null) EditorDrawing.objectPath(item) else {
                 val radius = max(12.0, item.style.width * 4)

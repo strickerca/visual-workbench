@@ -61,6 +61,11 @@ internal class RemoteSurfaceView(context:Context,private val controller:RemoteEd
     }
     override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int){super.onSizeChanged(w,h,oldw,oldh);controller.viewport(w,h);layoutVideo()}
     override fun onInterceptTouchEvent(event:MotionEvent):Boolean = event.getToolType(0) in setOf(MotionEvent.TOOL_TYPE_STYLUS,MotionEvent.TOOL_TYPE_ERASER)
-    override fun onTouchEvent(event:MotionEvent):Boolean = controller.touch(event)||event.getToolType(0) in setOf(MotionEvent.TOOL_TYPE_STYLUS,MotionEvent.TOOL_TYPE_ERASER)
+    override fun onTouchEvent(event:MotionEvent):Boolean {
+        // Developer switch only: deliver this contact's samples as the pen reports
+        // them instead of grouped once per display frame. Android ends it at pen-up.
+        if(remoteUnbufferedPenRequest(controller.unbufferedPen,event.actionMasked,event.getToolType(0)))requestUnbufferedDispatch(event)
+        return controller.touch(event)||event.getToolType(0) in setOf(MotionEvent.TOOL_TYPE_STYLUS,MotionEvent.TOOL_TYPE_ERASER)
+    }
     override fun onHoverEvent(event:MotionEvent):Boolean = controller.touch(event)||super.onHoverEvent(event)
 }

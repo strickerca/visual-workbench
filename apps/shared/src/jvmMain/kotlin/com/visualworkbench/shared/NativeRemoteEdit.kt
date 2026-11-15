@@ -36,7 +36,7 @@ private val retirementScope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
 internal class NativeRemoteEdit(private val handle:LiveSession,private val linkOwner:Any,
     private val compatibilityObservations:NativeCompatibilityObservationAccess?=null,
     private val drawingPreparations:NativeDrawingPreparationAccess?=null,
-):WorkbenchRemoteEdit,RemoteCompatibilityImportCapability,RemoteDrawingCheckCapability {
+):WorkbenchRemoteEdit,RemoteCompatibilityImportCapability,RemoteDrawingCheckCapability,RemotePenBatches {
     private val closing=AtomicBoolean(false)
     private val retired=AtomicBoolean(false)
     private val frameCollector=AtomicBoolean(false)
@@ -127,6 +127,24 @@ internal class NativeRemoteEdit(private val handle:LiveSession,private val linkO
         val json="{\"phase\":\"$phase\",\"x\":${sample.hostX},\"y\":${sample.hostY},\"pressure\":${sample.pressure},\"tilt_x\":${sample.tiltX},\"tilt_y\":${sample.tiltY},\"rotation\":${sample.rotation},\"pen_flags\":${sample.penFlags},\"pen_mask\":${sample.nativePenMask}}"
         val result=handle.remotePen(RemoteNativeJson.binding(binding),json)
         RemoteInputAdmission(RemoteNativeJson.binding(RemoteNativeJson.read(result.bindingJson)),result.inputSequence,sample.sampledLocalNanos)
+    }
+    private fun RemoteTargetBinding.typed()=com.visualworkbench.bindings.core.RemotePenBinding(connectionEpoch,captureSessionId,sourceGeneration,targetToken,geometryRevision,inputSessionId)
+    override fun reservePenBatch(binding:RemoteTargetBinding,samples:UInt):Boolean {
+        open();return try{handle.remoteReservePenBatch(binding.typed(),samples)}catch(error:SessionException){throw sessionFailure(error)}
+    }
+    override suspend fun penBatch(binding:RemoteTargetBinding,samples:List<RemotePenSample>):List<RemoteInputAdmission> = native{
+        val result=handle.remotePenBatch(binding.typed(),samples.map{sample->
+            com.visualworkbench.bindings.core.RemotePenPoint(when(sample.phase){
+                RemotePenPhase.Hover->com.visualworkbench.bindings.core.RemotePenPointPhase.HOVER
+                RemotePenPhase.Down->com.visualworkbench.bindings.core.RemotePenPointPhase.DOWN
+                RemotePenPhase.Move->com.visualworkbench.bindings.core.RemotePenPointPhase.MOVE
+                RemotePenPhase.Up->com.visualworkbench.bindings.core.RemotePenPointPhase.UP
+                RemotePenPhase.Leave->com.visualworkbench.bindings.core.RemotePenPointPhase.LEAVE
+            },sample.hostX,sample.hostY,sample.pressure,sample.tiltX,sample.tiltY,sample.rotation,sample.penFlags,sample.nativePenMask)
+        })
+        // The core checked this exact binding and gave the samples consecutive sequences.
+        if(result.admitted.toInt()!=samples.size)throw SessionFailure(SessionFailureKind.Invalid)
+        samples.mapIndexed{index,sample->RemoteInputAdmission(binding,result.firstInputSequence+index.toULong(),sample.sampledLocalNanos)}
     }
     override suspend fun discardFrame(ticket:ULong){withContext(Dispatchers.Default){if(!retired.get())handle.remoteDiscardFrame(ticket)}}
     override suspend fun rendered(ticket:ULong,ptsUs:Long):RemoteRenderedAcknowledgment? = native{handle.remoteRendered(ticket,ptsUs)?.let{RemoteRenderedAcknowledgment(RemoteNativeJson.binding(RemoteNativeJson.read(it.bindingJson)),it.frameId,it.ticket,it.lastInputSeqApplied)}}

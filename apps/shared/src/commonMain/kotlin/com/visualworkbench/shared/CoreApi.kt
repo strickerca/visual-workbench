@@ -28,6 +28,34 @@ public interface WorkbenchProject {
     public suspend fun export(options: ExportOptions): ExportResult
     public suspend fun close()
 }
+/** Optional project capability: read a document again without rebuilding or
+ * transferring the strokes the caller already holds. After every saved stroke
+ * the plain [WorkbenchProject.document] call recomputes the outline of every
+ * stroke in the document; this one costs what changed. */
+public interface WorkbenchDocumentChanges {
+    /** The document exactly as [WorkbenchProject.document] returns it at this
+     * moment. A stroke that is unchanged since [previous] is the very same
+     * [RenderItem] instance as in [previous] (or a copy sharing its contours
+     * when only its layer's opacity, blend or lock changed), so a caller can
+     * keep whatever it derived from it. [previous] must be the snapshot this
+     * project returned last for the document, or null for a first read.
+     * Null result: this document has no such path (paged documents); use
+     * [WorkbenchProject.document]. */
+    public suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot?
+}
+/** Optional project capability: start a stroke without waiting for the
+ * project, so ink can be drawn while the project is saving or writing a
+ * recovery checkpoint. */
+public interface WorkbenchDeferredStrokes {
+    /** Like [WorkbenchProject.beginStroke], but nothing is read from the
+     * project now: the layer, device and object checks are made, and the base
+     * revision taken, when the stroke is committed. A stroke that fails them is
+     * refused by [WorkbenchStroke.commit] and nothing of it is saved. Returns
+     * null for a stroke that needs the project at its start (highlighter); use
+     * [WorkbenchProject.beginStroke] for it. The caller owns the result and
+     * must [WorkbenchStroke.dispose] it. */
+    public fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke?
+}
 public interface WorkbenchStroke {
     /** Retain and retry this exact sequence only when CoreFailure.Backpressure is reported. */
     public suspend fun append(batch: SampleBatch): InkUpdate

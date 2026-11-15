@@ -33,7 +33,10 @@ pub struct StrokeGesture {
     project: Weak<ProjectSession>,
     worker: Worker<InkState>,
     options: StrokeOptions,
-    base_revision: pb::Revision,
+    /// The project revision read when the stroke began. `None`: the stroke
+    /// began without reading the project (`begin_stroke_deferred`), so the
+    /// checks and the revision are taken when it is committed.
+    base_revision: Option<pb::Revision>,
     phase: Arc<AtomicU8>,
     receipt: Arc<Mutex<Option<ProjectInfo>>>,
     highlighter_layer: Option<pb::CreateLayer>,
@@ -178,12 +181,102 @@ impl ProjectSession {
             project: Arc::downgrade(&self),
             worker: Worker::new("vw-core-ink", state, 8)?,
             options,
-            base_revision,
+            base_revision: Some(base_revision),
             highlighter_layer,
             phase: Arc::new(AtomicU8::new(ACTIVE)),
             receipt: Arc::new(Mutex::new(None)),
         }))
     }
+    /// Starts a stroke without waiting for the project: ink can be drawn while
+    /// the project is busy saving or writing a recovery checkpoint. What
+    /// `begin_stroke` checks against the project (the layer exists, belongs to
+    /// the document, is visible and unlocked; the device is this project's; the
+    /// object does not exist yet) is checked when the stroke is committed, and
+    /// the commit is based on the revision at that moment. A stroke that fails
+    /// those checks is refused at commit and nothing of it is saved. A
+    /// highlighter stroke may need a layer chosen from the project, so it is
+    /// refused here; use `begin_stroke` for it.
+    pub fn begin_stroke_deferred(
+        self: Arc<Self>,
+        options: StrokeOptions,
+    ) -> Result<Arc<StrokeGesture>> {
+        self.check_open()?;
+        for value in [
+            &options.gesture_id,
+            &options.transaction_id,
+            &options.object_id,
+            &options.document_id,
+            &options.layer_id,
+        ] {
+            Id::try_from(value.clone())?;
+        }
+        DeviceId::try_from(options.device_id.clone())?;
+        if options.created_at_ms < 0 || options.lamport == 0 {
+            return Err(CoreError::Invalid);
+        }
+        let family = vw_ink::BrushFamily::try_from(options.family.as_str())?;
+        if family == vw_ink::BrushFamily::Highlighter {
+            return Err(CoreError::Unsupported);
+        }
+        let mut brush = vw_ink::Brush::new(family, options.width)?;
+        if !options.pressure_curve.is_empty() {
+            brush.pressure_curve = vw_ink::PressureCurve::new(
+                options
+                    .pressure_curve
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| CoreError::Invalid)?,
+            )?;
+        }
+        brush.stabilization = options.stabilization;
+        brush.validate()?;
+        self.active_gestures
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+                (n < 4).then_some(n + 1)
+            })
+            .map_err(|_| CoreError::Backpressure)?;
+        let permit = GesturePermit(self.active_gestures.clone());
+        let state = InkState {
+            stroke: pb::Stroke {
+                brush: Some(brush.to_proto()),
+                ..Default::default()
+            },
+            builder: vw_ink::StrokeBuilder::begin(brush)?,
+            next_sequence: 1,
+            previous: None,
+            sealed: false,
+            _permit: permit,
+        };
+        Ok(Arc::new(StrokeGesture {
+            project: Arc::downgrade(&self),
+            worker: Worker::new("vw-core-ink", state, 8)?,
+            options,
+            base_revision: None,
+            highlighter_layer: None,
+            phase: Arc::new(AtomicU8::new(ACTIVE)),
+            receipt: Arc::new(Mutex::new(None)),
+        }))
+    }
+}
+/// The checks `begin_stroke` makes against the project, for a stroke that
+/// began without them.
+fn admit_deferred(state: &crate::project::ProjectState, options: &StrokeOptions) -> Result<()> {
+    let project = state.project()?;
+    let layer = project
+        .layers
+        .get(&Id::try_from(options.layer_id.clone())?)
+        .ok_or(CoreError::Invalid)?;
+    if Id::from_proto(layer.definition.document_id.as_ref())?.as_str() != options.document_id
+        || layer.locked
+        || !layer.visible
+        || state.store()?.local_device()? != DeviceId::try_from(options.device_id.clone())?
+        || project
+            .objects
+            .contains_key(&Id::try_from(options.object_id.clone())?)
+    {
+        return Err(CoreError::Invalid);
+    }
+    Ok(())
 }
 
 #[uniffi::export]
@@ -389,6 +482,13 @@ impl StrokeGesture {
                 if closed.load(Ordering::Acquire) {
                     return Err(CoreError::Closed);
                 }
+                let base = match base {
+                    Some(base) => base,
+                    None => {
+                        admit_deferred(state, &options)?;
+                        state.store()?.revision()?
+                    }
+                };
                 let model = state.project()?;
                 let layer_id = Id::try_from(options.layer_id)?;
                 let layer_wire = layer_id.to_proto();

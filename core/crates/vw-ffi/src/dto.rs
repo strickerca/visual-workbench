@@ -326,6 +326,39 @@ pub struct DocumentSnapshot {
     /// and marked export evaluate these recognized canonical parameters.
     pub has_tone_adjustments: bool,
 }
+/// A stroke the caller still holds from an earlier snapshot of the document.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct KnownStroke {
+    pub object_id: String,
+    /// The 32-byte digest returned with that stroke.
+    pub digest: Vec<u8>,
+}
+/// One place in the display list.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct RenderItemChange {
+    pub object_id: String,
+    /// Strokes only: pass it back as `KnownStroke::digest` next time.
+    pub digest: Option<Vec<u8>>,
+    /// Absent when the stroke the caller holds under this digest is still
+    /// exact; its layer fields below may nevertheless have changed.
+    pub item: Option<RenderItem>,
+    pub layer_opacity: f64,
+    pub layer_blend: String,
+    pub locked: bool,
+}
+/// `DocumentSnapshot` with its display list given as changes.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct DocumentSnapshotChanges {
+    pub document_id: String,
+    pub title: String,
+    pub width: u32,
+    pub height: u32,
+    pub bit_depth: u32,
+    pub layers: Vec<LayerInfo>,
+    pub revision: ProjectInfo,
+    pub items: Vec<RenderItemChange>,
+    pub has_tone_adjustments: bool,
+}
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct BackgroundImage {
     pub width: u32,

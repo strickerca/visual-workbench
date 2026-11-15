@@ -184,12 +184,28 @@ internal interface DecoderEngine {
         onRendered: (Long, Long, Long) -> Unit): DecoderAdmission
     fun queue(bytes: ByteArray, ptsUs: Long): Boolean
     fun output(): DecoderOutput
+    /** As [output], waiting up to [waitMicros] for a decoded frame. An engine
+     * that cannot wait answers at once, which is always correct. */
+    fun awaitOutput(waitMicros: Long): DecoderOutput = output()
     fun outputDimensions(): Pair<Int, Int>
     fun discardOutput(index: Int)
     fun renderOutput(index: Int, requestedLocalNanos: Long)
     fun stop()
     fun release()
 }
+
+/** How long the decoder worker waits for a decoded frame and then for its
+ * render callback in one pass, as (output microseconds, callback milliseconds).
+ *
+ * Originally it never waits for the frame and always waits up to 4 ms for the
+ * callback, so a frame that finishes decoding during that wait is picked up as
+ * much as 4 ms late. With [quick], while a frame is being decoded the worker
+ * waits on the decoder itself and is woken the moment the frame is ready; the
+ * callback is then awaited in the next pass, exactly as before. Either way one
+ * pass takes at most 4 ms, so closing and the frame deadline are noticed as
+ * promptly as before. */
+internal fun remoteDecoderWaits(quick: Boolean, inputQueued: Boolean, outputReleased: Boolean): Pair<Long, Long> =
+    if (quick && inputQueued && !outputReleased) Pair(4_000L, 0L) else Pair(0L, 4L)
 
 /** Samples the phone-local request and actual return separately. Media PTS is
  * an identity in microseconds; it never chooses the Surface scheduling clock.
@@ -211,6 +227,8 @@ class RemoteHardwareDecoder private constructor(
     private val onRendered: (ULong, Long, Long, Long) -> Unit,
     private val engineFactory: () -> DecoderEngine,
     private val releaseSurface: (Surface) -> Unit,
+    /** Developer switch: pick a decoded frame up the moment it is ready. */
+    private val quick: Boolean = false,
 ) {
     val ownerId: String = UUID.randomUUID().toString()
     private var borrowed: Surface? = borrowedSurface
@@ -307,8 +325,9 @@ class RemoteHardwareDecoder private constructor(
                 if (System.nanoTime() - frame.enqueuedLocalNanos >= FRAME_DEADLINE_NANOS) {
                     recover("FrameDeadline"); break
                 }
+                val waits = remoteDecoderWaits(quick, inputQueued, outputReleased)
                 if (inputQueued && !outputReleased) {
-                    when (val output = engine.output()) {
+                    when (val output = if (waits.first > 0L) engine.awaitOutput(waits.first) else engine.output()) {
                         DecoderOutput.None -> Unit
                         DecoderOutput.FormatChanged -> {
                             if (engine.outputDimensions() != Pair(config.codedWidth, config.codedHeight)) recover("OutputGeometryChanged")
@@ -331,7 +350,7 @@ class RemoteHardwareDecoder private constructor(
                         }
                     }
                 }
-                val callback = rendered.poll(4, TimeUnit.MILLISECONDS)
+                val callback = rendered.poll(waits.second, TimeUnit.MILLISECONDS)
                 if (callback != null && !closing.get()) {
                     if (System.nanoTime() - frame.enqueuedLocalNanos >= FRAME_DEADLINE_NANOS) {
                         recover("FrameDeadline"); break
@@ -435,18 +454,18 @@ class RemoteHardwareDecoder private constructor(
     companion object {
         private val retained = AtomicReference<RemoteHardwareDecoder?>(null)
         fun hasPendingOwner(): Boolean = retained.get() != null
-        fun open(surface: Surface, consumerOwner: Any, config: DecoderConfig,
+        fun open(surface: Surface, consumerOwner: Any, config: DecoderConfig, quick: Boolean = false,
             onRendered: (ULong, Long, Long, Long) -> Unit): DecoderOpenResult =
-            openOwned(surface, consumerOwner, config, onRendered) { AndroidDecoderEngine() }
+            openOwned(surface, consumerOwner, config, onRendered, quick = quick) { AndroidDecoderEngine(quick) }
 
         internal fun openOwned(surface: Surface, consumerOwner: Any, config: DecoderConfig,
             onRendered: (ULong, Long, Long, Long) -> Unit,
-            releaseSurface: (Surface) -> Unit = { it.release() },
+            releaseSurface: (Surface) -> Unit = { it.release() }, quick: Boolean = false,
             engineFactory: () -> DecoderEngine): DecoderOpenResult {
             if (!validDecoderConfig(config)) return DecoderOpenResult.Refused("InvalidConfig")
             if (Build.VERSION.SDK_INT < 30) return DecoderOpenResult.Refused("LowLatencyRequestApiUnavailable")
             val owned = config.copy(vps = config.vps.copyOf(), sps = config.sps.copyOf(), pps = config.pps.copyOf())
-            val decoder = RemoteHardwareDecoder(surface, consumerOwner, owned, onRendered, engineFactory, releaseSurface)
+            val decoder = RemoteHardwareDecoder(surface, consumerOwner, owned, onRendered, engineFactory, releaseSurface, quick)
             if (!retained.compareAndSet(null, decoder)) return DecoderOpenResult.Refused("PreviousOwnerPending")
             try { decoder.worker.start() }
             catch (_: Exception) {
@@ -459,7 +478,7 @@ class RemoteHardwareDecoder private constructor(
     }
 }
 
-private class AndroidDecoderEngine : DecoderEngine {
+private class AndroidDecoderEngine(private val quick: Boolean = false) : DecoderEngine {
     private var codec: MediaCodec? = null
     private var started = false
     private val info = MediaCodec.BufferInfo()
@@ -486,7 +505,10 @@ private class AndroidDecoderEngine : DecoderEngine {
         val format = MediaFormat.createVideoFormat(mime, config.codedWidth, config.codedHeight)
         format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, MAX_REMOTE_AU)
-        format.setFloat(MediaFormat.KEY_OPERATING_RATE, 30f)
+        // Developer switch: ask the decoder to run as for 60 frames a second when it
+        // says it can at this size. A hint only; the stream itself is unchanged.
+        format.setFloat(MediaFormat.KEY_OPERATING_RATE,
+            if (quick && capabilities.videoCapabilities?.areSizeAndRateSupported(config.codedWidth, config.codedHeight, 60.0) == true) 60f else 30f)
         val csd = config.vps + config.sps + config.pps
         format.setByteBuffer("csd-0", ByteBuffer.wrap(csd))
         val vendors = mutableListOf<DecoderVendorCapability>()
@@ -516,7 +538,8 @@ private class AndroidDecoderEngine : DecoderEngine {
         native.queueInputBuffer(index, 0, bytes.size, ptsUs, 0)
         return true
     }
-    override fun output(): DecoderOutput = when (val index = checkNotNull(codec).dequeueOutputBuffer(info, 0)) {
+    override fun output(): DecoderOutput = awaitOutput(0)
+    override fun awaitOutput(waitMicros: Long): DecoderOutput = when (val index = checkNotNull(codec).dequeueOutputBuffer(info, waitMicros)) {
         MediaCodec.INFO_TRY_AGAIN_LATER -> DecoderOutput.None
         MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> DecoderOutput.FormatChanged
         MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> DecoderOutput.None

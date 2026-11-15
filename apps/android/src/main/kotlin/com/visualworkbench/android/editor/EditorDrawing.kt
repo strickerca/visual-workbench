@@ -46,6 +46,13 @@ internal data class CanvasScene(
     val giantMode:Boolean=false,
     val giantFrame:GiantVisibleFrame<Bitmap>?=null,
     val rotationHandle:ObjectRotationHandle?=null,
+    /** Diagnostics only: input-clock time of the newest real pen sample in the
+     * wet ink of this scene and of that stroke's pen-down; 0 without wet ink. */
+    val wetSampleMs: Long = 0,
+    val wetStartMs: Long = 0,
+    /** Developer switch, fixed when the scene is published: an ink frame may
+     * keep the picture of everything but the wet ink instead of redrawing it. */
+    val keepDryPicture: Boolean = false,
 )
 
 internal object EditorDrawing {
@@ -203,6 +210,36 @@ internal object EditorDrawing {
     fun surroundArgb(dark: Boolean): Int = if (dark) 0xff17252d.toInt() else 0xffdce5e3.toInt()
     /** Full opaque front frame makes multiply wet ink correct across SurfaceControls. */
     fun draw(canvas: Canvas, scene: CanvasScene) {
+        if (drawDocument(canvas, scene, scene.provisional, null)) drawOverlays(canvas, scene)
+    }
+
+    /** As [draw], leaving out saved objects that cannot touch [visible] (a
+     * document-space rectangle). Used for the magnifier panes of an ink frame,
+     * which show a small part of the document. */
+    fun drawVisible(canvas: Canvas, scene: CanvasScene, visible: Rect) {
+        if (drawDocument(canvas, scene, scene.provisional, visible)) drawOverlays(canvas, scene)
+    }
+
+    /** Everything except the wet ink and the overlays: the picture an ink frame
+     * keeps and reuses while only the stroke in progress changes. */
+    fun drawDry(canvas: Canvas, scene: CanvasScene) { drawDocument(canvas, scene, emptyList(), null) }
+
+    /** The wet ink alone, clipped to the page like the document, for a frame
+     * whose kept picture already holds everything beneath it. Only valid when
+     * [wetInkOnTop] holds for the scene. */
+    fun drawWetOnTop(canvas: Canvas, scene: CanvasScene) {
+        val clipSave = canvas.save()
+        val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
+        page.transform(matrix(scene.matrix)); canvas.clipPath(page)
+        scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+        canvas.restoreToCount(clipSave)
+    }
+
+    /** Surround, page, source pixels and every object layer. False: results are
+     * not ready and nothing more may be drawn over the page. With [visible],
+     * saved objects whose bounds lie wholly outside it are skipped; they would
+     * be clipped away entirely, so the pixels are the same. */
+    private fun drawDocument(canvas: Canvas, scene: CanvasScene, provisional: List<DrawObject>, visible: Rect?): Boolean {
         canvas.drawColor(surroundArgb(scene.dark))
         val pageSave = canvas.save()
         canvas.concat(matrix(scene.matrix))
@@ -214,7 +251,7 @@ internal object EditorDrawing {
         val clipSave = canvas.save()
         val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
         page.transform(matrix(scene.matrix)); canvas.clipPath(page)
-        if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return}
+        if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return false}
         val documentLayer=canvas.saveLayer(null,null)
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
@@ -226,7 +263,8 @@ internal object EditorDrawing {
             canvas.drawRect(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat(),maxOf(a.x,b.x).toFloat(),maxOf(a.y,b.y).toFloat(),paint)
         }
         canvas.restoreToCount(sourceSave)
-        val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
+        val saved = if (visible == null) scene.objects else scene.objects.filter { mayTouch(scene, it, visible) }
+        val combined = (saved + provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
         val grouped = combined.groupBy { it.item.layerId }
         for (layerId in orderedLayers) {
@@ -246,6 +284,21 @@ internal object EditorDrawing {
         }
         canvas.restoreToCount(documentLayer)
         canvas.restoreToCount(clipSave)
+        return true
+    }
+
+    /** Whether a saved object could put a pixel inside [visible]. Only objects
+     * whose native bounds are known to contain everything drawn for them are
+     * ever skipped: markers, results, screen-constant outlines and objects
+     * under a preview transform are always drawn. */
+    private fun mayTouch(scene: CanvasScene, obj: DrawObject, visible: Rect): Boolean {
+        val item = obj.item
+        if (obj.marker != null || item.shape is Shape.Result || item.style.screenConstantWidth || item.objectId in scene.transformed) return true
+        return boundsMayTouch(item.bounds, visible, 4.0 / scene.camera.scale)
+    }
+
+    /** Peer viewport outline, rotation handle, selection and hover: drawn after the document. */
+    fun drawOverlays(canvas: Canvas, scene: CanvasScene) {
         if (scene.peerViewport.size == 4) {
             val points = scene.peerViewport.map { map(scene.matrix, it) }
             val outline = Path().apply {
