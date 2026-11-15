@@ -80,6 +80,10 @@ tokio = { version = "=1.53.3", features = ["rt", "macros", "time"] }
 name = "commit"
 harness = false
 
+[[bench]]
+name = "edits"
+harness = false
+
 [[bin]]
 name = "vw-bindgen"
 path = "src/bin/bindgen.rs"
