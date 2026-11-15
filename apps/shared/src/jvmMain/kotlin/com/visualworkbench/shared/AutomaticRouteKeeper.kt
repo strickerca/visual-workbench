@@ -94,6 +94,7 @@ public class AutomaticRouteKeeper(
     private var kept: ProjectLink? = null
     private var listening: List<SessionEndpoint>? = null
     private var offered: List<SessionEndpoint>? = null
+    private var offeredOn: String? = null
     private var remembered: Pair<String, List<SessionEndpoint>>? = null
 
     public suspend fun saved(): SavedRoutes = withContext(Dispatchers.IO) { store.load() }
@@ -164,7 +165,10 @@ public class AutomaticRouteKeeper(
                 }
             } else {
                 val hints = classifyRouteHints(discovery.found(service, plan.usable), plan.local, plan.tether)
-                if (hints != offered) { link.offerRoutes(hints); offered = hints }
+                // A local link that came or went (USB tethering switched on) is
+                // offered again even with the same hints: that asks the core
+                // for a fresh look at once instead of at its next slow retry.
+                if (hints != offered || plan.network != offeredOn) { link.offerRoutes(hints); offered = hints; offeredOn = plan.network }
             }
             authenticated(service, peer, status)
         } catch (cancel: CancellationException) { throw cancel }
@@ -191,6 +195,6 @@ public class AutomaticRouteKeeper(
     /** The automatic connection is gone: stop announcing and looking. */
     public suspend fun release() {
         discovery.stop()
-        kept = null; listening = null; offered = null; remembered = null
+        kept = null; listening = null; offered = null; offeredOn = null; remembered = null
     }
 }

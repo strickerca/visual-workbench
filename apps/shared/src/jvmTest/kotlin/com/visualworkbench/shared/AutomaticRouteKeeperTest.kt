@@ -171,6 +171,16 @@ class AutomaticRouteKeeperTest {
         discovery.nearby = emptyList()
         keeper.keep(sessions, link, false, phone, status(SessionCarrier.QuicTether, SyncStatus.Synced), keeper.plan())
         assertEquals(emptyList<SessionEndpoint>(), link.offers.last())
+        // A local link going or coming (USB tethering switched back on) asks the
+        // core for a fresh look at once, even with nothing new to offer.
+        val asked = link.offers.size
+        local = listOf(wifi)
+        keeper.keep(sessions, link, false, phone, status(SessionCarrier.QuicWifi, SyncStatus.Synced), keeper.plan())
+        local = listOf(wifi, usb)
+        keeper.keep(sessions, link, false, phone, status(SessionCarrier.QuicWifi, SyncStatus.Synced), keeper.plan())
+        keeper.keep(sessions, link, false, phone, status(SessionCarrier.QuicWifi, SyncStatus.Synced), keeper.plan())
+        assertEquals(asked + 2, link.offers.size)
+        assertEquals(emptyList<SessionEndpoint>(), link.offers.last())
 
         // A closing link is not an error and does not stop the next step.
         link.closing = true
