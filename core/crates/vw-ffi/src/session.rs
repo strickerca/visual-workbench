@@ -9,6 +9,7 @@ mod offline_recovery_tests;
 mod pairing;
 mod preview;
 mod replication;
+mod routing;
 mod runtime;
 mod stream;
 pub use stream::*;

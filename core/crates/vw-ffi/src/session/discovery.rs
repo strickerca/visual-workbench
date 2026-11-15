@@ -1,4 +1,4 @@
-use super::{SessionError, SessionResult, SessionService};
+use super::{SessionError, SessionResult, SessionService, routing::Causes};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -31,9 +31,24 @@ impl Permit {
             .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
                 (n < 4).then_some(n + 1)
             })
-            .map_err(|_| SessionError::Backpressure)?;
+            .map_err(|_| {
+                crate::diagnostics::failure(AREA, "too many discoveries open");
+                SessionError::Backpressure
+            })?;
         Ok(Self)
     }
+}
+const AREA: &str = "discovery";
+/// A neighbour can advertise anything, any number of times. Each distinct
+/// reason is therefore recorded once per discovery, never per record.
+fn rejected(causes: &Causes, error: &SessionError) {
+    causes.note(match error {
+        SessionError::Backpressure => "discovery catalog full",
+        SessionError::Invalid => "discovery record rejected",
+        SessionError::Timeout => "discovery timed out",
+        SessionError::Transport => "discovery network unavailable",
+        _ => "discovery failed",
+    });
 }
 impl Drop for Permit {
     fn drop(&mut self) {
@@ -51,6 +66,7 @@ struct State {
 pub struct SessionDiscovery {
     advertisement: Option<DiscoveryAdvertisement>,
     worker: crate::worker::Worker<State>,
+    causes: Arc<Causes>,
 }
 fn addresses(values: Vec<String>) -> SessionResult<Vec<std::net::SocketAddr>> {
     if values.is_empty() || values.len() > 8 {
@@ -92,9 +108,11 @@ impl SessionService {
         &self,
         endpoints: Vec<String>,
     ) -> SessionResult<Arc<SessionDiscovery>> {
-        let endpoints = addresses(endpoints)?;
+        let endpoints = addresses(endpoints).inspect_err(|_| {
+            crate::diagnostics::failure(AREA, "advertised address rejected");
+        })?;
         let permit = Permit::acquire()?;
-        crate::worker::startup(move || {
+        let started = crate::worker::startup(move || {
             Ok((|| -> SessionResult<_> {
                 let offer = Advertisement::for_startup(endpoints)?;
                 let advertisement = DiscoveryAdvertisement {
@@ -119,10 +137,12 @@ impl SessionService {
                 Ok(Arc::new(SessionDiscovery {
                     advertisement: Some(advertisement),
                     worker: crate::worker::Worker::new("vw-discovery", state, 2)?,
+                    causes: Arc::new(Causes::new(AREA)),
                 }))
             })())
         })
-        .await?
+        .await?;
+        started.inspect_err(|_| crate::diagnostics::failure(AREA, "advertising could not start"))
     }
     pub async fn browse_discovery(
         &self,
@@ -149,7 +169,7 @@ impl SessionService {
             })
             .collect::<SessionResult<Vec<_>>>()?;
         let permit = Permit::acquire()?;
-        crate::worker::startup(move || {
+        let started = crate::worker::startup(move || {
             Ok((|| -> SessionResult<_> {
                 #[cfg(windows)]
                 let desktop = Some(vw_net::discovery::desktop::MdnsDiscovery::browse_on(
@@ -167,10 +187,12 @@ impl SessionService {
                 Ok(Arc::new(SessionDiscovery {
                     advertisement: None,
                     worker: crate::worker::Worker::new("vw-discovery", state, 2)?,
+                    causes: Arc::new(Causes::new(AREA)),
                 }))
             })())
         })
-        .await?
+        .await?;
+        started.inspect_err(|_| crate::diagnostics::failure(AREA, "browsing could not start"))
     }
 }
 #[uniffi::export]
@@ -184,25 +206,29 @@ impl SessionDiscovery {
         properties: Vec<DiscoveryProperty>,
         endpoints: Vec<String>,
     ) -> SessionResult<()> {
-        if service_type.len() > 64
-            || properties.len() != 2
-            || properties
-                .iter()
-                .any(|p| p.key.len() > 8 || p.value.len() > 32)
-        {
-            return Err(SessionError::Invalid);
+        let observed = async {
+            if service_type.len() > 64
+                || properties.len() != 2
+                || properties
+                    .iter()
+                    .any(|p| p.key.len() > 8 || p.value.len() > 32)
+            {
+                return Err(SessionError::Invalid);
+            }
+            let hint = DiscoveryHint::from_untrusted(
+                &service_type,
+                &properties
+                    .into_iter()
+                    .map(|p| (p.key, p.value))
+                    .collect::<Vec<_>>(),
+                addresses(endpoints)?,
+            )?;
+            self.worker
+                .call(move |state| Ok(observe(state, hint)))
+                .await?
         }
-        let hint = DiscoveryHint::from_untrusted(
-            &service_type,
-            &properties
-                .into_iter()
-                .map(|p| (p.key, p.value))
-                .collect::<Vec<_>>(),
-            addresses(endpoints)?,
-        )?;
-        self.worker
-            .call(move |state| Ok(observe(state, hint)))
-            .await?
+        .await;
+        observed.inspect_err(|error| rejected(&self.causes, error))
     }
     pub async fn forget(&self, discovery_id: String) -> SessionResult<()> {
         if discovery_id.len() != 32
@@ -228,8 +254,11 @@ impl SessionDiscovery {
             .map_err(SessionError::from)
     }
     pub async fn snapshot(&self) -> SessionResult<Vec<DiscoveredPeer>> {
-        self.worker
-            .call(|state| {
+        #[cfg(windows)]
+        let causes = self.causes.clone();
+        let snapshot = self
+            .worker
+            .call(move |state| {
                 #[cfg(windows)]
                 {
                     Ok((|| -> SessionResult<_> {
@@ -237,13 +266,15 @@ impl SessionDiscovery {
                             let hints =
                                 desktop.browse_for(std::time::Duration::from_millis(500))?;
                             for hint in hints {
-                                if let Err(error) = observe(state, hint)
-                                    && !matches!(
+                                if let Err(error) = observe(state, hint) {
+                                    // One bad neighbour never hides the others.
+                                    rejected(&causes, &error);
+                                    if !matches!(
                                         error,
                                         SessionError::Backpressure | SessionError::Invalid
-                                    )
-                                {
-                                    return Err(error);
+                                    ) {
+                                        return Err(error);
+                                    }
                                 }
                             }
                         }
@@ -255,7 +286,8 @@ impl SessionDiscovery {
                     Ok(Ok(snapshot(state)))
                 }
             })
-            .await?
+            .await?;
+        snapshot.inspect_err(|error| rejected(&self.causes, error))
     }
     pub async fn close(&self) -> SessionResult<()> {
         self.worker
