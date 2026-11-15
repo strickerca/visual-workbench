@@ -15,19 +15,17 @@ package com.visualworkbench.android.remote
  * the sample keeps exactly its own event time. Otherwise, and always without
  * [exact], the original conversion is used unchanged. */
 internal class RemoteSampleClock(val exact: Boolean) {
-    data class Sample(val localNanos: Long, val ageNanos: Long)
-
-    /** [eventNanos] is the sample's uptime-clock event time. [nowNanos] is
-     * System.nanoTime() and [uptimeMillis] SystemClock.uptimeMillis(), read in
-     * that order when the event is handled. A negative or too large age is the
-     * caller's refusal, exactly as before. */
-    fun sample(eventNanos: Long, nowNanos: Long, uptimeMillis: Long): Sample {
-        if (exact && sameClock(nowNanos, uptimeMillis)) return Sample(eventNanos, nowNanos - eventNanos)
+    /** The sample's age in nanoseconds at the moment of handling; its time on
+     * the System.nanoTime clock is [nowNanos] minus this. [eventNanos] is the
+     * sample's uptime-clock event time. [nowNanos] is System.nanoTime() and
+     * [uptimeMillis] SystemClock.uptimeMillis(), read in that order when the
+     * event is handled. A negative or too large age is the caller's refusal,
+     * exactly as before. A plain number: nothing is allocated per sample. */
+    fun ageNanos(eventNanos: Long, nowNanos: Long, uptimeMillis: Long): Long =
+        if (exact && sameClock(nowNanos, uptimeMillis)) nowNanos - eventNanos
         // Align without assuming a shared clock. Uptime's millisecond upper
         // edge conservatively adds at most 1 ms of age.
-        val age = (uptimeMillis + 1L) * 1_000_000L - eventNanos
-        return Sample(nowNanos - age, age)
-    }
+        else (uptimeMillis + 1L) * 1_000_000L - eventNanos
 
     companion object {
         /** [nowNanos] was read just before [uptimeMillis]. On one shared clock

@@ -22,14 +22,16 @@ internal class RemotePenIntake(val longBatches: Boolean, val typed: Boolean = fa
     /** Samples that may wait on the phone between the touch thread and the sender. */
     val queueCapacity: Int get() = if (!longBatches) GROUP else if (typed) TYPED_QUEUE else LONG_QUEUE
     /** Largest single reservation: 8 for the original call, a whole event for the typed one. */
-    private val reservation: Int get() = if (longBatches && typed) TYPED_SAMPLES else GROUP
+    val reservation: Int get() = if (longBatches && typed) TYPED_SAMPLES else GROUP
 
     /** [reserve] is the short native state-only reservation: false means an
      * editor command is refreshing and no sample of this event may be queued.
      * [enqueue] is false when the phone queue is full. Call under the input
      * fence. After [Result.Refused] the caller clears the queue and pauses,
-     * which also retires every reservation made here. */
-    fun <T> admit(batch: List<T>, reserve: (UInt) -> Boolean, enqueue: (T) -> Boolean): Result {
+     * which also retires every reservation made here. Inline: the two calls
+     * are made in place, as they were written in the controller before, and
+     * nothing is allocated per event. */
+    inline fun <T> admit(batch: List<T>, reserve: (UInt) -> Boolean, enqueue: (T) -> Boolean): Result {
         if (!longBatches) {
             if (!reserve(batch.size.toUInt())) return Result.CommandBusy
             return if (batch.all(enqueue)) Result.Admitted else Result.Refused

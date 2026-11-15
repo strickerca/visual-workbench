@@ -7,10 +7,16 @@ import org.junit.Test
 class RemoteSampleClockTest {
     private val ms = 1_000_000L
 
+    private data class Sample(val localNanos: Long, val ageNanos: Long)
     /** The numbers the controller computed inline before the switch existed. */
-    private fun original(eventNanos: Long, nowNanos: Long, uptimeMillis: Long): RemoteSampleClock.Sample {
+    private fun original(eventNanos: Long, nowNanos: Long, uptimeMillis: Long): Sample {
         val age = (uptimeMillis + 1L) * 1_000_000L - eventNanos
-        return RemoteSampleClock.Sample(nowNanos - age, age)
+        return Sample(nowNanos - age, age)
+    }
+    /** As the controller uses it: the age, and the sample's time as now minus that age. */
+    private fun RemoteSampleClock.sample(eventNanos: Long, nowNanos: Long, uptimeMillis: Long): Sample {
+        val age = ageNanos(eventNanos, nowNanos, uptimeMillis)
+        return Sample(nowNanos - age, age)
     }
 
     @Test fun switched_off_gives_the_same_time_and_age_as_before_for_every_case() {
