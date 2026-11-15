@@ -19,6 +19,26 @@ public interface WorkbenchSessions {
     public suspend fun host(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink
     public suspend fun connect(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink
     public suspend fun receiveProject(path: String, peer: String, endpoints: List<SessionEndpoint>, expectedProjectId: String? = null, maxBlobBytes: ULong = 2uL * 1024uL * 1024uL * 1024uL): WorkbenchProject
+    /** Where this paired device was last authenticated, newest first. Hints for
+     * the next dial only; keep them with app-level pairing data, never in a
+     * project, a log or a report. */
+    public suspend fun knownRoutes(peer: String): List<SessionEndpoint> = emptyList()
+    /** Give back hints saved by an earlier run. Refused for a device that is
+     * not paired or was revoked; an empty list forgets its routes. */
+    public suspend fun restoreRoutes(peer: String, endpoints: List<SessionEndpoint>) {}
+    public suspend fun forgetRoutes(peer: String) {}
+    /** Listen for the paired device on every given local address and keep
+     * accepting while connected, so it can return on another route at once.
+     * An address that cannot be bound is skipped; at least one must bind. */
+    public suspend fun hostAutomatic(project: WorkbenchProject, peer: String, bindEndpoints: List<SessionEndpoint>): ProjectLink = host(project, peer, bindEndpoints)
+    /** Connect without a typed address: remembered routes first, then [hints]
+     * and whatever [ProjectLink.offerRoutes] adds later. With nowhere to dial
+     * the link waits offline. A hint never grants trust: only the pinned
+     * certificate decides whether the paired device is there. */
+    public suspend fun connectAutomatic(project: WorkbenchProject, peer: String, hints: List<SessionEndpoint> = emptyList()): ProjectLink = connect(project, peer, hints)
+    /** As [receiveProject], dialling remembered routes first and then [hints]. */
+    public suspend fun receiveProjectAutomatic(path: String, peer: String, hints: List<SessionEndpoint> = emptyList(), expectedProjectId: String? = null, maxBlobBytes: ULong = 2uL * 1024uL * 1024uL * 1024uL): WorkbenchProject =
+        receiveProject(path, peer, hints, expectedProjectId, maxBlobBytes)
     public suspend fun close()
 }
 public data class SessionDevice(public val deviceId: String, public val fingerprint: String)
@@ -44,6 +64,8 @@ public data class LocalSessionAddress(
     public val interfaceIndex: UInt,
     public val interfaceName: String? = null,
     public val loopback: Boolean = false,
+    /** Length of the local subnet prefix, when the platform reports one. */
+    public val prefixLength: Int? = null,
 ) {
     /** Refresh descriptions without changing the explicitly selected route. */
     public fun sameConnection(other: LocalSessionAddress): Boolean = address == other.address && interfaceIndex == other.interfaceIndex
@@ -104,5 +126,11 @@ public interface ProjectLink {
      * OPS or bounded expiry. Generation counters and ordering stay native. */
     public suspend fun finishPreview(gestureId: String, cancel: Boolean)
     public suspend fun peerPreviews(documentId: String): PeerPreviews
+    /** Automatic client only. Replace the address hints, for example with what
+     * discovery found. Also asks for a fresh look for a better carrier. */
+    public fun offerRoutes(hints: List<SessionEndpoint>) {}
+    /** Automatic host only. Make the listeners match these local addresses
+     * without disturbing a live connection; returns what is bound now. */
+    public suspend fun listenOn(bindEndpoints: List<SessionEndpoint>): List<SessionEndpoint> = endpoints
     public suspend fun close()
 }
