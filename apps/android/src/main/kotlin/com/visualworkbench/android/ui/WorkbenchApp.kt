@@ -47,6 +47,8 @@ import com.visualworkbench.android.stream.AndroidStreamSession
 @Composable
 internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     val context = LocalContext.current
+    // Pair once, then the open project connects to the computer by itself.
+    AutomaticConnectionEffect(editor)
     val documentState by editor.documents.state.collectAsState()
     var showExport by remember { mutableStateOf(false) }
     var showAirSettings by remember(editor) { mutableStateOf(false) }
