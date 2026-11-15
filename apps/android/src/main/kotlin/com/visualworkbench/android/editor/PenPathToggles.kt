@@ -8,6 +8,10 @@ package com.visualworkbench.android.editor
 internal enum class PenPathToggle(val key: String, val title: String, val effect: String) {
     RemoteLongBatches("remoteLongBatches", "Remote pen: keep drawing through a hitch",
         "A burst of more than 8 pen samples in one event is sent to the computer in paced groups of 8 instead of pausing input. Applies the next time the remote view opens."),
+    RemoteUnbufferedPen("remoteUnbufferedPen", "Remote pen: samples at the pen's own rate",
+        "Asks Android to deliver each pen sample as it is reported instead of once per display frame, so samples leave for the computer up to a frame sooner. Applies the next time the remote view opens."),
+    RemoteExactTimes("remoteExactTimes", "Remote pen: exact sample times",
+        "Each sample keeps the time the pen reported it instead of a time rounded to when the phone handled it. Steadier ghost ink and truer timings. Applies the next time the remote view opens."),
 }
 
 /** Immutable set of switched-on toggles. The default has none. */

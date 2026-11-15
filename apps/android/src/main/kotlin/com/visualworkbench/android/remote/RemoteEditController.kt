@@ -77,7 +77,9 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             kotlin.math.floor(viewport.left+viewport.width).toInt(),kotlin.math.floor(viewport.top+viewport.height).toInt())
         RemoteAccessibilityInputSnapshot(true,grant,paint,digest,rect,intArrayOf(map.rect.x,map.rect.y,map.rect.width.toInt(),map.rect.height.toInt()),age)
     }
-    val inputClockDescription:String=if(Build.VERSION.SDK_INT>=34)"Nanosecond event fields; uptime alignment bounded to 1 ms" else "Millisecond event precision"
+    val inputClockDescription:String get()=if(Build.VERSION.SDK_INT<34)"Millisecond event precision"
+        else if(sampleClock.exact)"Nanosecond event fields; each sample keeps its own event time"
+        else "Nanosecond event fields; uptime alignment bounded to 1 ms"
     val palette=RemoteEditorPalette(remote,scope)
     private val segments=RemoteGhostSegments(ghost)
     private val echoLedger=RemoteEchoLedger()
@@ -88,6 +90,9 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
     private val intake=RemotePenIntake(toggles[PenPathToggle.RemoteLongBatches])
     private val input=Channel<TouchAdmission>(intake.queueCapacity)
     private val pacer=if(intake.longBatches)RemoteSendPacer() else null
+    private val sampleClock=RemoteSampleClock(toggles[PenPathToggle.RemoteExactTimes])
+    /** Developer switch: the remote surface asks Android for unbatched pen samples during a contact. */
+    val unbufferedPen:Boolean=toggles[PenPathToggle.RemoteUnbufferedPen]
     @Volatile private var borrowedSurface:Surface?=null
     @Volatile private var surfaceOwner:Any?=null
     private var decoder:RemoteHardwareDecoder?=null
@@ -370,9 +375,10 @@ internal class RemoteEditController(val remote:WorkbenchRemoteEdit,parent:Corout
             val point=map.viewport.host(x,y,map.rect)?:return rejectTouch("viewport")
             val sampledUptime=if(Build.VERSION.SDK_INT>=34)eventNanos(event,historical,index) else (if(historical)event.getHistoricalEventTime(index)else event.eventTime)*1_000_000L
             // Align to this phone's System.nanoTime without BOOTTIME. Uptime's
-            // millisecond upper edge conservatively adds at most 1 ms of age.
-            val age=(uptime+1L)*1_000_000L-sampledUptime
-            if(age !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=now-age
+            // millisecond upper edge conservatively adds at most 1 ms of age;
+            // the exact-time switch keeps the sample's own time instead.
+            val timed=sampleClock.sample(sampledUptime,now,uptime)
+            if(timed.ageNanos !in 0 until 50_000_000L)return rejectTouch("sample_age");val sampled=timed.localNanos
             val pressure=if(historical)event.getHistoricalPressure(0,index)else event.pressure
             if(!pressure.isFinite()||pressure<0)return rejectTouch("pressure")
             val normalized=pressure.coerceAtMost(1f)

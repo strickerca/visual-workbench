@@ -46,6 +46,12 @@ internal class RemotePenIntake(val longBatches: Boolean) {
     }
 }
 
+/** Whether the remote surface asks Android for unbatched delivery: only at the
+ * pen-down of a stylus or eraser contact, and only while the switch is on. */
+internal fun remoteUnbufferedPenRequest(enabled: Boolean, actionMasked: Int, toolType: Int): Boolean =
+    enabled && actionMasked == android.view.MotionEvent.ACTION_DOWN &&
+        (toolType == android.view.MotionEvent.TOOL_TYPE_STYLUS || toolType == android.view.MotionEvent.TOOL_TYPE_ERASER)
+
 /** Releases queued samples to the computer no faster than its eight-slot input
  * queue is known to take them today: eight at once, then one more per
  * millisecond. In ordinary drawing (two to four samples per frame) it never
