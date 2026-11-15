@@ -1,24 +1,33 @@
 use crate::{StoreError, blobs, migrations};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use std::{
+    collections::BTreeSet,
     fs::{self, File, OpenOptions},
     path::{Path, PathBuf},
-    time::Duration,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
 use vw_model::{AssetId, DeviceId, Id, Project};
-use vw_ops::{Acceptance, HostSequencer, Touched};
+use vw_ops::{Acceptance, HostSequencer, OpsError, Touched};
 use vw_proto::{Message, v1};
 
 pub(crate) const MAX_PAYLOAD: usize = 64 * 1024 * 1024;
 /// No checkpoint is written for less replay than this, in the microseconds
 /// of `ReplayCost`: a tenth of a second of opening.
 const CHECKPOINT_MIN_MICROS: u64 = 100_000;
+/// A checkpoint is urgent from this much replay on: five seconds of opening.
+const CHECKPOINT_URGENT_MICROS: u64 = 5_000_000;
 /// Unused pages are handed back to the filesystem once they make up this much
 /// of the database and at least a quarter of it.
 const RECLAIM_MIN_BYTES: i64 = 4 * 1024 * 1024;
 /// Compacting copies the live pages once. Up to this size the copy is held in
 /// memory, because not every platform gives SQLite a temporary directory.
 const RECLAIM_IN_MEMORY_BYTES: i64 = 256 * 1024 * 1024;
+/// How long a write waits for another connection.
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+/// The same while an open tidies the file: a connected reader makes a step
+/// fail, to be tried at a later open, instead of holding the open up.
+const UPKEEP_BUSY_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// Diagnostic commit boundaries. Observers must return promptly and never panic.
 /// The process-crash harness kills its own writer at randomized boundaries.
@@ -40,8 +49,74 @@ pub enum OpenStage {
     /// Superseded checkpoints are removed inside the uncommitted transaction.
     Pruned,
     Committed,
+    /// A compaction is about to start; the attempt is noted in the database.
+    Compacting,
+    /// The compaction is copying rows. Nothing of it is committed.
+    Copying,
+    /// The compacted pages are committed to the write-ahead log.
+    Vacuumed,
+    /// They are in the database file; the log is about to be emptied.
+    Transferred,
     /// Unused pages were handed back, or there were too few to bother.
     Compacted,
+}
+
+/// What an open did besides loading the project, for diagnostics: counts and
+/// durations, and for a step that failed the error it failed with.
+#[derive(Debug, Default)]
+pub struct OpenReport {
+    /// Stored checkpoints that did not load and were passed over.
+    pub skipped_checkpoints: u64,
+    /// The clean-up transaction: superseded checkpoints, cancellation
+    /// records and the log seal.
+    pub tidy: Upkeeping,
+    /// A checkpoint written because this open had a costly log to replay.
+    pub checkpoint: Upkeeping,
+    /// Handing unused pages back to the filesystem.
+    pub compaction: Upkeeping,
+}
+
+/// How one step of an open's upkeep went. None of them can fail the open.
+#[derive(Debug, Default)]
+pub enum Upkeeping {
+    /// There was nothing to do.
+    #[default]
+    NotDue,
+    Done(Duration),
+    /// The project is open and the step changed nothing; a later open tries
+    /// again.
+    Failed(Duration, StoreError),
+    /// Not attempted: an earlier step failed, or this one did not finish
+    /// before and nothing has changed since.
+    Skipped,
+}
+impl Upkeeping {
+    fn of(started: Instant, result: Result<bool, StoreError>) -> Self {
+        match result {
+            Ok(true) => Self::Done(started.elapsed()),
+            Ok(false) => Self::NotDue,
+            Err(error) => Self::Failed(started.elapsed(), error),
+        }
+    }
+}
+
+/// How much the next open would gain from a checkpoint written now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CheckpointNeed {
+    /// Replaying the log costs less than loading a checkpoint would.
+    None,
+    /// A checkpoint would shorten the next open: write it when the project
+    /// closes.
+    Due,
+    /// Replaying would at least double the next open: write it when the
+    /// project has been left alone for a while.
+    Overdue,
+    /// Replaying would take at least five seconds and four times as long as
+    /// the rest of the open: write it at the next moment nothing else is
+    /// waiting, although someone is working. Writing one holds the project
+    /// up for about as long as an open takes, so this is the backstop for
+    /// work that never pauses, not the usual way.
+    Urgent,
 }
 
 /// A single-writer project database. Its advisory lock is released by the OS on
@@ -52,9 +127,17 @@ pub enum OpenStage {
 /// replay only the log after it. At most two are stored. The first is the one
 /// the project began with: at revision zero it is small, it is never removed,
 /// and gesture cancellations, the one thing the log cannot rebuild, are
-/// recorded in it. A later one is written when replaying the log has become
-/// more expensive than loading a checkpoint, and only while the project is
-/// being opened or closed: saving never writes one.
+/// recorded in it; each cancellation also has a row of its own, in case that
+/// one row is ever damaged. A later checkpoint is written when replaying the
+/// log has become more expensive than loading one. Saving never writes it:
+/// this store does when a project opens, and the application asks for it
+/// while the project is idle and when it closes (`checkpoint_if`). Before a
+/// new one replaces the one before it, it is read back.
+///
+/// Opening decides again every transaction stored after the checkpoint it
+/// starts from, with the engine of the build that opens. What that requires
+/// of the engine is stated at `evaluate` in `vw-ops`, and what happens when
+/// it does not hold at `restore` here.
 pub struct ProjectStore {
     pub(crate) root: PathBuf,
     pub(crate) connection: Connection,
@@ -68,6 +151,10 @@ pub struct ProjectStore {
     log: LogSpan,
     seal: LogSeal,
     replayed_transactions: u64,
+    opened: OpenReport,
+    /// The history has outgrown what a checkpoint may hold. Writing one was
+    /// tried and refused; it is not tried again while the project is open.
+    beyond_checkpoint: bool,
 }
 
 /// The advisory lock, given up explicitly. A lock belongs to the open file
@@ -132,6 +219,7 @@ impl ProjectStore {
             write_conflict(&tx, conflict)?;
         }
         write_snapshot(&tx, &host, now_ms)?;
+        write_cancellations(&tx, &host)?;
         write_seal(&tx, &seal)?;
         verify_prefix(&tx, &host, seq)?;
         super::projections::verify_assets(&tx, host.project())?;
@@ -150,6 +238,8 @@ impl ProjectStore {
             log,
             seal,
             replayed_transactions: 0,
+            opened: OpenReport::default(),
+            beyond_checkpoint: false,
         })
     }
 
@@ -212,25 +302,38 @@ impl ProjectStore {
             log: LogSpan::default(),
             seal,
             replayed_transactions: 0,
+            opened: OpenReport::default(),
+            beyond_checkpoint: false,
         })
     }
 
     /// Verify the newest checkpoint that loads and replay the accepted log
     /// after it. Unsupported schemas, a damaged log and damaged projections
-    /// are rejected without repair. A damaged checkpoint is skipped when an
-    /// earlier one and the log give the same project. A project written by an
-    /// older build carries a checkpoint for every 500 saves: once the project
-    /// is verified, all but the two this store keeps are removed and their
-    /// space is handed back.
+    /// are rejected without repair, and so is a log this build's engine does
+    /// not decide the way it was stored (`StoreError::EngineMismatch`); a
+    /// refused project is left exactly as it was. A damaged checkpoint is
+    /// skipped when an earlier one and the log give the same project. A
+    /// project written by an older build carries a checkpoint for every 500
+    /// saves: once the project is verified, all but the two this store keeps
+    /// are removed and their space is handed back. `open_report` says what
+    /// of this happened.
     pub fn open(path: &Path) -> Result<Self, StoreError> {
         Self::open_observed(path, |_| {})
     }
 
     /// Diagnostic boundaries of the clean-up for the process-crash regression.
-    pub fn open_observed<F: FnMut(OpenStage)>(
+    /// One of them is reported from inside SQLite while it compacts, which is
+    /// why the observer has to be owned and sendable.
+    pub fn open_observed<F: FnMut(OpenStage) + Send + 'static>(
         path: &Path,
-        mut observer: F,
+        observer: F,
     ) -> Result<Self, StoreError> {
+        let observer = Arc::new(Mutex::new(observer));
+        let mut observer = move |stage: OpenStage| {
+            if let Ok(mut observer) = observer.lock() {
+                observer(stage);
+            }
+        };
         blobs::check_directory(path)?;
         let root = path.canonicalize()?;
         let lock = lock_project(&root)?;
@@ -243,15 +346,9 @@ impl ProjectStore {
             log,
             seal,
             upkeep,
+            skipped,
         } = restore(&connection)?;
         observer(OpenStage::Restored);
-        // The project is verified and complete in memory. What follows only
-        // tidies the file: one transaction, a checkpoint if this open had to
-        // replay a lot, and one compaction, each all or nothing. If the disk
-        // refuses one (it is full, a reader holds the file), the project
-        // opens as it is and the next open tries again: an open has never
-        // needed room to write.
-        let tidied = tidy(&mut connection, &host, &seal, &upkeep, &mut observer);
         let mut store = Self {
             root,
             connection,
@@ -262,15 +359,74 @@ impl ProjectStore {
             log,
             seal,
             replayed_transactions: replayed,
+            opened: OpenReport {
+                skipped_checkpoints: skipped,
+                ..OpenReport::default()
+            },
+            beyond_checkpoint: false,
         };
-        if tidied.is_ok() {
-            if checkpoint_pays(&store.cost, &store.log) {
-                let _ = store.write_checkpoint(None, |_| {});
-            }
-            let _ = reclaim(&store.connection);
-        }
+        store.upkeep(&upkeep, &mut observer);
         observer(OpenStage::Compacted);
         Ok(store)
+    }
+
+    /// The project is verified and complete in memory. This only tidies the
+    /// file: one transaction, a checkpoint if this open had to replay a lot,
+    /// and one compaction, each all or nothing. If the disk refuses one (it
+    /// is full, a reader holds the file), the project is open as it is and a
+    /// later open tries again: an open has never needed room to write. What
+    /// happened is kept in the report.
+    fn upkeep<F: FnMut(OpenStage) + Clone + Send + 'static>(
+        &mut self,
+        upkeep: &Upkeep,
+        observer: &mut F,
+    ) {
+        if upkeep.unsettled {
+            self.opened.tidy = Upkeeping::Skipped;
+            self.opened.checkpoint = Upkeeping::Skipped;
+            self.opened.compaction = Upkeeping::Skipped;
+            return;
+        }
+        let _ = self.connection.busy_timeout(UPKEEP_BUSY_TIMEOUT);
+        let started = Instant::now();
+        self.opened.tidy = Upkeeping::of(
+            started,
+            tidy(
+                &mut self.connection,
+                &self.host,
+                &self.seal,
+                upkeep,
+                observer,
+            ),
+        );
+        if matches!(self.opened.tidy, Upkeeping::Failed(..)) {
+            self.opened.checkpoint = Upkeeping::Skipped;
+            self.opened.compaction = Upkeeping::Skipped;
+        } else {
+            let started = Instant::now();
+            let due = self.checkpoint_need() >= CheckpointNeed::Due;
+            self.opened.checkpoint = Upkeeping::of(
+                started,
+                if due {
+                    self.write_checkpoint(None, |_| {}).map(|()| true)
+                } else {
+                    Ok(false)
+                },
+            );
+            let started = Instant::now();
+            self.opened.compaction = match reclaim(&mut self.connection, observer) {
+                Ok(Reclaimed::Skipped) => Upkeeping::Skipped,
+                Ok(Reclaimed::NotDue) => Upkeeping::NotDue,
+                Ok(Reclaimed::Done) => Upkeeping::Done(started.elapsed()),
+                Err(error) => Upkeeping::Failed(started.elapsed(), error),
+            };
+        }
+        let _ = self.connection.busy_timeout(BUSY_TIMEOUT);
+    }
+
+    /// What this open did besides loading the project.
+    pub const fn open_report(&self) -> &OpenReport {
+        &self.opened
     }
 
     pub fn project(&self) -> &Project {
@@ -464,6 +620,7 @@ impl ProjectStore {
             let mut ledger = load_checkpoint(&tx, sql_u64(self.ledger_seq)?)?;
             carry_cancellations(&mut ledger, &candidate)?;
             write_snapshot(&tx, &ledger, now_ms)?;
+            write_cancellations(&tx, &candidate)?;
         }
         let mut removed = 0;
         for txn in acknowledged {
@@ -616,20 +773,37 @@ impl ProjectStore {
         Ok(acceptance)
     }
 
-    /// Write a checkpoint at the current revision if the next open would
-    /// otherwise replay more than loading one costs. It rewrites the whole
-    /// sequencing state, which takes as long as the history is large, so no
-    /// save does it: this store does when a project opens, and applications
-    /// call this before they close one. Returns whether one was written.
-    pub fn checkpoint_if_due(&mut self, now_ms: i64) -> Result<bool, StoreError> {
+    /// How much the next open would gain from a checkpoint written now. It
+    /// is `None` for a log of new strokes however long: replaying them is
+    /// cheaper than loading a checkpoint that holds them.
+    pub fn checkpoint_need(&self) -> CheckpointNeed {
+        if self.beyond_checkpoint {
+            return CheckpointNeed::None;
+        }
+        checkpoint_need(&self.cost, &self.log)
+    }
+
+    /// Write a checkpoint at the current revision if one is needed at least
+    /// as much as `need` says. It rewrites the whole sequencing state and
+    /// reads it back, which takes as long as the history is large, so no
+    /// save does it. This store writes a due one when a project opens;
+    /// applications ask for a due one before they close a project, for an
+    /// overdue one when the project is idle, and for an urgent one between
+    /// two pieces of work. Returns whether one was written.
+    pub fn checkpoint_if(&mut self, need: CheckpointNeed, now_ms: i64) -> Result<bool, StoreError> {
         if now_ms < 0 {
             return Err(StoreError::Invalid("checkpoint time"));
         }
-        if !checkpoint_pays(&self.cost, &self.log) {
+        if need == CheckpointNeed::None || self.checkpoint_need() < need {
             return Ok(false);
         }
         self.write_checkpoint(Some(now_ms), |_| {})?;
         Ok(true)
+    }
+
+    /// `checkpoint_if` for a checkpoint that is due.
+    pub fn checkpoint_if_due(&mut self, now_ms: i64) -> Result<bool, StoreError> {
+        self.checkpoint_if(CheckpointNeed::Due, now_ms)
     }
 
     /// Write a checkpoint at the current revision whether or not one is due.
@@ -655,6 +829,23 @@ impl ProjectStore {
     fn write_checkpoint<F: FnMut(CommitStage)>(
         &mut self,
         now_ms: Option<i64>,
+        observer: F,
+    ) -> Result<(), StoreError> {
+        let written = self.try_write_checkpoint(now_ms, observer);
+        // Serializing a history that large takes seconds every time, and the
+        // history only grows: once refused for its size, do not ask again.
+        if matches!(
+            written,
+            Err(StoreError::Operation(OpsError::Invalid("checkpoint size")))
+        ) {
+            self.beyond_checkpoint = true;
+        }
+        written
+    }
+
+    fn try_write_checkpoint<F: FnMut(CommitStage)>(
+        &mut self,
+        now_ms: Option<i64>,
         mut observer: F,
     ) -> Result<(), StoreError> {
         observer(CommitStage::Prepared);
@@ -677,6 +868,13 @@ impl ProjectStore {
             [sql_u64(self.ledger_seq)?],
         )?;
         write_snapshot(&tx, &self.host, created)?;
+        // Where no revision-zero checkpoint is kept (every mirror), the new
+        // row is now the only way into the project. Read it back the way an
+        // open will before the old one is gone for good: if it does not load
+        // and bind to the log, the transaction is abandoned and the stored
+        // checkpoints stay as they were.
+        let seq = sql_u64(self.host.revision()?.host_seq)?;
+        verify_prefix(&tx, &load_checkpoint(&tx, seq)?, seq)?;
         observer(CommitStage::LogWritten);
         observer(CommitStage::BeforeCommit);
         tx.commit()?;
@@ -729,6 +927,7 @@ impl ProjectStore {
         let mut ledger = load_checkpoint(&tx, sql_u64(self.ledger_seq)?)?;
         ledger.cancel_gesture(device.clone(), gesture.clone())?;
         write_snapshot(&tx, &ledger, now_ms)?;
+        write_cancellation(&tx, &device, &gesture)?;
         observer(CommitStage::LogWritten);
         observer(CommitStage::BeforeCommit);
         tx.commit()?;
@@ -867,16 +1066,7 @@ fn lock_project(root: &Path) -> Result<ProjectLock, StoreError> {
     }
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x0020_0000);
-    }
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x0002_0000);
-    }
+    blobs::no_follow(&mut options);
     let file = options.open(path)?;
     blobs::check_regular_metadata(&file.metadata()?)?;
     fs2::FileExt::try_lock_exclusive(&file).map_err(|e| {
@@ -910,7 +1100,7 @@ fn connect(root: &Path, create: bool) -> Result<Connection, StoreError> {
         flags |= OpenFlags::SQLITE_OPEN_CREATE;
     }
     let connection = Connection::open_with_flags(root.join("project.sqlite"), flags)?;
-    connection.busy_timeout(Duration::from_secs(5))?;
+    connection.busy_timeout(BUSY_TIMEOUT)?;
     connection.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
     Ok(connection)
 }
@@ -1042,6 +1232,53 @@ fn carry_cancellations(into: &mut HostSequencer, from: &HostSequencer) -> Result
     Ok(())
 }
 
+const CANCELLED_PREFIX: &str = "cancelled ";
+
+/// A second copy of one cancellation, as a row of its own. The checkpoint
+/// that cancellations are recorded in is one row; if that row is ever damaged
+/// the project opens from another checkpoint, and these keep what only the
+/// damaged one held.
+fn write_cancellation(
+    connection: &Connection,
+    device: &DeviceId,
+    gesture: &Id,
+) -> Result<(), StoreError> {
+    connection
+        .prepare("INSERT INTO meta(key,value) VALUES(?1,'') ON CONFLICT(key) DO NOTHING")?
+        .execute([format!("{CANCELLED_PREFIX}{device} {gesture}")])?;
+    Ok(())
+}
+fn write_cancellations(connection: &Connection, host: &HostSequencer) -> Result<(), StoreError> {
+    for (device, gesture) in host.cancelled_gestures() {
+        write_cancellation(connection, device, gesture)?;
+    }
+    Ok(())
+}
+fn read_cancellations(connection: &Connection) -> Result<BTreeSet<(DeviceId, Id)>, StoreError> {
+    let mut query = connection.prepare("SELECT key FROM meta WHERE key GLOB 'cancelled *'")?;
+    let mut rows = query.query([])?;
+    let mut cancelled = BTreeSet::new();
+    while let Some(row) = rows.next()? {
+        let key: String = row.get(0)?;
+        let (device, gesture) = key
+            .strip_prefix(CANCELLED_PREFIX)
+            .and_then(|pair| pair.split_once(' '))
+            .ok_or(StoreError::Corrupt("cancellation record"))?;
+        cancelled.insert((
+            DeviceId::try_from(device.to_owned())
+                .map_err(|_| StoreError::Corrupt("cancellation record"))?,
+            Id::try_from(gesture.to_owned())
+                .map_err(|_| StoreError::Corrupt("cancellation record"))?,
+        ));
+    }
+    Ok(cancelled)
+}
+fn cancelled(host: &HostSequencer) -> BTreeSet<(DeviceId, Id)> {
+    host.cancelled_gestures()
+        .map(|(device, gesture)| (device.clone(), gesture.clone()))
+        .collect()
+}
+
 /// What replaying a stretch of the log costs. It is estimated from what each
 /// transaction touched and never timed, so that the same log gives the same
 /// answer on every machine and every run. The unit is a microsecond on the
@@ -1111,15 +1348,27 @@ impl LogSpan {
     }
 }
 
-/// Whether to write a checkpoint at the end of a log of size `log` when the
-/// next open would otherwise replay `tail`. Replaying has to cost enough to
-/// notice, more than loading a checkpoint of the same rows would, and at
-/// least a quarter of loading one of the whole history, which is what gets
-/// rewritten. A log of new strokes never meets the second condition.
-fn checkpoint_pays(tail: &ReplayCost, log: &LogSpan) -> bool {
-    tail.micros >= CHECKPOINT_MIN_MICROS
-        && tail.micros >= tail.span.load_micros()
-        && tail.micros.saturating_mul(4) >= log.load_micros()
+/// How much a checkpoint at the end of a log of size `log` is needed when the
+/// next open would otherwise replay `tail`. For it to be due, replaying has
+/// to cost enough to notice, more than loading a checkpoint of the same rows
+/// would, and at least a quarter of loading one of the whole history, which
+/// is what gets rewritten. A log of new strokes never meets the second
+/// condition. Overdue and urgent compare the replay with loading the whole
+/// history, which is what the rest of an open costs.
+fn checkpoint_need(tail: &ReplayCost, log: &LogSpan) -> CheckpointNeed {
+    let whole = log.load_micros();
+    if tail.micros < CHECKPOINT_MIN_MICROS
+        || tail.micros < tail.span.load_micros()
+        || tail.micros.saturating_mul(4) < whole
+    {
+        CheckpointNeed::None
+    } else if tail.micros < whole {
+        CheckpointNeed::Due
+    } else if tail.micros < CHECKPOINT_URGENT_MICROS || tail.micros < whole.saturating_mul(4) {
+        CheckpointNeed::Overdue
+    } else {
+        CheckpointNeed::Urgent
+    }
 }
 
 const SEAL_KEY: &str = "log_seal";
@@ -1186,10 +1435,20 @@ pub(crate) fn write_seal(connection: &Connection, seal: &LogSeal) -> Result<(), 
     Ok(())
 }
 
+/// What the stored seal says about the log.
+struct Sealed {
+    /// The seal of the complete log.
+    seal: LogSeal,
+    /// Rows up to this revision are as the build that sealed them wrote them.
+    through: i64,
+    /// The stored seal is missing or ends before the last row.
+    stale: bool,
+    log: LogSpan,
+}
+
 /// Recompute the seal over the whole log and compare it with the stored one
-/// at the row the stored one ends on. Returns the seal of the complete log,
-/// whether the stored one is missing or ends earlier, and the log's size.
-fn verify_seal(connection: &Connection) -> Result<(LogSeal, bool, LogSpan), StoreError> {
+/// at the row the stored one ends on.
+fn verify_seal(connection: &Connection) -> Result<Sealed, StoreError> {
     let stored: Option<String> = connection
         .query_row("SELECT value FROM meta WHERE key=?1", [SEAL_KEY], |row| {
             row.get(0)
@@ -1228,21 +1487,27 @@ fn verify_seal(connection: &Connection) -> Result<(LogSeal, bool, LogSpan), Stor
         return Err(StoreError::Corrupt("operation log seal"));
     }
     let stale = stored.as_ref() != Some(&seal);
-    Ok((seal, stale, log))
+    Ok(Sealed {
+        seal,
+        through: stored.map_or(0, |stored| stored.seq),
+        stale,
+        log,
+    })
 }
 
 /// Make durable what `restore` found left to do: record cancellations a
-/// later checkpoint held in the first one, remove every checkpoint that is
-/// not kept, and store the seal of the complete log.
+/// later checkpoint held in the first one, give every cancellation its
+/// second copy, remove every checkpoint that is not kept, and store the seal
+/// of the complete log. Returns whether there was anything to do.
 fn tidy<F: FnMut(OpenStage)>(
     connection: &mut Connection,
     host: &HostSequencer,
     seal: &LogSeal,
     upkeep: &Upkeep,
     observer: &mut F,
-) -> Result<(), StoreError> {
-    if !(upkeep.superseded || upkeep.cancellations || upkeep.seal) {
-        return Ok(());
+) -> Result<bool, StoreError> {
+    if !(upkeep.superseded || upkeep.cancellations || upkeep.copies || upkeep.seal) {
+        return Ok(false);
     }
     let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
@@ -1256,6 +1521,9 @@ fn tidy<F: FnMut(OpenStage)>(
         carry_cancellations(&mut ledger, host)?;
         write_snapshot(&tx, &ledger, created)?;
     }
+    if upkeep.copies {
+        write_cancellations(&tx, host)?;
+    }
     if upkeep.superseded {
         tx.execute(
             "DELETE FROM snapshots WHERE host_seq NOT IN (?1,?2)",
@@ -1268,12 +1536,33 @@ fn tidy<F: FnMut(OpenStage)>(
     observer(OpenStage::Pruned);
     tx.commit()?;
     observer(OpenStage::Committed);
-    Ok(())
+    Ok(true)
+}
+
+const RECLAIM_KEY: &str = "compaction_attempt";
+/// How often a compaction is started for about the same unused space.
+const RECLAIM_ATTEMPTS: u32 = 2;
+
+enum Reclaimed {
+    NotDue,
+    Skipped,
+    Done,
 }
 
 /// Hand unused pages back to the filesystem when they are a large part of the
 /// database, which happens once after an old checkpoint pile is removed.
-fn reclaim(connection: &Connection) -> Result<(), StoreError> {
+///
+/// A compaction that does not finish is not started again at every open. It
+/// is refused where the copy needs a temporary file and there is no directory
+/// for one, and it ends with the process when the system takes the process
+/// away for the memory the copy needs. So each start is noted in the
+/// database first and the note is removed when the compaction is through;
+/// with two starts noted, nothing is tried until there is a quarter more to
+/// hand back.
+fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
+    connection: &mut Connection,
+    observer: &mut F,
+) -> Result<Reclaimed, StoreError> {
     let pragma = |name: &str| -> Result<i64, StoreError> {
         Ok(connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))?)
     };
@@ -1283,32 +1572,101 @@ fn reclaim(connection: &Connection) -> Result<(), StoreError> {
         pragma("page_size")?,
     );
     if free.saturating_mul(size) < RECLAIM_MIN_BYTES || free.saturating_mul(4) < pages {
-        return Ok(());
+        return Ok(Reclaimed::NotDue);
     }
     let in_memory = (pages - free).saturating_mul(size) <= RECLAIM_IN_MEMORY_BYTES;
-    if in_memory {
-        connection.execute_batch("PRAGMA temp_store=MEMORY")?;
+    // Android gives SQLite no directory for the temporary file a larger copy
+    // needs, so there the attempt could only fail.
+    if !in_memory && cfg!(target_os = "android") {
+        return Ok(Reclaimed::Skipped);
     }
-    let compacted = connection.execute_batch("VACUUM");
+    let noted: Option<String> = connection
+        .query_row(
+            "SELECT value FROM meta WHERE key=?1",
+            [RECLAIM_KEY],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let (attempts, noted_free) = noted
+        .as_deref()
+        .and_then(|note| note.split_once(' '))
+        .and_then(|(attempts, free)| {
+            Some((attempts.parse::<u32>().ok()?, free.parse::<i64>().ok()?))
+        })
+        .unwrap_or((0, 0));
+    let more = free > noted_free.saturating_add(noted_free / 4);
+    if attempts >= RECLAIM_ATTEMPTS && !more {
+        return Ok(Reclaimed::Skipped);
+    }
+    let attempts = if more { 1 } else { attempts + 1 };
+    connection
+        .prepare("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")?
+        .execute(params![RECLAIM_KEY, format!("{attempts} {free}")])?;
+    observer(OpenStage::Compacting);
+    // Tell the observer once from inside the copy.
+    let mut inside = Some(observer.clone());
+    connection.progress_handler(
+        1000,
+        Some(move || {
+            if let Some(mut observer) = inside.take() {
+                observer(OpenStage::Copying);
+            }
+            false
+        }),
+    )?;
+    let compacted = if in_memory {
+        connection.execute_batch("PRAGMA temp_store=MEMORY; VACUUM")
+    } else {
+        connection.execute_batch("VACUUM")
+    };
+    // Whatever became of it, the connection goes back to how it was.
+    let _ = connection.progress_handler(0, None::<fn() -> bool>);
     if in_memory {
-        connection.execute_batch("PRAGMA temp_store=DEFAULT")?;
+        let _ = connection.execute_batch("PRAGMA temp_store=DEFAULT");
     }
     compacted?;
-    // The compacted pages are in the write-ahead log; this moves them into
-    // the database file and empties the log.
+    connection.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
+    // The compacted pages are in the write-ahead log. Move them into the
+    // database file, then empty the log. With a reader connected either step
+    // gives up after the busy timeout and the next checkpoint finishes it.
+    observer(OpenStage::Vacuumed);
+    connection.execute_batch("PRAGMA wal_checkpoint(FULL)")?;
+    observer(OpenStage::Transferred);
     connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
-    Ok(())
+    Ok(Reclaimed::Done)
 }
 
-/// Replay the log after revision `after`. Returns how many rows that was and
-/// what it cost, or nothing once the cost reaches `give_up_at`.
+/// How replaying a stretch of the log ended.
+pub(crate) enum Replay {
+    /// Every row was decided as stored: how many rows, and what that cost.
+    Done(u64, ReplayCost),
+    /// The cost reached the limit first.
+    GaveUp,
+    /// This engine does not decide the row at this revision as stored.
+    Differs(i64),
+}
+
+/// What replay does with the acknowledgement of each row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Acks {
+    /// Keep the stored one. The engine has to reproduce the revision and the
+    /// state hash it names; its notices are text and are kept as stored.
+    Stored,
+    /// Store the one the engine gives: the first migration, whose rows have
+    /// none yet.
+    Write,
+}
+
+/// Replay the log after revision `after`. An error is a row that is not what
+/// a log row has to be, or a failed read; a row this engine decides
+/// differently is reported as that and leaves the host at the row before.
 pub(crate) fn replay_log(
     connection: &Connection,
     host: &mut HostSequencer,
     after: i64,
-    verify_ack: bool,
+    acks: Acks,
     give_up_at: Option<u64>,
-) -> Result<Option<(u64, ReplayCost)>, StoreError> {
+) -> Result<Replay, StoreError> {
     let mut query=connection.prepare("SELECT host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack FROM op_log WHERE host_seq>?1 ORDER BY host_seq")?;
     let mut rows = query.query([after])?;
     let mut count = 0;
@@ -1318,36 +1676,49 @@ pub(crate) fn replay_log(
         let bytes: Vec<u8> = row.get(5)?;
         let txn: v1::Transaction = decode(&bytes)?;
         verify_log_columns(row, &txn)?;
-        let device = DeviceId::try_from(txn.device_id.clone())?;
-        let (accepted, replayed) =
-            host.submit_with(txn, &device, row.get(8)?, |host, _, touched| {
-                cost.add(host, touched, bytes.len());
-                Ok::<(), StoreError>(())
-            })?;
-        // A stored row is never a retry of an earlier one.
-        if replayed.is_none()
-            || sql_u64(accepted.ack.host_seq)? != seq
-            || host.state_hash()?.as_str() != row.get::<_, String>(6)?
-        {
-            return Err(StoreError::Corrupt("operation replay"));
-        }
-        if verify_ack {
-            let ack: Vec<u8> = row.get(9)?;
-            if ack != accepted.ack.encode_to_vec() {
-                return Err(StoreError::Corrupt("operation ack"));
+        let accepted_at: i64 = row.get(8)?;
+        match acks {
+            Acks::Stored => {
+                let stored: v1::TxnAck = decode(&row.get::<_, Vec<u8>>(9)?)?;
+                let hash = AssetId::try_from(row.get::<_, String>(6)?)?;
+                // The row has to agree with itself before the engine is asked.
+                if stored.txn_id != txn.txn_id
+                    || sql_u64(stored.host_seq)? != seq
+                    || stored.state_hash != hash.bytes()
+                {
+                    return Err(StoreError::Corrupt("operation ack"));
+                }
+                match host.replay(txn, accepted_at, &stored) {
+                    Ok(Some(touched)) => cost.add(host, &touched, bytes.len()),
+                    Ok(None) | Err(_) => return Ok(Replay::Differs(seq)),
+                }
             }
-        } else {
-            connection.execute(
-                "UPDATE op_log SET ack=?1 WHERE host_seq=?2",
-                params![accepted.ack.encode_to_vec(), seq],
-            )?;
+            Acks::Write => {
+                let device = DeviceId::try_from(txn.device_id.clone())?;
+                let (accepted, replayed) =
+                    host.submit_with(txn, &device, accepted_at, |host, _, touched| {
+                        cost.add(host, touched, bytes.len());
+                        Ok::<(), StoreError>(())
+                    })?;
+                // A stored row is never a retry of an earlier one.
+                if replayed.is_none()
+                    || sql_u64(accepted.ack.host_seq)? != seq
+                    || host.state_hash()?.as_str() != row.get::<_, String>(6)?
+                {
+                    return Err(StoreError::Corrupt("operation replay"));
+                }
+                connection.execute(
+                    "UPDATE op_log SET ack=?1 WHERE host_seq=?2",
+                    params![accepted.ack.encode_to_vec(), seq],
+                )?;
+            }
         }
         count += 1;
         if give_up_at.is_some_and(|limit| cost.micros >= limit) {
-            return Ok(None);
+            return Ok(Replay::GaveUp);
         }
     }
-    Ok(Some((count, cost)))
+    Ok(Replay::Done(count, cost))
 }
 fn verify_log_columns(row: &rusqlite::Row<'_>, txn: &v1::Transaction) -> Result<(), StoreError> {
     if uuid(txn.txn_id.as_ref())? != row.get::<_, String>(1)?
@@ -1585,6 +1956,8 @@ pub(crate) struct Restored {
     pub(crate) log: LogSpan,
     pub(crate) seal: LogSeal,
     pub(crate) upkeep: Upkeep,
+    /// Stored checkpoints that did not load.
+    pub(crate) skipped: u64,
 }
 
 /// What an open still has to write once the project is verified.
@@ -1595,47 +1968,80 @@ pub(crate) struct Upkeep {
     pub(crate) keep: [i64; 2],
     /// Other checkpoints are stored.
     pub(crate) superseded: bool,
-    /// The first of `keep` lacks cancellations the other holds.
+    /// The first of `keep` lacks cancellations the project holds.
     pub(crate) cancellations: bool,
+    /// Some cancellation has no second copy.
+    pub(crate) copies: bool,
     /// The stored log seal is missing or ends before the last row.
     pub(crate) seal: bool,
+    /// A read failed while working out what to keep. The project is open
+    /// from a verified checkpoint; nothing is written this time.
+    pub(crate) unsettled: bool,
+}
+
+enum Replayed {
+    Done(Box<HostSequencer>, u64, ReplayCost),
+    GaveUp,
+    Differs(i64),
 }
 
 /// The checkpoint at `seq` with the log after it replayed, how many rows that
-/// was and what it cost; nothing once the cost reaches `give_up_at`.
+/// was and what it cost.
 fn replay_from(
     connection: &Connection,
     mut host: HostSequencer,
     seq: i64,
     give_up_at: Option<u64>,
-) -> Result<Option<(HostSequencer, u64, ReplayCost)>, StoreError> {
+) -> Result<Replayed, StoreError> {
     verify_prefix(connection, &host, seq)?;
-    let Some((replayed, cost)) = replay_log(connection, &mut host, seq, true, give_up_at)? else {
-        return Ok(None);
-    };
-    // Each replayed step was matched with the hash the host carries forward.
-    // Recompute the final state from nothing once, so the stored history and
-    // the carried hash cannot agree on a state the project is not in.
-    if replayed > 0 && &host.project().state_hash()? != host.state_hash()? {
-        return Err(StoreError::Corrupt("operation replay"));
+    match replay_log(connection, &mut host, seq, Acks::Stored, give_up_at)? {
+        Replay::Done(replayed, cost) => {
+            // Each replayed step was matched with the hash the host carries
+            // forward. Recompute the final state from nothing once, so the
+            // stored history and the carried hash cannot agree on a state
+            // the project is not in.
+            if replayed > 0 && &host.project().state_hash()? != host.state_hash()? {
+                return Err(StoreError::Corrupt("operation replay"));
+            }
+            Ok(Replayed::Done(Box::new(host), replayed, cost))
+        }
+        Replay::GaveUp => Ok(Replayed::GaveUp),
+        Replay::Differs(seq) => Ok(Replayed::Differs(seq)),
     }
-    Ok(Some((host, replayed, cost)))
 }
 
+/// Load the project and check everything stored against it. Nothing is
+/// written.
+///
+/// The log is replayed from the newest checkpoint that loads. When this
+/// engine does not decide a row of it as stored, the project is refused, and
+/// how depends on what is known about the row. Rows the seal covers are as
+/// the build that accepted them wrote them, so the difference is the engine:
+/// the project was saved by another version, `EngineMismatch`. A row the seal
+/// does not cover may have changed since, and is reported as damage, as it
+/// always was. Either way nothing has been changed, and the build that saved
+/// the project still opens it. An earlier checkpoint is no way round this:
+/// the same rows would have to be replayed from there as well.
 pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
     integrity(connection)?;
     check_all_column_bounds(connection)?;
     check_payload_bounds(connection)?;
-    let (seal, stale, log) = verify_seal(connection)?;
+    let Sealed {
+        seal,
+        through,
+        stale,
+        log,
+    } = verify_seal(connection)?;
     let rows = connection
         .prepare("SELECT host_seq FROM snapshots ORDER BY host_seq")?
         .query_map([], |row| row.get::<_, i64>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     // Start from the newest checkpoint that loads, as every build has. One
-    // that does not load is skipped: an earlier one and more of the log give
-    // the same project.
+    // that does not load is skipped and counted: an earlier one and more of
+    // the log give the same project.
     let mut failure = None;
     let mut newest = None;
+    let mut skipped = 0;
     for (index, seq) in rows.iter().enumerate().rev() {
         match load_checkpoint(connection, *seq) {
             Ok(checkpoint) => {
@@ -1643,6 +2049,7 @@ pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
                 break;
             }
             Err(error) => {
+                skipped += 1;
                 failure.get_or_insert(error);
             }
         }
@@ -1651,49 +2058,86 @@ pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
         return Err(failure.unwrap_or(StoreError::Corrupt("checkpoint binding")));
     };
     let start = rows[index];
-    // How many cancellations the checkpoint they are recorded in holds.
-    let mut recorded = checkpoint.cancelled_gestures().count();
-    let (mut host, mut replayed, mut cost) = replay_from(connection, checkpoint, start, None)?
-        .ok_or(StoreError::Corrupt("operation replay"))?;
-    let mut keep = [start, start];
-    // The revision-zero checkpoint, when the project has one besides the one
-    // just used, is where cancellations are recorded.
-    if index > 0
-        && rows[0] == 0
-        && let Ok(first) = load_checkpoint(connection, 0)
+    // The cancellations held by the checkpoint they are recorded in.
+    let mut recorded = cancelled(&checkpoint);
+    // Conflict records up to here are the checkpoint's; later ones are
+    // decided again by the replay.
+    let mut loaded_conflicts = checkpoint.conflicts().len();
+    let (mut host, mut replayed, mut cost) = match replay_from(connection, checkpoint, start, None)?
     {
-        let mut continues = true;
-        if rows.len() > 2 || stale {
-            // An older build was here: it wrote a checkpoint for every 500
-            // saves whether or not replaying them was cheaper, and for a log
-            // of strokes it is. Find out by replaying the whole log from
-            // revision zero, up to the cost at which a checkpoint pays.
-            let limit = CHECKPOINT_MIN_MICROS.max(log.load_micros());
-            match replay_from(connection, first.clone(), 0, Some(limit)) {
-                Ok(Some((mut whole, count, whole_cost))) => {
-                    if whole.revision()? != host.revision()? {
-                        return Err(StoreError::Corrupt("operation replay"));
-                    }
-                    carry_cancellations(&mut whole, &host)?;
-                    (host, replayed, cost) = (whole, count, whole_cost);
-                    keep = [0, 0];
-                }
-                Ok(None) => {}
-                // The log was not written on top of this checkpoint.
-                Err(_) => continues = false,
-            }
+        Replayed::Done(host, replayed, cost) => (*host, replayed, cost),
+        Replayed::Differs(seq) if seq <= through => return Err(StoreError::EngineMismatch),
+        Replayed::Differs(_) | Replayed::GaveUp => {
+            return Err(StoreError::Corrupt("operation replay"));
         }
-        carry_cancellations(&mut host, &first)?;
-        if continues {
-            recorded = first.cancelled_gestures().count();
-            keep[0] = 0;
+    };
+    let mut keep = [start, start];
+    let mut unsettled = false;
+    // The revision-zero checkpoint, when the project has one besides the one
+    // just used, is where cancellations are recorded. It is never removed.
+    if index > 0 && rows[0] == 0 {
+        match load_checkpoint(connection, 0) {
+            Ok(first) => {
+                if rows.len() > 2 || stale {
+                    // An older build was here: it wrote a checkpoint for
+                    // every 500 saves whether or not replaying them was
+                    // cheaper, and for a log of strokes it is. Find out by
+                    // replaying the whole log from revision zero, up to the
+                    // cost at which a checkpoint pays.
+                    let limit = CHECKPOINT_MIN_MICROS.max(log.load_micros());
+                    match replay_from(connection, first.clone(), 0, Some(limit)) {
+                        // Use it only if it is the history the checkpoint
+                        // holds, journal and all.
+                        Ok(Replayed::Done(mut whole, count, whole_cost))
+                            if whole.same_history(&host) =>
+                        {
+                            carry_cancellations(&mut whole, &host)?;
+                            (host, replayed, cost) = (*whole, count, whole_cost);
+                            keep = [0, 0];
+                            loaded_conflicts = 0;
+                        }
+                        // Replaying everything costs more than loading the
+                        // later checkpoint, or this engine does not decide
+                        // the early history as it was decided, or the log
+                        // was not written on top of this checkpoint: the
+                        // later checkpoint stays in use.
+                        Ok(_) => {}
+                        // The database could not be read. That says nothing
+                        // about the checkpoints; decide another time.
+                        Err(_) => unsettled = true,
+                    }
+                }
+                carry_cancellations(&mut host, &first)?;
+                recorded = cancelled(&first);
+                keep[0] = 0;
+            }
+            Err(_) => skipped += 1,
         }
     }
-    // The host now holds every cancellation of both checkpoints.
-    let cancellations = host.cancelled_gestures().count() != recorded;
+    let copies = read_cancellations(connection)?;
+    for (device, gesture) in &copies {
+        if !host.gesture_closed(device, gesture) {
+            host.cancel_gesture(device.clone(), gesture.clone())?;
+        }
+    }
+    // The host now holds every cancellation stored anywhere.
+    let held = cancelled(&host);
     let conflicts = read_conflicts(connection)?;
     if conflicts != host.conflicts() {
-        return Err(StoreError::Corrupt("conflict projection"));
+        // What a checkpoint held has to be in the table as it is. What the
+        // replay of sealed rows decided again differs only if the engine does.
+        let loaded = host.conflicts().get(..loaded_conflicts);
+        return Err(
+            if replayed > 0
+                && !stale
+                && loaded.is_some()
+                && conflicts.get(..loaded_conflicts) == loaded
+            {
+                StoreError::EngineMismatch
+            } else {
+                StoreError::Corrupt("conflict projection")
+            },
+        );
     }
     super::projections::verify_assets(connection, host.project())?;
     super::projections::verify(
@@ -1710,9 +2154,12 @@ pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
         seal,
         upkeep: Upkeep {
             keep,
-            superseded: rows.iter().any(|seq| !keep.contains(seq)),
-            cancellations,
+            superseded: !unsettled && rows.iter().any(|seq| !keep.contains(seq)),
+            cancellations: !held.is_subset(&recorded),
+            copies: !held.is_subset(&copies),
             seal: stale,
+            unsettled,
         },
+        skipped,
     })
 }

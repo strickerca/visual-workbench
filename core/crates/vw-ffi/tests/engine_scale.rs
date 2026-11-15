@@ -1,7 +1,7 @@
 //! Large documents and long strokes through the same calls the apps make:
 //! a layer holds far more than 768 objects, and predicting the end of a very
 //! long stroke costs what it costs on a short one.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod support;
 use std::{
     sync::Arc,
@@ -97,29 +97,17 @@ async fn closing_writes_the_checkpoint_a_costly_history_needs_and_drawing_needs_
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("project");
         let project = create_image_project(create(&path), cancel()).await.unwrap();
-        for half in 0..2_u32 {
-            let shapes = (half * 450..(half + 1) * 450)
-                .map(|n| rectangle(wide_id(0x50, n), n))
-                .collect();
-            edit(&project, 900 + half, shapes).await;
-        }
-        for number in 0..6 {
-            stroke_on_top(&project, number).await;
-        }
         if costly {
-            for number in 1..=50_u32 {
-                let moved = EditCommand::Transform {
-                    object_id: wide_id(0x50, 0),
-                    transform: Transform {
-                        a: 1.0,
-                        b: 0.0,
-                        c: 0.0,
-                        d: 1.0,
-                        e: f64::from(number),
-                        f: 0.0,
-                    },
-                };
-                edit(&project, number, vec![moved]).await;
+            costly_history(&project).await;
+        } else {
+            for half in 0..2_u32 {
+                let shapes = (half * 450..(half + 1) * 450)
+                    .map(|n| rectangle(wide_id(0x50, n), n))
+                    .collect();
+                edit(&project, 900 + half, shapes).await;
+            }
+            for number in 0..6 {
+                stroke_on_top(&project, number).await;
             }
         }
         let saved = project.info().await.unwrap();
@@ -134,6 +122,101 @@ async fn closing_writes_the_checkpoint_a_costly_history_needs_and_drawing_needs_
             "costly history: {costly}"
         );
     }
+}
+
+/// The history `closing_writes_the_checkpoint…` calls costly.
+async fn costly_history(project: &Arc<ProjectSession>) {
+    for half in 0..2_u32 {
+        let shapes = (half * 450..(half + 1) * 450)
+            .map(|n| rectangle(wide_id(0x50, n), n))
+            .collect();
+        edit(project, 900 + half, shapes).await;
+    }
+    for number in 0..6 {
+        stroke_on_top(project, number).await;
+    }
+    for number in 1..=50_u32 {
+        let moved = EditCommand::Transform {
+            object_id: wide_id(0x50, 0),
+            transform: Transform {
+                a: 1.0,
+                b: 0.0,
+                c: 0.0,
+                d: 1.0,
+                e: f64::from(number),
+                f: 0.0,
+            },
+        };
+        edit(project, number, vec![moved]).await;
+    }
+}
+
+/// An application that is killed, or put away and ended by the system, never
+/// closes its project. The project writes the checkpoint a costly history
+/// needs by itself once it has been left alone for a few seconds, so the
+/// next open does not have all of that history to replay.
+#[tokio::test]
+async fn a_project_left_open_writes_its_checkpoint_itself_and_a_kill_leaves_nothing_to_replay() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project");
+    let marker = dir.path().join("written");
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--ignored", "--exact", "left_open_worker"])
+        .env("VW_LEFT_OPEN_PROJECT", &path)
+        .env("VW_LEFT_OPEN_MARKER", &marker)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(120);
+    while !marker.exists() {
+        if child.try_wait().unwrap().is_some() || Instant::now() >= deadline {
+            let _ = child.kill();
+            child.wait().unwrap();
+            panic!("the open project did not write its checkpoint");
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    child.kill().unwrap();
+    assert!(!child.wait().unwrap().success());
+    let saved = std::fs::read_to_string(&marker).unwrap();
+    let (host_seq, state_hash) = saved.split_once(' ').unwrap();
+    let store = vw_store::ProjectStore::open(&path).unwrap();
+    assert_eq!(store.revision().unwrap().host_seq.to_string(), host_seq);
+    assert_eq!(store.state_hash().unwrap().to_string(), state_hash);
+    assert_eq!(store.replayed_transactions(), 0);
+}
+
+#[tokio::test]
+#[ignore = "private owned subprocess killed while its project is open"]
+async fn left_open_worker() {
+    let path = std::env::var_os("VW_LEFT_OPEN_PROJECT").expect("owned project");
+    let marker = std::path::PathBuf::from(std::env::var_os("VW_LEFT_OPEN_MARKER").expect("marker"));
+    let project = create_image_project(create(std::path::Path::new(&path)), cancel())
+        .await
+        .unwrap();
+    costly_history(&project).await;
+    let saved = project.info().await.unwrap();
+    // From here on nothing is asked of the project and it is never closed.
+    let deadline = Instant::now() + Duration::from_secs(100);
+    while !core_diagnostics(0)
+        .events
+        .iter()
+        .any(|event| event.area == "project" && event.name == "checkpoint while open")
+    {
+        assert!(Instant::now() < deadline, "no checkpoint while open");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let unfinished = marker.with_extension("tmp");
+    std::fs::write(
+        &unfinished,
+        format!("{} {}", saved.host_seq, saved.state_hash),
+    )
+    .unwrap();
+    std::fs::rename(&unfinished, &marker).unwrap();
+    tokio::time::sleep(Duration::from_secs(120)).await;
+    panic!("the owning test did not end this worker");
 }
 
 #[tokio::test]

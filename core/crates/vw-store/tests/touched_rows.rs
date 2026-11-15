@@ -286,6 +286,12 @@ fn every_kind_of_change_leaves_rows_equal_to_a_full_rebuild() {
             store.state_hash().unwrap().bytes().to_vec()
         );
         store.integrity_check().unwrap();
+        // Every fifth step also stores a checkpoint, so that opening loads
+        // one that holds each kind of change, journal and all, and replays
+        // the rest on top of it.
+        if n.is_multiple_of(5) {
+            store.checkpoint_now(n as i64).unwrap();
+        }
         let revision = store.revision().unwrap();
         let checkpoint = store.checkpoint_bytes().unwrap();
         drop(store);
@@ -300,6 +306,12 @@ fn every_kind_of_change_leaves_rows_equal_to_a_full_rebuild() {
         store = reopened.unwrap();
         assert_eq!(store.revision().unwrap(), revision, "step {n}");
         assert_eq!(store.checkpoint_bytes().unwrap(), checkpoint, "step {n}");
+        // Steps since the last stored checkpoint were replayed, no more.
+        assert_eq!(
+            store.replayed_transactions(),
+            if n < 5 { n - 1 } else { n % 5 },
+            "step {n}"
+        );
     }
     // The script ended with the layer and group restored and object 10 gone.
     let project = store.project();
