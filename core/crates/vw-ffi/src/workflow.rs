@@ -272,11 +272,18 @@ pub(crate) fn current(state: &ProjectState, document: &str) -> WorkflowResult<Wo
         return Err(WorkflowError::Missing);
     }
     let revision = state.view_revision()?;
+    // The hash of what is shown is carried forward by every edit; hashing the
+    // whole project here would take as long as the project is large, three
+    // times for every edit a workflow makes.
+    let state_hash = match &state.replica {
+        Some(replica) => replica.state_hash().to_string(),
+        None => state.store()?.state_hash()?.to_string(),
+    };
     Ok(WorkflowBinding {
         project_id: state.project()?.id.to_string(),
         document_id: id.to_string(),
         host_seq: revision.host_seq,
-        state_hash: state.project()?.state_hash()?.to_string(),
+        state_hash,
     })
 }
 pub(crate) fn check_binding(
