@@ -28,5 +28,8 @@ thiserror = "=2.0.21"
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 rustix = { version = "=1.1.6", features = ["fs"] }
 
+[dev-dependencies]
+vw-ops = { path = "../vw-ops", version = "=0.1.0", features = ["cross-check"] }
+
 [target.'cfg(windows)'.dev-dependencies]
 windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_System_Com"] }

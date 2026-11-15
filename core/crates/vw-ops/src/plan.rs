@@ -1,12 +1,13 @@
-use crate::OpsError;
+use crate::{OpsError, draft::Draft};
 use vw_model::{
     AssetId, Document, Group, Id, Instruction, Layer, Object, Project, ResultCandidate,
     SemanticSnapshot, validate_asset, validate_object_state,
 };
 use vw_proto::v1::{self, op::Kind, property_value::Value};
 
-pub(crate) fn plan(project: &Project, transaction: &v1::Transaction) -> Result<Project, OpsError> {
-    let mut next = project.clone();
+/// Apply a transaction's operations to a draft in order. The caller validates
+/// the edited project and discards the draft when anything here fails.
+pub(crate) fn apply(draft: &mut Draft<'_>, transaction: &v1::Transaction) -> Result<(), OpsError> {
     for op in &transaction.ops {
         let kind = op
             .kind
@@ -20,20 +21,19 @@ pub(crate) fn plan(project: &Project, transaction: &v1::Transaction) -> Result<P
         {
             return Err(OpsError::DeviceMismatch);
         }
-        apply(&mut next, kind, transaction.created_at_wall_ms)?;
+        apply_kind(draft, kind, transaction.created_at_wall_ms)?;
     }
-    next.validate()?;
-    Ok(next)
+    Ok(())
 }
 
-fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> {
+fn apply_kind(draft: &mut Draft<'_>, kind: &Kind, time: i64) -> Result<(), OpsError> {
     match kind {
         Kind::CreateDocument(value) => {
             let id = Id::from_proto(value.document_id.as_ref())?;
-            if project.documents.contains_key(&id) {
+            if draft.project().documents.contains_key(&id) {
                 return Err(OpsError::AlreadyExists);
             }
-            project.documents.insert(
+            draft.insert_document(
                 id,
                 Document {
                     definition: value.clone(),
@@ -44,9 +44,8 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         }
         Kind::UpdateDocument(value) => {
             let id = Id::from_proto(value.document_id.as_ref())?;
-            project
-                .documents
-                .get_mut(&id)
+            draft
+                .document_mut(&id)
                 .ok_or(OpsError::NotFound)?
                 .definition
                 .title = value.title.clone();
@@ -54,20 +53,20 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         Kind::AddAsset(value) => {
             validate_asset(value)?;
             let id = AssetId::try_from(value.asset_id.clone())?;
-            if let Some(old) = project.assets.get(&id) {
+            if let Some(old) = draft.project().assets.get(&id) {
                 if old != value {
                     return Err(OpsError::AlreadyExists);
                 }
             } else {
-                project.assets.insert(id, value.clone());
+                draft.insert_asset(id, value.clone());
             }
         }
         Kind::CreateLayer(value) => {
             let id = Id::from_proto(value.layer_id.as_ref())?;
-            if project.layers.contains_key(&id) {
+            if draft.project().layers.contains_key(&id) {
                 return Err(OpsError::AlreadyExists);
             }
-            project.layers.insert(
+            draft.insert_layer(
                 id,
                 Layer {
                     definition: value.clone(),
@@ -80,7 +79,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         }
         Kind::UpdateLayer(value) => {
             let id = Id::from_proto(value.layer_id.as_ref())?;
-            let layer = project.layers.get_mut(&id).ok_or(OpsError::NotFound)?;
+            let layer = draft.layer_mut(&id).ok_or(OpsError::NotFound)?;
             if layer.locked
                 && (value.name.is_some()
                     || value.order_key.is_some()
@@ -111,6 +110,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         }
         Kind::DeleteLayer(value) => {
             let id = Id::from_proto(value.layer_id.as_ref())?;
+            let project = draft.project();
             let layer = project.layers.get(&id).ok_or(OpsError::NotFound)?;
             if layer.locked
                 || project
@@ -120,10 +120,16 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
             {
                 return Err(OpsError::Locked);
             }
-            project
+            let members = project
                 .objects
-                .retain(|_, o| o.state.layer_id != value.layer_id);
-            project.layers.remove(&id);
+                .iter()
+                .filter(|(_, o)| o.state.layer_id == value.layer_id)
+                .map(|(id, _)| id.clone())
+                .collect::<Vec<_>>();
+            for member in &members {
+                draft.remove_object(member);
+            }
+            draft.remove_layer(&id);
         }
         Kind::CreateObject(value) => {
             let state = value
@@ -132,6 +138,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
                 .ok_or(OpsError::Invalid("object state"))?;
             validate_object_state(&state)?;
             let id = Id::from_proto(state.object_id.as_ref())?;
+            let project = draft.project();
             if project.objects.contains_key(&id) || project.groups.contains_key(&id) {
                 return Err(OpsError::AlreadyExists);
             }
@@ -142,7 +149,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
             if layer.locked {
                 return Err(OpsError::Locked);
             }
-            project.objects.insert(
+            draft.insert_object(
                 id,
                 Object {
                     document_id: Id::from_proto(value.document_id.as_ref())?,
@@ -152,32 +159,33 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         }
         Kind::SetProperty(value) => {
             let id = Id::from_proto(value.object_id.as_ref())?;
-            ensure_editable(project, &id, value.property == "locked")?;
-            let object = project.objects.get_mut(&id).ok_or(OpsError::NotFound)?;
+            ensure_editable(draft.project(), &id, value.property == "locked")?;
+            let object = draft.object_mut(&id).ok_or(OpsError::NotFound)?;
             set_property(&mut object.state, value)?;
         }
         Kind::DeleteObject(value) => {
             let id = Id::from_proto(value.object_id.as_ref())?;
-            ensure_editable(project, &id, false)?;
-            project.objects.remove(&id);
+            ensure_editable(draft.project(), &id, false)?;
+            draft.remove_object(&id);
         }
         Kind::Reorder(value) => {
             let id = Id::from_proto(value.object_id.as_ref())?;
-            ensure_editable(project, &id, false)?;
-            let destination = project
+            ensure_editable(draft.project(), &id, false)?;
+            let destination = draft
+                .project()
                 .layers
                 .get(&Id::from_proto(value.layer_id.as_ref())?)
                 .ok_or(OpsError::NotFound)?;
             if destination.locked {
                 return Err(OpsError::Locked);
             }
-            let object = project.objects.get_mut(&id).ok_or(OpsError::NotFound)?;
+            let object = draft.object_mut(&id).ok_or(OpsError::NotFound)?;
             object.state.order_key = value.order_key.clone();
             object.state.layer_id = value.layer_id.clone();
         }
         Kind::Group(value) => {
             let id = Id::from_proto(value.group_id.as_ref())?;
-            if project.objects.contains_key(&id) || value.object_ids.is_empty() {
+            if draft.project().objects.contains_key(&id) || value.object_ids.is_empty() {
                 return Err(OpsError::Invalid("group members"));
             }
             let members = value
@@ -186,6 +194,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
                 .map(|v| Id::from_proto(Some(v)))
                 .collect::<Result<Vec<_>, _>>()?;
             let first = members.first().ok_or(OpsError::Invalid("group members"))?;
+            let project = draft.project();
             let document = if let Some(object) = project.objects.get(first) {
                 object.document_id.clone()
             } else {
@@ -201,7 +210,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
                     return Err(OpsError::Invalid("group document"));
                 }
             } else {
-                project.groups.insert(
+                draft.insert_group(
                     id.clone(),
                     Group {
                         id: id.clone(),
@@ -211,27 +220,23 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
                 );
             }
             for member in members {
-                if project.objects.contains_key(&member) {
-                    ensure_editable(project, &member, false)?;
-                    project
-                        .objects
-                        .get_mut(&member)
+                if draft.project().objects.contains_key(&member) {
+                    ensure_editable(draft.project(), &member, false)?;
+                    draft
+                        .object_mut(&member)
                         .ok_or(OpsError::NotFound)?
                         .state
                         .group_id = Some(id.to_proto());
                 } else {
-                    ensure_group_editable(project, &member)?;
-                    project
-                        .groups
-                        .get_mut(&member)
-                        .ok_or(OpsError::NotFound)?
-                        .parent = Some(id.clone());
+                    ensure_group_editable(draft.project(), &member)?;
+                    draft.group_mut(&member).ok_or(OpsError::NotFound)?.parent = Some(id.clone());
                 }
             }
         }
         Kind::Ungroup(value) => {
             let id = Id::from_proto(value.group_id.as_ref())?;
-            ensure_group_editable(project, &id)?;
+            ensure_group_editable(draft.project(), &id)?;
+            let project = draft.project();
             let parent = project
                 .groups
                 .get(&id)
@@ -244,26 +249,30 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
                 .filter(|(_, o)| o.state.group_id == value.group_id)
                 .map(|(id, _)| id.clone())
                 .collect::<Vec<_>>();
+            let child_ids = project
+                .groups
+                .iter()
+                .filter(|(_, group)| group.parent.as_ref() == Some(&id))
+                .map(|(id, _)| id.clone())
+                .collect::<Vec<_>>();
             for member in member_ids {
-                ensure_editable(project, &member, false)?;
-                project
-                    .objects
-                    .get_mut(&member)
+                ensure_editable(draft.project(), &member, false)?;
+                draft
+                    .object_mut(&member)
                     .ok_or(OpsError::NotFound)?
                     .state
                     .group_id = parent.as_ref().map(Id::to_proto);
             }
-            for group in project.groups.values_mut() {
-                if group.parent.as_ref() == Some(&id) {
-                    group.parent = parent.clone();
-                }
+            for child in child_ids {
+                draft.group_mut(&child).ok_or(OpsError::NotFound)?.parent = parent.clone();
             }
-            project.groups.remove(&id);
+            draft.remove_group(&id);
         }
         Kind::SetInstruction(value) => {
             let document = Id::from_proto(value.document_id.as_ref())?;
             for target in &value.target_object_ids {
-                if project
+                if draft
+                    .project()
                     .objects
                     .get(&Id::from_proto(Some(target))?)
                     .ok_or(OpsError::NotFound)?
@@ -274,7 +283,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
                 }
             }
             let id = Id::from_proto(value.instruction_id.as_ref())?;
-            project.instructions.insert(
+            draft.insert_instruction(
                 id,
                 Instruction {
                     definition: value.clone(),
@@ -283,16 +292,13 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
             );
         }
         Kind::DeleteInstruction(value) => {
-            if project
-                .instructions
-                .remove(&Id::from_proto(value.instruction_id.as_ref())?)
-                .is_none()
-            {
+            if !draft.remove_instruction(&Id::from_proto(value.instruction_id.as_ref())?) {
                 return Err(OpsError::NotFound);
             }
         }
         Kind::AddSemanticSnapshot(value) => {
             let id = Id::from_proto(value.snapshot_id.as_ref())?;
+            let project = draft.project();
             if project.semantic_snapshots.contains_key(&id) {
                 return Err(OpsError::AlreadyExists);
             }
@@ -304,22 +310,23 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
             let capture_session_id = capture
                 .map(|c| Id::from_proto(c.capture_session_id.as_ref()))
                 .transpose()?;
-            project.semantic_snapshots.insert(
+            let frame_id = capture.map(|c| c.frame_id);
+            draft.insert_semantic_snapshot(
                 id,
                 SemanticSnapshot {
                     definition: value.clone(),
                     capture_session_id,
-                    frame_id: capture.map(|c| c.frame_id),
+                    frame_id,
                     created_at_ms: time,
                 },
             );
         }
         Kind::AddResult(value) => {
             let id = Id::from_proto(value.result_id.as_ref())?;
-            if project.results.contains_key(&id) {
+            if draft.project().results.contains_key(&id) {
                 return Err(OpsError::AlreadyExists);
             }
-            project.results.insert(
+            draft.insert_result(
                 id,
                 ResultCandidate {
                     definition: value.clone(),
@@ -331,7 +338,7 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         }
         Kind::UpdateResult(value) => {
             let id = Id::from_proto(value.result_id.as_ref())?;
-            let result = project.results.get_mut(&id).ok_or(OpsError::NotFound)?;
+            let result = draft.result_mut(&id).ok_or(OpsError::NotFound)?;
             result.status = value.status.clone();
             result.acceptance_mask_asset_id = if value.acceptance_mask_asset_id.is_empty() {
                 None
@@ -341,7 +348,8 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
         }
         Kind::MaskOp(value) => {
             let id = Id::from_proto(value.output_object_id.as_ref())?;
-            ensure_editable(project, &id, false)?;
+            ensure_editable(draft.project(), &id, false)?;
+            let project = draft.project();
             let output = project.objects.get(&id).ok_or(OpsError::NotFound)?;
             for input in &value.input_object_ids {
                 let input = project
@@ -355,11 +363,10 @@ fn apply(project: &mut Project, kind: &Kind, time: i64) -> Result<(), OpsError> 
             if !is_mask(&output.state) {
                 return Err(OpsError::Invalid("mask output"));
             }
-            project
-                .mask_versions
-                .entry(id)
-                .or_default()
-                .push(value.clone());
+            match draft.mask_versions_mut(&id) {
+                Some(versions) => versions.push(value.clone()),
+                None => draft.insert_mask_versions(id, vec![value.clone()]),
+            }
         }
         Kind::UndoTransaction(_) => {
             return Err(OpsError::Invalid("undo must be a standalone transaction"));

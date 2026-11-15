@@ -124,12 +124,18 @@ impl ProjectState {
     }
     pub fn info(&self) -> Result<ProjectInfo> {
         let mut info = project_info(self.store()?, &self.history)?;
-        info.state_hash = self.project()?.state_hash()?.to_string();
+        // The store already holds the hash of its own project; only a replica
+        // shows a different one, with its pending edits applied.
+        if let Some(replica) = &self.replica {
+            info.state_hash = replica.state_hash().to_string();
+        }
         Ok(info)
     }
     pub fn view_revision(&self) -> Result<pb::Revision> {
         let mut revision = self.store()?.revision()?;
-        revision.state_hash = self.project()?.state_hash()?.bytes().to_vec();
+        if let Some(replica) = &self.replica {
+            revision.state_hash = replica.state_hash().bytes().to_vec();
+        }
         Ok(revision)
     }
     pub(crate) fn previous(&self, id: &pb::Uuid) -> Result<Option<&pb::Transaction>> {
@@ -143,8 +149,7 @@ impl ProjectState {
         }
         Ok(self
             .store()?
-            .accepted_transactions()
-            .find(|(txn, _)| txn.txn_id.as_ref() == Some(id))
+            .accepted_transaction(&Id::from_proto(Some(id))?)
             .map(|(txn, _)| txn))
     }
 }
@@ -249,7 +254,7 @@ impl ProjectSession {
         };
         let mut initial = project_info(store, &history)?;
         if let Some(replica) = &replica {
-            initial.state_hash = replica.project().state_hash()?.to_string();
+            initial.state_hash = replica.state_hash().to_string();
         }
         let events = EventHub::new(initial);
         let changed = Arc::new(tokio::sync::Notify::new());
@@ -583,7 +588,7 @@ pub(crate) fn project_info(
         can_undo: history.undo.operation(false, history.next_lamport).is_ok(),
         can_redo: history.undo.operation(true, history.next_lamport).is_ok(),
         host_seq: revision.host_seq,
-        state_hash: store.project().state_hash()?.to_string(),
+        state_hash: store.state_hash()?.to_string(),
         document_ids: store
             .project()
             .documents

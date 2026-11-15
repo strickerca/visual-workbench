@@ -146,6 +146,9 @@ impl AssetId {
     pub fn hash(bytes: &[u8]) -> Self {
         Self(blake3::hash(bytes).to_hex().to_string())
     }
+    pub(crate) fn from_digest(digest: blake3::Hash) -> Self {
+        Self(digest.to_hex().to_string())
+    }
     /// Canonical lowercase content-address key.
     pub fn as_str(&self) -> &str {
         &self.0

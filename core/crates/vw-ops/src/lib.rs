@@ -1,12 +1,14 @@
 //! Host-authoritative, atomic transactions over the shared document model.
 //! Persistence is supplied by vw-store; network delivery is supplied by vw-net.
 
+mod draft;
 mod gesture;
 mod host;
 mod patch;
 mod plan;
 mod replica;
 mod undo;
+pub use draft::Touched;
 pub use gesture::GestureStore;
 pub use host::{Acceptance, HostSequencer, HostSnapshot};
 pub use replica::{PendingTransaction, Replica};

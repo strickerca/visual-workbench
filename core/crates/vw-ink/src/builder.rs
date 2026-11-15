@@ -45,8 +45,15 @@ struct FilterState {
     segment_end: Option<SegmentEnd>,
 }
 
-/// One bounded stroke. Clones are independent and may be used for disposable
-/// motion prediction; they copy contours, so prediction callers must bound size.
+/// What appending a batch would do to a builder, before it is done.
+struct Extension {
+    polygons: Vec<Polygon>,
+    filter: FilterState,
+    sample_count: usize,
+}
+
+/// One bounded stroke. Clones are independent but copy every contour; for
+/// disposable motion prediction use `preview`, which copies nothing.
 #[derive(Debug, Clone)]
 pub struct StrokeBuilder {
     brush: Brush,
@@ -83,6 +90,26 @@ impl StrokeBuilder {
     /// not use them. Pressure is rounded to the protobuf's f32 sample precision
     /// before f64 modeling, so replay from stored model arrays stays identical.
     pub fn append(&mut self, samples: &[Sample]) -> Result<GeometryRange, InkError> {
+        let extension = self.extension(samples)?;
+        let start = self.geometry.polygons().len();
+        self.geometry.extend(extension.polygons)?;
+        self.filter = extension.filter;
+        self.sample_count = extension.sample_count;
+        Ok(GeometryRange {
+            start,
+            end: self.geometry.polygons().len(),
+        })
+    }
+    /// The contours `append` would add for these samples, in the same order
+    /// and with the same validation and limits, leaving the builder as it is.
+    /// They follow the existing contours, so the first has the index
+    /// `geometry().polygons().len()`. The cost depends on the samples given,
+    /// not on the length of the stroke, which makes this the way to draw a
+    /// predicted tail: nothing predicted ever enters the stroke.
+    pub fn preview(&self, samples: &[Sample]) -> Result<Vec<Polygon>, InkError> {
+        Ok(self.extension(samples)?.polygons)
+    }
+    fn extension(&self, samples: &[Sample]) -> Result<Extension, InkError> {
         if self.state != StrokeState::Active {
             return Err(InkError::Closed);
         }
@@ -101,7 +128,6 @@ impl StrokeBuilder {
             }
             previous_time = Some(sample.t_ms);
         }
-        let start = self.geometry.polygons().len();
         let mut filter = self.filter;
         let mut changed = Vec::new();
         let mut vertices = self.geometry.vertex_count();
@@ -162,12 +188,10 @@ impl StrokeBuilder {
             filter.node = Some(node);
             filter.raw = Some(canonical);
         }
-        self.geometry.extend(changed)?;
-        self.filter = filter;
-        self.sample_count = count;
-        Ok(GeometryRange {
-            start,
-            end: self.geometry.polygons().len(),
+        Ok(Extension {
+            polygons: changed,
+            filter,
+            sample_count: count,
         })
     }
     /// Close without adding samples, smoothing a tail or changing any vertex.

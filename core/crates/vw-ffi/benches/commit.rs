@@ -2,11 +2,25 @@
 //!
 //! Each stroke goes through the same path the apps use: begin, append samples,
 //! commit. The table shows the median commit time once the document already
-//! holds N strokes, so growth with document size is visible directly.
+//! holds N strokes, so growth with document size is visible directly, and the
+//! slowest commit since the previous row. The slowest one is the recovery
+//! checkpoint the store writes every 500 commits: it serializes the whole
+//! accepted history, so it does grow with the document.
 //!
 //! Run: cargo bench -p vw-ffi --bench commit
 //! Set VW_BENCH_STROKES to change the largest document (default 2000), and
 //! VW_BENCH_BUDGET_MS to fail when the median at the largest size exceeds it.
+//!
+//! Recommended regression check (a few seconds, no other tooling needed):
+//!
+//!   VW_BENCH_STROKES=2000 VW_BENCH_BUDGET_MS=10 \
+//!     cargo bench -p vw-ffi --bench commit --locked
+//!
+//! A commit costs about half a millisecond at every size up to 8,000 strokes
+//! on a four-core Linux container (0.5 ms at 2,000, 0.85 ms at 8,000). Ten
+//! milliseconds leaves room for a slow or busy machine, and still fails on
+//! any return to work that grows with the document: hashing the whole project
+//! once at 2,000 strokes already takes about 60 ms.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::{
     sync::Arc,
@@ -150,12 +164,15 @@ fn main() {
         )
         .await
         .unwrap();
-        println!("strokes in document | median commit of one more stroke");
+        println!(
+            "strokes in document | median commit of one more stroke | slowest since previous row"
+        );
         let mut count = 0u32;
         let mut last = Duration::ZERO;
         for checkpoint in checkpoints {
+            let mut slowest = Duration::ZERO;
             while count < checkpoint {
-                stroke(&project, count).await;
+                slowest = slowest.max(stroke(&project, count).await);
                 count += 1;
             }
             let mut timings = Vec::with_capacity(MEASURED);
@@ -163,8 +180,13 @@ fn main() {
                 timings.push(stroke(&project, count).await);
                 count += 1;
             }
+            slowest = timings.iter().copied().fold(slowest, Duration::max);
             last = median(&mut timings);
-            println!("{checkpoint:>19} | {:>8.2} ms", last.as_secs_f64() * 1000.0);
+            println!(
+                "{checkpoint:>19} | {:>30.2} ms | {:>24.2} ms",
+                last.as_secs_f64() * 1000.0,
+                slowest.as_secs_f64() * 1000.0
+            );
         }
         project.close().await.unwrap();
         last

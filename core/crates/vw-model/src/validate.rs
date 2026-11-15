@@ -119,40 +119,7 @@ impl Project {
             }
         }
         for (id, object) in &self.objects {
-            same_id(id, object.state.object_id.as_ref())?;
-            validate_object_state(&object.state)?;
-            if !self.documents.contains_key(&object.document_id) {
-                return Err(ModelError::Missing("object document"));
-            }
-            let layer_id = Id::from_proto(object.state.layer_id.as_ref())?;
-            let layer = self
-                .layers
-                .get(&layer_id)
-                .ok_or(ModelError::Missing("object layer"))?;
-            if Id::from_proto(layer.definition.document_id.as_ref())? != object.document_id {
-                return Err(ModelError::Invalid("cross-document object layer"));
-            }
-            if let Some(group) = &object.state.group_id {
-                let group = self
-                    .groups
-                    .get(&Id::from_proto(Some(group))?)
-                    .ok_or(ModelError::Missing("object group"))?;
-                if group.document_id != object.document_id {
-                    return Err(ModelError::Invalid("cross-document object group"));
-                }
-            }
-            if let Some(v1::object_state::Shape::SelectionRaster(mask)) = &object.state.shape {
-                self.asset_ref(&mask.mask_asset_id, false)?;
-            }
-            if let Some(v1::object_state::Shape::ResultId(result)) = &object.state.shape {
-                let result = self
-                    .results
-                    .get(&Id::from_proto(Some(result))?)
-                    .ok_or(ModelError::Missing("object result"))?;
-                if Id::from_proto(result.definition.document_id.as_ref())? != object.document_id {
-                    return Err(ModelError::Invalid("cross-document result"));
-                }
-            }
+            self.validate_object(id, object)?;
         }
         for (id, instruction) in &self.instructions {
             let value = &instruction.definition;
@@ -252,6 +219,86 @@ impl Project {
             }
         }
         self.validate_image_outputs()?;
+        Ok(())
+    }
+
+    /// Everything `validate` requires of one object entry: its own state and
+    /// the document, layer, group, mask asset and result it refers to.
+    fn validate_object(&self, id: &Id, object: &crate::Object) -> Result<(), ModelError> {
+        same_id(id, object.state.object_id.as_ref())?;
+        validate_object_state(&object.state)?;
+        if !self.documents.contains_key(&object.document_id) {
+            return Err(ModelError::Missing("object document"));
+        }
+        let layer_id = Id::from_proto(object.state.layer_id.as_ref())?;
+        let layer = self
+            .layers
+            .get(&layer_id)
+            .ok_or(ModelError::Missing("object layer"))?;
+        if Id::from_proto(layer.definition.document_id.as_ref())? != object.document_id {
+            return Err(ModelError::Invalid("cross-document object layer"));
+        }
+        if let Some(group) = &object.state.group_id {
+            let group = self
+                .groups
+                .get(&Id::from_proto(Some(group))?)
+                .ok_or(ModelError::Missing("object group"))?;
+            if group.document_id != object.document_id {
+                return Err(ModelError::Invalid("cross-document object group"));
+            }
+        }
+        if let Some(v1::object_state::Shape::SelectionRaster(mask)) = &object.state.shape {
+            self.asset_ref(&mask.mask_asset_id, false)?;
+        }
+        if let Some(v1::object_state::Shape::ResultId(result)) = &object.state.shape {
+            let result = self
+                .results
+                .get(&Id::from_proto(Some(result))?)
+                .ok_or(ModelError::Missing("object result"))?;
+            if Id::from_proto(result.definition.document_id.as_ref())? != object.document_id {
+                return Err(ModelError::Invalid("cross-document result"));
+            }
+        }
+        Ok(())
+    }
+
+    /// The outcome `validate` would have, for a project that was valid before
+    /// and in which nothing but the listed objects has since been created,
+    /// changed or removed. `changed` gives each such object's ID with its
+    /// previous value (`None` when it did not exist), in ascending ID order.
+    ///
+    /// Only what those objects can affect is rechecked: their own entries, an
+    /// ID shared with a group, and the single-object rule of an image-output
+    /// layer. The checks run in `validate`'s order, so the first error is the
+    /// same one.
+    pub fn validate_changed_objects<'a>(
+        &self,
+        changed: impl IntoIterator<Item = (&'a Id, Option<&'a crate::Object>)> + Clone,
+    ) -> Result<(), ModelError> {
+        for (id, before) in changed.clone() {
+            if before.is_none() && self.objects.contains_key(id) && self.groups.contains_key(id) {
+                return Err(ModelError::Invalid("group identity"));
+            }
+        }
+        let mut output = false;
+        let in_output_layer = |object: &crate::Object| -> Result<bool, ModelError> {
+            Ok(self
+                .layers
+                .get(&Id::from_proto(object.state.layer_id.as_ref())?)
+                .is_some_and(|layer| layer.definition.kind == crate::IMAGE_OUTPUT_LAYER_KIND))
+        };
+        for (id, before) in changed {
+            if let Some(object) = self.objects.get(id) {
+                self.validate_object(id, object)?;
+                output |= in_output_layer(object)?;
+            }
+            if let Some(object) = before {
+                output |= in_output_layer(object)?;
+            }
+        }
+        if output {
+            self.validate_image_outputs()?;
+        }
         Ok(())
     }
 
