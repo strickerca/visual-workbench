@@ -61,7 +61,7 @@ internal fun DiagnosticsScreen(controller: DiagnosticsController, penPath: PenPa
             text = {
                 Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Only counters and fixed event codes are included. Raw traces, images, names and identifiers stay out.")
+                    Text("Only counters, timings, fixed event codes and the app's own fixed-wording reasons for recent failures are included. Raw traces, images, names and identifiers stay out.")
                     Text("The text below is exactly what will be saved.")
                     Text(preview.jsonText, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.caption)
                     controller.reportMessage?.let { Text(it) }

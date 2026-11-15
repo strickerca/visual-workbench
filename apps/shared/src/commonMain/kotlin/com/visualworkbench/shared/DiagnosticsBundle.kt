@@ -6,6 +6,10 @@ private const val MAX_DIAGNOSTIC_EVENTS: Int = 256
 /** The most core events one report carries; older ones are counted, not listed. */
 public const val MAX_REPORTED_CORE_EVENTS: Int = 256
 
+/** The largest report text an exporter has to accept (a report that carries
+ * core events; the text is ASCII, so this is also its size in bytes). */
+public const val MAX_DIAGNOSTIC_REPORT_CHARS: Int = 131_072
+
 public enum class DiagnosticPlatform { Android, Windows }
 
 /** Closed event codes. Do not add an arbitrary message, identifier or path field. */

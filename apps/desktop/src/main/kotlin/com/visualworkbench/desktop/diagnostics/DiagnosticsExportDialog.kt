@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.visualworkbench.shared.DiagnosticEventCode
+import com.visualworkbench.shared.MAX_DIAGNOSTIC_REPORT_CHARS
 import com.visualworkbench.shared.PreparedDiagnosticsReport
 import kotlinx.coroutines.*
 import java.awt.EventQueue
@@ -55,7 +56,7 @@ internal class DiagnosticPublication(
     val gate: DiagnosticPublicationGate = DiagnosticPublicationGate(),
     private val nowNanos: () -> Long = System::nanoTime,
 ) {
-    private val bytes = report.jsonText.toByteArray(Charsets.UTF_8).also { check(it.size in 1..65_536) }
+    private val bytes = report.jsonText.toByteArray(Charsets.UTF_8).also { check(it.size in 1..MAX_DIAGNOSTIC_REPORT_CHARS) }
     private var temporary: DiagnosticOwnedFile? = null
     val cleanupPending: Boolean get() = temporary != null
     var published: Boolean = false
@@ -320,7 +321,7 @@ internal fun DiagnosticsExportDialog(owner: DiagnosticsExportOwner, onSave: () -
     val frozen = owner.report ?: return
     AlertDialog(onDismissRequest = { if (!owner.busy) onClose() }, title = { Text("Diagnostic report") }, text = {
         Column(Modifier.widthIn(max = 620.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Review the exact report before saving. It contains timing, memory and app events. Missing measurements are null.")
+            Text("Review the exact report before saving. It contains timing, memory, app events and the app's own fixed-wording reasons for recent failures. Missing measurements are null.")
             Text("Echo RTT measures the connection round trip; it is not drawing latency.", style = MaterialTheme.typography.caption)
             SelectionContainer {
                 Text(frozen.jsonText, Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState()),

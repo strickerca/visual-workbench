@@ -30,3 +30,8 @@ public fun readCoreEvents(afterSequence: Long = 0L): CoreEventLog {
     }
     return CoreEventLog(events, bounded(snapshot.dropped))
 }
+
+/** The core's events for a problem report, or null when they cannot be read
+ * (the report is then written without them, as before). Fixed words and
+ * numbers only: see [readCoreEvents]. */
+public fun coreEventsForReport(): CoreEventLog? = try { readCoreEvents() } catch (_: Throwable) { null }

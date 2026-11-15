@@ -244,7 +244,7 @@ fun main(args: Array<String>) {
                     startupMillis = measuredDiagnosticValue(startupMs),
                     heapUsedBytes = measuredDiagnosticValue(memory.totalMemory() - memory.freeMemory()),
                     echoRoundTripMillis = measuredEchoRoundTripMillis(sync?.echoSamples ?: 0u, sync?.echoRttP50Ms),
-                )))
+                ), coreEventsForReport()))
             }, apply = {
                 controller.instructionModal(value != null)
                 dialog = value

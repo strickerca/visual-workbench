@@ -7,7 +7,7 @@ private const val AUDIT_MAX_REPORT_CHARS: Int = 65_536
 // Schema 2 adds the core section; its limits are equally fixed here.
 private const val AUDIT_MAX_CORE_EVENTS: Int = 256
 private const val AUDIT_MAX_CORE_TEXT: Int = 64
-private const val AUDIT_MAX_CORE_REPORT_CHARS: Int = 131_072
+private const val AUDIT_MAX_CORE_REPORT_CHARS: Int = MAX_DIAGNOSTIC_REPORT_CHARS
 
 /** Validates the existing private factory's exact canonical layout (schema 1, or
  * schema 2 when both core counts are given), not
