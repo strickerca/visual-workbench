@@ -23,7 +23,9 @@ function Step([string]$Name, [scriptblock]$Body) {
 }
 
 Step 'clippy' { cargo clippy --workspace --all-targets --locked -- -D warnings }
-Step 'workspace tests' { cargo test --workspace --exclude vw-sim --locked -- --test-threads=2 }
+# --no-fail-fast: every test binary runs even after one fails, so a single
+# failure cannot hide others; the step still fails at the end.
+Step 'workspace tests' { cargo test --workspace --exclude vw-sim --locked --no-fail-fast -- --test-threads=2 }
 foreach ($fixture in 'device-selection-fixtures.ps1', 'app-hil-device-fixtures.ps1',
                      'android-normal-delivery-fixtures.ps1', 'store-crash-receipt-fixtures.ps1') {
     Step "fixture $fixture" {
