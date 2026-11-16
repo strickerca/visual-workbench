@@ -4,7 +4,9 @@
 . "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 step "workspace tests"
-cargo test --workspace --exclude vw-sim --locked
+# Every test binary runs even after one fails, so a single failure cannot hide
+# others behind it; the step still fails at the end.
+cargo test --workspace --exclude vw-sim --locked --no-fail-fast
 step "simulator tests (release)"
 cargo test --release --locked -p vw-sim
 # Speed budget: saving one stroke into a 2,000-stroke document must stay under
