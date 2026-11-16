@@ -30,6 +30,7 @@ mod instructions;
 mod packages;
 mod verification;
 pub use verification::*;
+mod packed_contours;
 mod payload;
 pub use packages::*;
 mod project;

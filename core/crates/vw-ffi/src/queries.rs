@@ -97,19 +97,179 @@ fn render_list_for_page(
     selected_page: Option<u32>,
     query: Option<QueryRect>,
 ) -> Result<RenderList> {
-    let (revision, entries) = render_entries(state, document, selected_page, query, None)?;
+    let (revision, entries) = render_entries(
+        state,
+        document,
+        selected_page,
+        query,
+        None,
+        OutlineForm::Lists,
+    )?;
     let mut items = Vec::new();
     items
         .try_reserve_exact(entries.len())
         .map_err(|_| CoreError::Worker)?;
     for entry in entries {
         match entry {
-            RenderEntry::Item { item, .. } => items.push(item),
-            // Without a set of known strokes every entry is a complete item.
-            RenderEntry::Kept { .. } => return Err(CoreError::Worker),
+            RenderEntry::Item {
+                item: DisplayItem::Lists(item),
+                ..
+            } => items.push(item),
+            // Without a set of known strokes every entry is a complete item,
+            // in the form asked for.
+            _ => return Err(CoreError::Worker),
         }
     }
     Ok(RenderList { revision, items })
+}
+/// The complete display list `render_list` or `render_list_page` returns,
+/// with every stroke outline packed.
+pub(crate) fn packed_render_list(
+    state: &ProjectState,
+    document: &str,
+    selected_page: Option<u32>,
+) -> Result<PackedRenderList> {
+    let (revision, entries) = render_entries(
+        state,
+        document,
+        selected_page,
+        None,
+        None,
+        OutlineForm::Packed,
+    )?;
+    let mut items = Vec::new();
+    items
+        .try_reserve_exact(entries.len())
+        .map_err(|_| CoreError::Worker)?;
+    for entry in entries {
+        match entry {
+            RenderEntry::Item {
+                item: DisplayItem::Packed(item),
+                ..
+            } => items.push(item),
+            _ => return Err(CoreError::Worker),
+        }
+    }
+    Ok(PackedRenderList { revision, items })
+}
+/// How a display item carries its stroke outline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OutlineForm {
+    /// `RenderItem`: `Contours` and the stored object bytes.
+    Lists,
+    /// `PackedRenderItem`.
+    Packed,
+}
+// Either form is a complete item; boxing would add one allocation per object.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum DisplayItem {
+    Lists(RenderItem),
+    Packed(PackedRenderItem),
+}
+impl DisplayItem {
+    /// What the item counts toward the response size limit.
+    fn cost(&self) -> Result<usize> {
+        match self {
+            Self::Lists(item) => crate::payload::item_bytes(item),
+            Self::Packed(item) => crate::payload::packed_item_bytes(item),
+        }
+    }
+    /// The object id and the layer fields a changes entry repeats.
+    fn header(&self) -> (String, f64, String, bool) {
+        match self {
+            Self::Lists(item) => (
+                item.object_id.clone(),
+                item.layer_opacity,
+                item.layer_blend.clone(),
+                item.locked,
+            ),
+            Self::Packed(item) => (
+                item.object_id.clone(),
+                item.layer_opacity,
+                item.layer_blend.clone(),
+                item.locked,
+            ),
+        }
+    }
+}
+/// The strokes a caller says it holds, checked before the worker is asked.
+fn held_strokes(
+    known: Vec<KnownStroke>,
+) -> Result<std::collections::BTreeMap<String, (StrokeDigest, usize)>> {
+    if known.len() > 10_000 {
+        return Err(CoreError::Invalid);
+    }
+    let mut held = std::collections::BTreeMap::new();
+    for stroke in known {
+        Id::try_from(stroke.object_id.clone())?;
+        let digest: StrokeDigest = stroke
+            .digest
+            .as_slice()
+            .try_into()
+            .map_err(|_| CoreError::Invalid)?;
+        // No item counts less than its fixed part or more than a whole response.
+        let cost = usize::try_from(stroke.cost).map_err(|_| CoreError::Invalid)?;
+        if !(crate::payload::MIN_ITEM..=crate::payload::MAX_RESPONSE).contains(&cost)
+            || held.insert(stroke.object_id, (digest, cost)).is_some()
+        {
+            return Err(CoreError::Invalid);
+        }
+    }
+    Ok(held)
+}
+/// One entry of a changes answer, before it takes its record form.
+struct ChangeEntry<I> {
+    object_id: String,
+    digest: Option<Vec<u8>>,
+    cost: u64,
+    item: Option<I>,
+    layer_opacity: f64,
+    layer_blend: String,
+    locked: bool,
+}
+/// The entries of a changes answer in drawing order; `take` returns a sent
+/// item in the form the answer carries, or None when it is in another form.
+fn change_entries<I>(
+    entries: Vec<RenderEntry>,
+    take: impl Fn(DisplayItem) -> Option<I>,
+) -> Result<Vec<ChangeEntry<I>>> {
+    let mut items = Vec::new();
+    items
+        .try_reserve_exact(entries.len())
+        .map_err(|_| CoreError::Worker)?;
+    for entry in entries {
+        items.push(match entry {
+            RenderEntry::Item { item, digest, cost } => {
+                let (object_id, layer_opacity, layer_blend, locked) = item.header();
+                ChangeEntry {
+                    object_id,
+                    digest: digest.map(|value| value.to_vec()),
+                    cost: cost as u64,
+                    item: Some(take(item).ok_or(CoreError::Worker)?),
+                    layer_opacity,
+                    layer_blend,
+                    locked,
+                }
+            }
+            RenderEntry::Kept {
+                object_id,
+                digest,
+                cost,
+                layer_opacity,
+                layer_blend,
+                locked,
+            } => ChangeEntry {
+                object_id,
+                digest: Some(digest.to_vec()),
+                cost: cost as u64,
+                item: None,
+                layer_opacity,
+                layer_blend,
+                locked,
+            },
+        });
+    }
+    Ok(items)
 }
 /// Digest of everything a stroke's display item is built from except its
 /// layer's opacity, blend and lock, which travel with every entry.
@@ -118,7 +278,7 @@ pub(crate) type StrokeDigest = [u8; 32];
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum RenderEntry {
     Item {
-        item: RenderItem,
+        item: DisplayItem,
         /// Strokes only, and only when the caller asked for changes.
         digest: Option<StrokeDigest>,
         /// What the item counts toward the response size limit.
@@ -135,15 +295,16 @@ pub(crate) enum RenderEntry {
         locked: bool,
     },
 }
-/// The display list in drawing order. With `known`, a stroke whose stored
-/// state still has the digest the caller holds is reported as kept instead of
-/// being rebuilt; without it this is the complete list, built as before.
+/// The display list in drawing order, each item in `form`. With `known`, a
+/// stroke whose stored state still has the digest the caller holds is reported
+/// as kept instead of being rebuilt; without it this is the complete list.
 fn render_entries(
     state: &ProjectState,
     document: &str,
     selected_page: Option<u32>,
     query: Option<QueryRect>,
     known: Option<&std::collections::BTreeMap<String, (StrokeDigest, usize)>>,
+    form: OutlineForm,
 ) -> Result<(ProjectInfo, Vec<RenderEntry>)> {
     let query = query.map(rect).transpose()?;
     let project = state.project()?;
@@ -259,7 +420,7 @@ fn render_entries(
                 digest = Some(value);
             }
             let shape = draw_shape(&object.state, project)?;
-            let (local, contours) = local_bounds(&object.state, project, page, &shape)?;
+            let (local, geometry) = local_bounds(&object.state, project, page, &shape)?;
             let a = object.state.transform.as_ref().ok_or(CoreError::Invalid)?;
             let mut bounds = from_bounds(
                 corners(local).map(|(x, y)| (a.a * x + a.c * y + a.e, a.b * x + a.d * y + a.f)),
@@ -271,61 +432,81 @@ fn render_entries(
             if query.is_some_and(|q| !overlaps(q, bounds)) {
                 continue;
             }
-            let protobuf = match encoded {
-                Some(bytes) => bytes,
-                None => object.state.encode_to_vec(),
-            };
             if items.len() >= 10_000 {
                 return Err(CoreError::Backpressure);
             }
-            let item = RenderItem {
-                object_id: id.to_string(),
-                layer_id: layer_id.to_string(),
-                layer_opacity: layer.opacity,
-                layer_blend: layer.blend.clone(),
-                bounds,
-                object_protobuf: protobuf,
-                stroke_contours: contours,
-                transform: Transform {
-                    a: a.a,
-                    b: a.b,
-                    c: a.c,
-                    d: a.d,
-                    e: a.e,
-                    f: a.f,
-                },
-                style: ObjectStyle {
-                    rgba: style.stroke.as_ref().map_or(0, |c| c.rgba),
-                    width: style.width,
-                    screen_constant_width: style.screen_constant_width,
-                    fill: style
-                        .has_fill
-                        .then(|| style.fill.as_ref().map_or(0, |c| c.rgba)),
-                },
-                shape,
-                locked: object.state.locked || layer.locked,
+            let outline = geometry.as_ref().map_or(&[][..], |g| g.polygons());
+            let transform = Transform {
+                a: a.a,
+                b: a.b,
+                c: a.c,
+                d: a.d,
+                e: a.e,
+                f: a.f,
             };
-            let cost = crate::payload::item_bytes(&item)?;
+            let style = ObjectStyle {
+                rgba: style.stroke.as_ref().map_or(0, |c| c.rgba),
+                width: style.width,
+                screen_constant_width: style.screen_constant_width,
+                fill: style
+                    .has_fill
+                    .then(|| style.fill.as_ref().map_or(0, |c| c.rgba)),
+            };
+            let locked = object.state.locked || layer.locked;
+            let item = match form {
+                OutlineForm::Lists => DisplayItem::Lists(RenderItem {
+                    object_id: id.to_string(),
+                    layer_id: layer_id.to_string(),
+                    layer_opacity: layer.opacity,
+                    layer_blend: layer.blend.clone(),
+                    bounds,
+                    object_protobuf: match encoded {
+                        Some(bytes) => bytes,
+                        None => object.state.encode_to_vec(),
+                    },
+                    stroke_contours: crate::gesture::contours(outline)?,
+                    transform,
+                    style,
+                    shape,
+                    locked,
+                }),
+                OutlineForm::Packed => DisplayItem::Packed(PackedRenderItem {
+                    object_id: id.to_string(),
+                    layer_id: layer_id.to_string(),
+                    layer_opacity: layer.opacity,
+                    layer_blend: layer.blend.clone(),
+                    bounds,
+                    contours: crate::packed_contours::pack(outline)?,
+                    transform,
+                    style,
+                    shape,
+                    locked,
+                }),
+            };
+            // The working geometry is not kept once its outline is built.
+            drop(geometry);
+            let cost = item.cost()?;
             crate::payload::accumulate(&mut bytes_total, cost)?;
             items.push(RenderEntry::Item { item, digest, cost });
         }
     }
     Ok((revision, items))
 }
+/// The local bounds, and for a stroke the geometry its outline is built from.
 fn local_bounds(
     object: &pb::ObjectState,
     project: &Project,
     page: QueryRect,
     draw: &DrawShape,
-) -> Result<(QueryRect, Contours)> {
+) -> Result<(QueryRect, Option<vw_ink::Geometry>)> {
     let style = object.style.as_ref().ok_or(CoreError::Invalid)?;
-    let mut contours = Contours::default();
+    let mut outline = None;
     let mut margin = style.width * 2.0;
     let bounds = match object.shape.as_ref().ok_or(CoreError::Invalid)? {
         Shape::Stroke(stroke) => {
             let geometry = vw_ink::geometry_from_stroke(stroke)?;
             let b = geometry.bounds();
-            contours = crate::gesture::contours(geometry.polygons())?;
+            outline = Some(geometry);
             margin = 0.0;
             b.map(|b| QueryRect {
                 x: b.min_x,
@@ -409,7 +590,7 @@ fn local_bounds(
             page
         }
     };
-    Ok((rect(inflate(bounds, margin))?, contours))
+    Ok((rect(inflate(bounds, margin))?, outline))
 }
 pub(crate) fn preview_item(
     state: &ProjectState,
@@ -432,7 +613,7 @@ pub(crate) fn preview_item(
         (asset.width, asset.height)
     };
     let shape = draw_shape(object, project)?;
-    let (local, stroke_contours) = local_bounds(
+    let (local, geometry) = local_bounds(
         object,
         project,
         QueryRect {
@@ -443,6 +624,8 @@ pub(crate) fn preview_item(
         },
         &shape,
     )?;
+    let stroke_contours =
+        crate::gesture::contours(geometry.as_ref().map_or(&[][..], |g| g.polygons()))?;
     let a = object.transform.as_ref().ok_or(CoreError::Invalid)?;
     let style = object.style.as_ref().ok_or(CoreError::Invalid)?;
     let layer_id = Id::from_proto(object.layer_id.as_ref())?;
@@ -687,6 +870,36 @@ impl ProjectSession {
             })
             .await
     }
+    /// `document_snapshot` with every stroke outline packed: the same items in
+    /// the same order, each `PackedRenderItem::contours` carrying exactly the
+    /// values of `RenderItem::stroke_contours`. It is admitted under the same
+    /// 64 MB response limit, counting what the packed form costs.
+    pub async fn document_snapshot_packed(
+        &self,
+        document_id: String,
+        cancellation: Arc<Cancellation>,
+    ) -> Result<PackedDocumentSnapshot> {
+        self.check_open()?;
+        self.worker
+            .call(move |state| {
+                cancellation.check()?;
+                let frame = document_frame(state, &document_id)?;
+                let result = PackedDocumentSnapshot {
+                    document_id,
+                    title: frame.title,
+                    width: frame.width,
+                    height: frame.height,
+                    bit_depth: frame.bit_depth,
+                    has_tone_adjustments: frame.has_tone_adjustments,
+                    layers: frame.layers,
+                    render: packed_render_list(state, frame.id.as_str(), None)?,
+                };
+                crate::payload::packed_document_bytes(&result)?;
+                cancellation.check()?;
+                Ok(result)
+            })
+            .await
+    }
     /// The same document as `document_snapshot`, without rebuilding or
     /// resending the strokes the caller still holds. `known` names those
     /// strokes by the digest this call returned for them earlier; each entry
@@ -702,64 +915,34 @@ impl ProjectSession {
         cancellation: Arc<Cancellation>,
     ) -> Result<DocumentSnapshotChanges> {
         self.check_open()?;
-        if known.len() > 10_000 {
-            return Err(CoreError::Invalid);
-        }
-        let mut held = std::collections::BTreeMap::new();
-        for stroke in known {
-            Id::try_from(stroke.object_id.clone())?;
-            let digest: StrokeDigest = stroke
-                .digest
-                .as_slice()
-                .try_into()
-                .map_err(|_| CoreError::Invalid)?;
-            // No item counts less than its fixed part or more than a whole response.
-            let cost = usize::try_from(stroke.cost).map_err(|_| CoreError::Invalid)?;
-            if !(crate::payload::MIN_ITEM..=crate::payload::MAX_RESPONSE).contains(&cost)
-                || held.insert(stroke.object_id, (digest, cost)).is_some()
-            {
-                return Err(CoreError::Invalid);
-            }
-        }
+        let held = held_strokes(known)?;
         self.worker
             .call(move |state| {
                 cancellation.check()?;
                 let frame = document_frame(state, &document_id)?;
-                let (revision, entries) =
-                    render_entries(state, frame.id.as_str(), None, None, Some(&held))?;
-                let mut items = Vec::new();
-                items
-                    .try_reserve_exact(entries.len())
-                    .map_err(|_| CoreError::Worker)?;
-                for entry in entries {
-                    items.push(match entry {
-                        RenderEntry::Item { item, digest, cost } => RenderItemChange {
-                            object_id: item.object_id.clone(),
-                            digest: digest.map(|value| value.to_vec()),
-                            cost: cost as u64,
-                            layer_opacity: item.layer_opacity,
-                            layer_blend: item.layer_blend.clone(),
-                            locked: item.locked,
-                            item: Some(item),
-                        },
-                        RenderEntry::Kept {
-                            object_id,
-                            digest,
-                            cost,
-                            layer_opacity,
-                            layer_blend,
-                            locked,
-                        } => RenderItemChange {
-                            object_id,
-                            digest: Some(digest.to_vec()),
-                            cost: cost as u64,
-                            layer_opacity,
-                            layer_blend,
-                            locked,
-                            item: None,
-                        },
-                    });
-                }
+                let (revision, entries) = render_entries(
+                    state,
+                    frame.id.as_str(),
+                    None,
+                    None,
+                    Some(&held),
+                    OutlineForm::Lists,
+                )?;
+                let items = change_entries(entries, |item| match item {
+                    DisplayItem::Lists(item) => Some(item),
+                    DisplayItem::Packed(_) => None,
+                })?
+                .into_iter()
+                .map(|entry| RenderItemChange {
+                    object_id: entry.object_id,
+                    digest: entry.digest,
+                    cost: entry.cost,
+                    item: entry.item,
+                    layer_opacity: entry.layer_opacity,
+                    layer_blend: entry.layer_blend,
+                    locked: entry.locked,
+                })
+                .collect();
                 let result = DocumentSnapshotChanges {
                     document_id,
                     title: frame.title,
@@ -772,6 +955,61 @@ impl ProjectSession {
                     items,
                 };
                 crate::payload::document_changes_bytes(&result)?;
+                cancellation.check()?;
+                Ok(result)
+            })
+            .await
+    }
+    /// `document_snapshot_changes` with every sent stroke outline packed as in
+    /// `document_snapshot_packed`. Each entry's `cost` is what the packed item
+    /// counts; `known` must name the costs this call returned.
+    pub async fn document_snapshot_changes_packed(
+        &self,
+        document_id: String,
+        known: Vec<KnownStroke>,
+        cancellation: Arc<Cancellation>,
+    ) -> Result<PackedDocumentSnapshotChanges> {
+        self.check_open()?;
+        let held = held_strokes(known)?;
+        self.worker
+            .call(move |state| {
+                cancellation.check()?;
+                let frame = document_frame(state, &document_id)?;
+                let (revision, entries) = render_entries(
+                    state,
+                    frame.id.as_str(),
+                    None,
+                    None,
+                    Some(&held),
+                    OutlineForm::Packed,
+                )?;
+                let items = change_entries(entries, |item| match item {
+                    DisplayItem::Packed(item) => Some(item),
+                    DisplayItem::Lists(_) => None,
+                })?
+                .into_iter()
+                .map(|entry| PackedRenderItemChange {
+                    object_id: entry.object_id,
+                    digest: entry.digest,
+                    cost: entry.cost,
+                    item: entry.item,
+                    layer_opacity: entry.layer_opacity,
+                    layer_blend: entry.layer_blend,
+                    locked: entry.locked,
+                })
+                .collect();
+                let result = PackedDocumentSnapshotChanges {
+                    document_id,
+                    title: frame.title,
+                    width: frame.width,
+                    height: frame.height,
+                    bit_depth: frame.bit_depth,
+                    has_tone_adjustments: frame.has_tone_adjustments,
+                    layers: frame.layers,
+                    revision,
+                    items,
+                };
+                crate::payload::packed_document_changes_bytes(&result)?;
                 cancellation.check()?;
                 Ok(result)
             })
