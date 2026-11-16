@@ -96,7 +96,7 @@ def check_workspace(root: pathlib.Path) -> list[str]:
     issues = []
     package_defaults = workspace.get("workspace", {}).get("package", {})
     expected_crates = {
-        "core": {"vw-geom", "vw-model", "vw-ops", "vw-store", "vw-ink", "vw-raster", "vw-assets", "vw-pdf", "vw-svg", "vw-pkg", "vw-ai", "vw-proto", "vw-net", "vw-sim", "vw-ffi"},
+        "core": {"vw-geom", "vw-model", "vw-ops", "vw-store", "vw-ink", "vw-raster", "vw-assets", "vw-pdf", "vw-svg", "vw-package", "vw-ai", "vw-proto", "vw-net", "vw-sim", "vw-ffi"},
         "host-win": {"vw-host-win", "vw-host-ffi"},
     }
     for component, names in expected_crates.items():

@@ -3717,10 +3717,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vw-pkg"
-version = "0.1.0"
-
-[[package]]
 name = "vw-proto"
 version = "0.1.0"
 dependencies = [
