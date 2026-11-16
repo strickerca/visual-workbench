@@ -1,4 +1,4 @@
-use crate::{Error, Header, MAX_ENCODED, MAX_ICC, Result};
+use super::{Error, Header, MAX_ENCODED, MAX_ICC, Result};
 use vw_model::AssetId;
 #[derive(Clone, Copy)]
 struct BoxRef<'a> {
@@ -255,7 +255,7 @@ pub fn inspect(bytes: &[u8], budget: u64) -> Result<Header> {
         }
     }
     let config = config.ok_or(Error::Invalid)?;
-    let signal = crate::av1::admit(
+    let signal = super::av1::admit(
         config,
         bytes.get(extent.0..extent.1).ok_or(Error::Invalid)?,
         width,
@@ -272,7 +272,7 @@ pub fn inspect(bytes: &[u8], budget: u64) -> Result<Header> {
             {
                 return Err(Error::Color);
             }
-            let declared = crate::Nclx {
+            let declared = super::Nclx {
                 primaries: short(color, 4)?,
                 transfer: short(color, 6)?,
                 matrix: short(color, 8)?,

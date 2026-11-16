@@ -783,16 +783,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3314,15 +3304,16 @@ name = "vw-ai-spike"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
- "fs2",
  "image",
  "moxcms",
+ "rustix",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "tempfile",
  "thiserror",
  "windows",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3348,16 +3339,6 @@ dependencies = [
  "vw-raster",
  "vw-stream",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "vw-avif-os"
-version = "0.1.0"
-dependencies = [
- "thiserror",
- "vw-model",
- "vw-raster",
- "windows",
 ]
 
 [[package]]
@@ -3438,7 +3419,6 @@ name = "vw-ffi"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "fs2",
  "jni",
  "pdfium-render",
  "png",
@@ -3456,7 +3436,6 @@ dependencies = [
  "vw-ai-provider",
  "vw-assets",
  "vw-assets-win",
- "vw-avif-os",
  "vw-capture",
  "vw-codec-os",
  "vw-document-protocol",
@@ -3517,9 +3496,9 @@ name = "vw-host-ffi"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "fs2",
  "moxcms",
  "png",
+ "rustix",
  "serde",
  "serde_json",
  "tempfile",
@@ -3537,10 +3516,10 @@ dependencies = [
 name = "vw-host-win"
 version = "0.1.0"
 dependencies = [
- "fs2",
  "tempfile",
  "vw-model",
  "vw-net",
+ "vw-store",
  "windows-sys 0.61.2",
  "zeroize",
 ]
@@ -3586,7 +3565,6 @@ dependencies = [
 name = "vw-mcp-native"
 version = "0.1.0"
 dependencies = [
- "fs2",
  "getrandom 0.4.3",
  "png",
  "serde",
@@ -3717,10 +3695,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vw-pkg"
-version = "0.1.0"
-
-[[package]]
 name = "vw-proto"
 version = "0.1.0"
 dependencies = [
@@ -3810,7 +3784,6 @@ name = "vw-store"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "fs2",
  "rusqlite",
  "rustix",
  "serde",
@@ -3821,6 +3794,7 @@ dependencies = [
  "vw-ops",
  "vw-proto",
  "windows",
+ "windows-sys 0.61.2",
  "zip",
 ]
 

@@ -184,7 +184,7 @@ pub use masks::*;
 pub(crate) fn original_image_label(bytes: &[u8]) -> &'static str {
     if let Some(label) = format_images::label(bytes) {
         label
-    } else if vw_avif_os::is_avif(bytes) {
+    } else if vw_codec_os::avif::is_avif(bytes) {
         "avif"
     } else if vw_codec_os::is_heic(bytes) {
         "heic"

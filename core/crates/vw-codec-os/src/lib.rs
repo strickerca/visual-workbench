@@ -2,6 +2,8 @@
 //! No codec is downloaded, no lossy proxy is retained, and refused variants
 //! never reach an OS decoder. The first adapter accepts opaque 8-bit, identity
 //! orientation, single-item HEVC images; other HEIF features fail explicitly.
+//! AVIF has the same boundary in [`avif`].
+pub mod avif;
 mod container;
 mod hevc;
 #[cfg(windows)]

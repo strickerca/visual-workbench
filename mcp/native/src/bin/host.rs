@@ -10,7 +10,6 @@ fn main() {
 }
 #[cfg(windows)]
 fn run() -> vw_mcp_native::Result<()> {
-    use fs2::FileExt;
     use serde_json::{Value, json};
     use std::{
         fs::{self, OpenOptions},
@@ -68,7 +67,7 @@ fn run() -> vw_mcp_native::Result<()> {
         .truncate(false)
         .open(lock_path)
         .map_err(|_| "lock")?;
-    lock.try_lock_exclusive().map_err(|_| "already_running")?;
+    windows::try_lock_exclusive(&lock).map_err(|_| "already_running")?;
     let port_path = state.join("mcp-port-v1");
     let port = if port_path.exists() {
         no_redirect(&port_path)?;

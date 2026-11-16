@@ -15,22 +15,24 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 vw-capture = { version = "=0.1.0", path = "../../../core/crates/vw-capture" }
-uniffi = { version = "=0.32.2", default-features = false }
-thiserror = "=2.0.21"
-tokio = { version = "=1.53.3", default-features = false, features = ["sync"] }
+uniffi.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync"] }
 vw-raster = { version = "=0.1.0", path = "../../../core/crates/vw-raster" }
 vw-model = { version = "=0.1.0", path = "../../../core/crates/vw-model" }
-png = "=0.18.1"
-blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
-fs2 = "=0.4.3"
+png.workspace = true
+blake3 = { workspace = true, features = ["std", "pure"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true, features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "=0.62.2", features = [
+windows = { workspace = true, features = [
     "ApplicationModel", "Management_Deployment", "Foundation", "Win32_System_WinRT"
 ] }
-windows-sys = { version = "=0.61.2", features = [
+windows-sys = { workspace = true, features = [
     "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem",
     "Win32_Storage_Packaging_Appx", "Win32_System_DataExchange",
     "Win32_System_Memory", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging",
@@ -51,6 +53,6 @@ windows-sys = { version = "=0.61.2", features = [
 ] }
 
 [dev-dependencies]
-moxcms = "=0.8.1"
-tempfile = "=3.27.0"
-tokio = { version = "=1.53.3", default-features = false, features = ["rt", "macros", "time"] }
+moxcms.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt", "macros", "time"] }

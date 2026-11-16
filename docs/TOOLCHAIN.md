@@ -308,9 +308,9 @@ non-yanked versions. Cargo.lock retains exact transitive versions and checksums.
 | rusqlite | 0.41.1 | MIT | bundled; defaults disabled |
 | libsqlite3-sys | 0.39.1 (resolved) | MIT | bundled SQLite 3.54.1 |
 | zip | 9.5.1 | MIT | defaults disabled; stored ZIP/ZIP64 entries |
-| fs2 | 0.4.3 | MIT OR Apache-2.0 | filesystem capacity and advisory locks |
 | tempfile | 3.27.0 (reused) | MIT OR Apache-2.0 | atomic temporary-file publication |
-| rustix | 1.1.6 (reused) | Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT | fs, Android/Linux no-replace directory rename |
+| rustix | 1.1.6 (reused) | Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT | fs: advisory locks (`flock`) and volume space (`statvfs`) on Unix, Android/Linux no-replace directory rename |
+| windows-sys | 0.61.2 (reused) | MIT OR Apache-2.0 | advisory locks (`LockFileEx`) and volume space (`GetDiskFreeSpaceW`) on Windows |
 
 BLAKE3 1.8.7, serde 1.0.229, serde_json 1.0.151 with float_roundtrip,
 thiserror 2.0.21 and development-only Windows 0.62.2 reuse existing exact pins.
@@ -320,8 +320,9 @@ is bundled. The same fixture bytes run through storage tests on Windows and S23.
 
 Sources: [rusqlite releases](https://github.com/rusqlite/rusqlite/releases),
 [rusqlite 0.41.1](https://crates.io/crates/rusqlite/0.41.1),
-[zip 9.5.1](https://crates.io/crates/zip/9.5.1),
-[fs2 0.4.3](https://crates.io/crates/fs2/0.4.3).
+[zip 9.5.1](https://crates.io/crates/zip/9.5.1).
+The unmaintained fs2 0.4.3 was dropped on 2026-11-16 for the same OS calls through
+rustix and windows-sys.
 SQLite's generated amalgamation reports **3.53.2** in sqlite3.h and is
 [public domain](https://www.sqlite.org/copyright.html). The MIT Rust wrapper
 license does not replace that upstream dedication. The existing license policy
@@ -362,7 +363,7 @@ The spike adds [sha2 **0.11.0**](https://crates.io/crates/sha2/0.11.0) and
 MIT OR Apache-2.0 terms checked against official registry metadata. Cargo.lock
 adds eight external packages and does not replace existing versions. It reuses
 image **0.25.10** (PNG/JPEG), moxcms **0.8.1**, windows **0.62.2** (WinHTTP and
-Credential Manager), fs2 **0.4.3**, tempfile **3.27.0**, serde **1.0.229**,
+Credential Manager), rustix **1.1.6** and windows-sys **0.61.2** (ledger lock), tempfile **3.27.0**, serde **1.0.229**,
 serde_json **1.0.151** and thiserror **2.0.21**.
 
 The Rust license/source/ban gate passes. Android dependencies are unchanged:

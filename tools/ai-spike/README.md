@@ -169,7 +169,8 @@ unsupported; the published Tier 1 limit is 100,000 tokens/minute and 5 images/mi
 The owner's actual account tier, permissions and available models are unverified.
 
 Dependencies reuse pinned image 0.25.10 (MIT/Apache-2.0), moxcms 0.8.1
-(BSD-3-Clause/Apache-2.0), serde, serde_json, thiserror, fs2, tempfile and windows.
+(BSD-3-Clause/Apache-2.0), serde, serde_json, thiserror, rustix, tempfile, windows and
+windows-sys.
 Official crates.io metadata checked on the same date identifies sha2 0.11.0 and
 base64 0.23.1 as stable releases under MIT OR Apache-2.0. Root's lockfile/license
 checks are required before every dependency-changing build.

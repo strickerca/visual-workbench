@@ -100,7 +100,7 @@ fn lock(parent: &Path) -> AiEditResult<DirectoryLock> {
     if file.metadata().map_err(|_| AiEditError::Storage)?.len() != 0 {
         return Err(AiEditError::Storage);
     }
-    fs2::FileExt::try_lock_exclusive(&file).map_err(|_| AiEditError::Busy)?;
+    vw_store::os_fs::try_lock_exclusive(&file).map_err(|_| AiEditError::Busy)?;
     Ok(DirectoryLock { _file: file })
 }
 pub(super) fn open(

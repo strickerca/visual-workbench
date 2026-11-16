@@ -253,6 +253,7 @@ fn role(kind: i32) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // Fixture setup failures fail the test.
 mod tests {
     use super::*;
     #[test]

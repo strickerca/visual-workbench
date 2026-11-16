@@ -423,6 +423,7 @@ pub fn read_packet<R: Read>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // Fixture setup failures fail the test.
 mod allocation_tests {
     use super::*;
     use std::{cell::Cell, io::Cursor};

@@ -2,9 +2,8 @@
 //! considers our exact versioned layout under the operating system temp root.
 use crate::{
     DragCleanupReceipt, DragFile, DragFileReceipt, ExportBinding, HostError, HostResult, binding,
-    worker::RequestContext,
+    file_lock, worker::RequestContext,
 };
-use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -165,7 +164,7 @@ impl DragStore {
         let guards = Directories::open(&directory)?;
         let result: HostResult<(DragFileReceipt, File, File)> = (|| {
             let lock = create_file(&directory.join("lease.lock"))?;
-            FileExt::try_lock_exclusive(&lock).map_err(storage)?;
+            file_lock::try_lock_exclusive(&lock).map_err(storage)?;
             let mut marker = create_file(&directory.join("owner.json"))?;
             marker.write_all(&encoded).map_err(storage)?;
             marker.sync_all().map_err(storage)?;
@@ -283,7 +282,7 @@ impl DragStore {
             let attempt: HostResult<bool> = (|| {
                 let guards = Directories::open(&directory)?;
                 let lock = open_cleanup_lock(&directory.join("lease.lock"))?;
-                if FileExt::try_lock_exclusive(&lock).is_err() {
+                if file_lock::try_lock_exclusive(&lock).is_err() {
                     return Ok(false);
                 }
                 let mut marker = open_regular(&directory.join("owner.json"), false)?;
@@ -360,11 +359,12 @@ impl RootLock {
             } else if Instant::now() >= cleanup_deadline {
                 return Err(HostError::Busy);
             }
-            match FileExt::try_lock_exclusive(&file) {
+            match file_lock::try_lock_exclusive(&file) {
                 Ok(()) => return Ok(Self(file)),
                 Err(error)
                     if error.kind() == std::io::ErrorKind::WouldBlock
-                        || error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {}
+                        || error.raw_os_error()
+                            == file_lock::lock_contended_error().raw_os_error() => {}
                 Err(error) => return Err(storage(error)),
             }
             std::thread::sleep(Duration::from_millis(5));
@@ -373,7 +373,7 @@ impl RootLock {
 }
 impl Drop for RootLock {
     fn drop(&mut self) {
-        let _ = FileExt::unlock(&self.0);
+        let _ = file_lock::unlock(&self.0);
     }
 }
 
