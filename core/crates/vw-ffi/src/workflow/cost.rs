@@ -9,8 +9,8 @@
 //! one `Vec` per array and one `BTreeMap` per object or struct.
 //!
 //! The same count bounds a clone of the value itself, for the model's types:
-//! a scalar in a sequence takes at most 8 bytes of its `Vec`, and every other
-//! value at most what its `Value` would. A struct's own fields, `None`
+//! a scalar in a sequence takes the width of its type in its `Vec`, and
+//! every other value at most what its `Value` would. A struct's own fields, `None`
 //! messages and enum variants included, fit in the map nodes counted for it.
 use serde::Serialize;
 use serde_json::ser::{CharEscape, CompactFormatter, Formatter, Serializer};
@@ -36,8 +36,13 @@ pub(crate) struct JsonCost {
     /// bytes. The root `Value` itself lives on the stack.
     pub tree: u64,
     /// Heap bytes of a clone of the value: the tree with every scalar in a
-    /// sequence at the 8 bytes it can take in an exactly sized `Vec`.
+    /// sequence at the width of its type in an exactly sized `Vec`.
     pub copy: u64,
+    /// For a project: the text and tree of its `objects` member alone.
+    pub objects_text: u64,
+    pub objects_tree: u64,
+    /// For a project: the hashed cost of its largest object.
+    pub largest_object: u64,
 }
 impl JsonCost {
     /// What `Project::state_hash` allocates for a project of this cost: the
@@ -48,6 +53,24 @@ impl JsonCost {
         self.tree
             .saturating_add(self.text.saturating_mul(3))
             .saturating_add(256)
+    }
+    /// Text of a project's members other than `objects`.
+    pub fn shell_text(self) -> u64 {
+        self.text.saturating_sub(self.objects_text)
+    }
+    /// What a new `vw_model::StateHasher` allocates to hash a project of
+    /// this cost. The members other than `objects` become one `Value` tree,
+    /// written to their bytes, which are kept three times (per entity, per
+    /// member, and joined in front of and behind `objects`) and joined again
+    /// by doubling. Every object becomes a `Value` and its bytes, one at a
+    /// time, and is kept in pages filled by doubling, of at most 512 KiB.
+    pub fn hasher(self) -> u64 {
+        self.tree
+            .saturating_sub(self.objects_tree)
+            .saturating_add(self.shell_text().saturating_mul(5))
+            .saturating_add(self.objects_text.saturating_mul(2))
+            .saturating_add(self.largest_object)
+            .saturating_add(1024 * 1024)
     }
 }
 
@@ -63,6 +86,9 @@ pub(crate) fn measure<T: Serialize + ?Sized>(
         string_start: None,
         limit,
         exceeded: false,
+        key: Vec::new(),
+        member: None,
+        entity: None,
     };
     // Every byte goes through the formatter, which writes to its own count;
     // anything written past it would still be counted here.
@@ -91,8 +117,8 @@ impl io::Write for Count {
 }
 
 enum Frame {
-    /// Elements, and how many of them were scalars.
-    Array(u64, u64),
+    /// Elements, how many of them were scalars, and their widths together.
+    Array(u64, u64, u64),
     Object(u64),
 }
 
@@ -103,6 +129,12 @@ struct Tally {
     string_start: Option<u64>,
     limit: u64,
     exceeded: bool,
+    /// The key of the member being written, at the top level.
+    key: Vec<u8>,
+    /// Text and tree where the `objects` member's value began.
+    member: Option<(u64, u64)>,
+    /// Text and tree where an object began.
+    entity: Option<(u64, u64)>,
 }
 impl Tally {
     fn text(&mut self, length: usize) -> io::Result<()> {
@@ -114,12 +146,13 @@ impl Tally {
         self.cost.copy = self.cost.copy.saturating_add(bytes);
         self.check()
     }
-    /// A scalar: in a sequence, not as the text of a map key.
-    fn scalar(&mut self) {
+    /// A scalar of `width` bytes: in a sequence, not as the text of a key.
+    fn scalar(&mut self, width: u64) {
         if self.string_start.is_none()
-            && let Some(Frame::Array(_, scalars)) = self.frames.last_mut()
+            && let Some(Frame::Array(_, scalars, widths)) = self.frames.last_mut()
         {
             *scalars += 1;
+            *widths += width;
         }
     }
     fn check(&mut self) -> io::Result<()> {
@@ -132,9 +165,10 @@ impl Tally {
     /// Write through the compact formatter, counting what it writes.
     fn compact(
         &mut self,
+        width: u64,
         write: impl FnOnce(&mut CompactFormatter, &mut Count) -> io::Result<()>,
     ) -> io::Result<()> {
-        self.scalar();
+        self.scalar(width);
         let mut count = Count(0);
         write(&mut CompactFormatter, &mut count)?;
         self.cost.text = self.cost.text.saturating_add(count.0);
@@ -168,7 +202,8 @@ fn map_heap(count: u64) -> u64 {
 macro_rules! scalars {
     ($($name:ident: $type:ty),* $(,)?) => {$(
         fn $name<W: ?Sized + io::Write>(&mut self, _: &mut W, value: $type) -> io::Result<()> {
-            self.compact(|formatter, count| formatter.$name(count, value))
+            let width = std::mem::size_of::<$type>() as u64;
+            self.compact(width, |formatter, count| formatter.$name(count, value))
         }
     )*};
 }
@@ -189,19 +224,21 @@ impl Formatter for &mut Tally {
         write_f64: f64,
     );
     fn write_null<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
-        self.scalar();
+        self.scalar(8);
         self.text(4)
     }
     /// A `Value` holds a 32-bit float as a 64-bit one, which writes longer.
     fn write_f32<W: ?Sized + io::Write>(&mut self, _: &mut W, value: f32) -> io::Result<()> {
-        self.compact(|formatter, count| formatter.write_f64(count, f64::from(value)))
+        self.compact(4, |formatter, count| {
+            formatter.write_f64(count, f64::from(value))
+        })
     }
     fn write_number_str<W: ?Sized + io::Write>(
         &mut self,
         _: &mut W,
         value: &str,
     ) -> io::Result<()> {
-        self.scalar();
+        self.scalar(8);
         self.text(value.len())
     }
     fn begin_string<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
@@ -220,6 +257,10 @@ impl Formatter for &mut Tally {
         _: &mut W,
         fragment: &str,
     ) -> io::Result<()> {
+        // Only a top-level key is kept, and only as long as a member name.
+        if self.frames.len() == 1 && self.key.len() < 32 {
+            self.key.extend_from_slice(fragment.as_bytes());
+        }
         self.text(fragment.len())
     }
     fn write_char_escape<W: ?Sized + io::Write>(
@@ -227,21 +268,23 @@ impl Formatter for &mut Tally {
         _: &mut W,
         escape: CharEscape,
     ) -> io::Result<()> {
-        self.compact(|formatter, count| formatter.write_char_escape(count, escape))
+        self.compact(0, |formatter, count| {
+            formatter.write_char_escape(count, escape)
+        })
     }
     fn begin_array<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
-        self.frames.push(Frame::Array(0, 0));
+        self.frames.push(Frame::Array(0, 0, 0));
         self.text(1)
     }
     fn end_array<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
-        if let Some(Frame::Array(count, scalars)) = self.frames.pop() {
+        if let Some(Frame::Array(count, scalars, widths)) = self.frames.pop() {
             let heap = array_heap(count);
             self.cost.tree = self.cost.tree.saturating_add(heap);
-            // A cloned `Vec` is sized exactly: scalars take at most 8 bytes,
-            // anything else at most the slot its `Value` would take.
+            // A cloned `Vec` is sized exactly: scalars take the width of
+            // their type, anything else at most the slot its `Value` would.
             let copied = (count - scalars)
                 .saturating_mul(VALUE)
-                .saturating_add(scalars.saturating_mul(8));
+                .saturating_add(widths);
             self.cost.copy = self.cost.copy.saturating_add(copied);
             self.check()?;
         }
@@ -252,7 +295,7 @@ impl Formatter for &mut Tally {
         _: &mut W,
         first: bool,
     ) -> io::Result<()> {
-        if let Some(Frame::Array(count, _)) = self.frames.last_mut() {
+        if let Some(Frame::Array(count, ..)) = self.frames.last_mut() {
             *count += 1;
         }
         self.text(usize::from(!first))
@@ -278,15 +321,44 @@ impl Formatter for &mut Tally {
         if let Some(Frame::Object(count)) = self.frames.last_mut() {
             *count += 1;
         }
+        if self.frames.len() == 1 {
+            self.key.clear();
+        }
         self.text(usize::from(!first))
     }
     fn end_object_key<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
         Ok(())
     }
     fn begin_object_value<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
-        self.text(1)
+        self.text(1)?;
+        let at = (self.cost.text, self.cost.tree);
+        match self.frames.len() {
+            1 if self.key == b"objects" => self.member = Some(at),
+            2 if self.member.is_some() => self.entity = Some(at),
+            _ => {}
+        }
+        Ok(())
     }
     fn end_object_value<W: ?Sized + io::Write>(&mut self, _: &mut W) -> io::Result<()> {
+        match self.frames.len() {
+            1 => {
+                if let Some((text, tree)) = self.member.take() {
+                    self.cost.objects_text = self.cost.text.saturating_sub(text);
+                    self.cost.objects_tree = self.cost.tree.saturating_sub(tree);
+                }
+            }
+            2 => {
+                if let Some((text, tree)) = self.entity.take() {
+                    let entity = JsonCost {
+                        text: self.cost.text.saturating_sub(text),
+                        tree: self.cost.tree.saturating_sub(tree),
+                        ..JsonCost::default()
+                    };
+                    self.cost.largest_object = self.cost.largest_object.max(entity.hashed());
+                }
+            }
+            _ => {}
+        }
         Ok(())
     }
     fn write_raw_fragment<W: ?Sized + io::Write>(
@@ -373,6 +445,31 @@ mod tests {
         // What `to_value` builds of it, with keys as long as their text.
         let rebuilt = serde_json::to_value(&value).unwrap();
         assert!(cost.tree >= actual(&rebuilt));
+    }
+
+    #[test]
+    fn a_project_tells_its_objects_and_largest_object_apart() {
+        #[derive(Serialize)]
+        struct Page {
+            assets: std::collections::BTreeMap<String, Vec<u8>>,
+            objects: std::collections::BTreeMap<String, Vec<f64>>,
+            title: String,
+        }
+        let page = Page {
+            assets: [("a".to_string(), vec![7u8; 5000])].into(),
+            objects: (0..20)
+                .map(|n| (format!("{n:02}"), vec![1.25; 10 + n]))
+                .collect(),
+            title: "page".into(),
+        };
+        let cost = measure(&page, u64::MAX).unwrap().unwrap();
+        let objects = serde_json::to_vec(&page.objects).unwrap();
+        assert_eq!(cost.objects_text, objects.len() as u64);
+        let largest = measure(&page.objects["19"], u64::MAX).unwrap().unwrap();
+        assert_eq!(cost.largest_object, largest.hashed());
+        // A copy holds the asset's bytes at one byte each, not as values.
+        assert!(cost.copy < cost.tree);
+        assert!(cost.copy >= 5000 + 20 * 8 * 10);
     }
 
     #[test]

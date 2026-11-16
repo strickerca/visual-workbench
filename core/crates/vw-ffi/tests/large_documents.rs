@@ -1,18 +1,26 @@
 //! Pages of ordinary pen strokes through the calls the apps make, with the
 //! budget they pass (256 MiB), on the PC that hosts the page and on the
-//! phone's mirror of it. Every stroke has 100 samples with pressure, tilt and
-//! orientation: what a stylus reports in under half a second.
+//! phone's mirror of it. A stroke has 100 samples with pressure, tilt and
+//! orientation unless said otherwise: what a stylus reports in under half a
+//! second.
 //!
-//! The workflows the apps offer on such a page stay available: instructions,
-//! the layers panel, selections, the eraser and exporting a file. What each
+//! The workflows the apps offer on such a page stay available, and what each
 //! call allocates, measured by this binary's counting allocator, stays within
-//! the charge it was admitted for, and a workflow is refused only when what
-//! it really needs passes the budget.
+//! the charge it is admitted with: a read or a plan against what it was
+//! refused with one byte short, a commit against what its commit admits at
+//! that moment, the eraser against what it reports. A mirror's replay of its
+//! queued work (the outbox refusing an edit, or recovered work) is run for
+//! real and measured against the charge every mirror commit carries. A
+//! workflow is refused only when what it really needs passes the budget.
+//!
+//! Measurements are process-wide: the tests of this binary take one lock, so
+//! nothing else allocates while a single call is measured.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod support;
 use std::{
     alloc::{GlobalAlloc, Layout, System},
-    path::{Path, PathBuf},
+    ops::Range,
+    path::Path,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -20,7 +28,8 @@ use std::{
 };
 use support::*;
 use vw_core::*;
-use vw_model::{DeviceId, Id};
+use vw_model::{AssetId, DeviceId, Document, Id, Layer, Project};
+use vw_proto::v1 as pb;
 
 static TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -81,23 +90,36 @@ async fn peak<T>(work: impl std::future::Future<Output = T>) -> (T, u64) {
         PEAK.load(Ordering::SeqCst).saturating_sub(base) as u64,
     )
 }
+fn peak_of<T>(work: impl FnOnce() -> T) -> (T, u64) {
+    let base = LIVE.load(Ordering::SeqCst);
+    PEAK.store(base, Ordering::SeqCst);
+    let value = work();
+    (
+        value,
+        PEAK.load(Ordering::SeqCst).saturating_sub(base) as u64,
+    )
+}
 
 const MIB: u64 = 1024 * 1024;
 /// What the apps pass to every workflow.
 const BUDGET: u64 = 256 * MIB;
-/// The core's fixed reserve and the instruction and layers-panel work
-/// constants, as `workflow.rs` and `document_controls.rs` define them.
+/// The core's fixed reserve and the instruction work constant, as
+/// `workflow.rs` defines them, and the 1 KiB per listed object the layers
+/// panel's work constant covers (`document_controls.rs`).
 const RESERVE: u64 = 4 * MIB;
 const INSTRUCTION_WORK: u64 = 48 * MIB;
-const CONTROL_WORK: u64 = 32 * MIB;
+const PANEL_ROW: u64 = 1024;
+/// The device of the phone that mirrors the page.
+const PHONE: [u8; 16] = [9; 16];
 
 fn wide_id(kind: u8, number: u32) -> String {
     let mut entropy = [kind; 10];
     entropy[6..].copy_from_slice(&number.to_be_bytes());
     Id::from_parts(TIME as u64, entropy).unwrap().to_string()
 }
-fn stroke_id(number: u32) -> String {
-    wide_id(0x60, number)
+/// Strokes drawn on the PC have IDs of kind 0x60, the phone's of 0x50.
+fn stroke_id(kind: u8, number: u32) -> String {
+    wide_id(kind, number)
 }
 /// A handwriting-like stroke of `points` samples: a wandering curve sampled
 /// at 240 Hz.
@@ -134,16 +156,16 @@ fn pen(number: u32, points: usize) -> SampleBatch {
     }
     batch
 }
-
-/// A closed host project of `strokes` pen strokes, each saved on its own.
-async fn draw_page(path: &Path, strokes: u32, points: usize) {
-    let project = create_image_project(create(path), cancel()).await.unwrap();
-    let mut lamport = project.info().await.unwrap().next_lamport;
-    for number in 0..strokes {
+/// Draw the strokes `numbers`, each saved on its own, as `project`'s device.
+async fn draw(project: &Arc<ProjectSession>, kind: u8, numbers: Range<u32>, points: usize) {
+    let info = project.info().await.unwrap();
+    let mut lamport = info.next_lamport;
+    for number in numbers {
         let mut options = stroke();
-        options.gesture_id = wide_id(0x41, number);
-        options.transaction_id = wide_id(0x42, number);
-        options.object_id = stroke_id(number);
+        options.gesture_id = wide_id(kind + 1, number);
+        options.transaction_id = wide_id(kind + 2, number);
+        options.object_id = stroke_id(kind, number);
+        options.device_id = info.device_id.clone();
         options.lamport = lamport;
         options.created_at_ms = TIME + 10 + i64::from(number);
         options.width = 3.0;
@@ -152,30 +174,38 @@ async fn draw_page(path: &Path, strokes: u32, points: usize) {
         lamport = gesture.commit(cancel()).await.unwrap().next_lamport;
         gesture.shutdown().await.unwrap();
     }
+}
+async fn open(path: &Path) -> Arc<ProjectSession> {
+    open_project(path.to_string_lossy().into(), cancel())
+        .await
+        .unwrap()
+}
+/// A closed host project of `strokes` pen strokes.
+async fn draw_page(path: &Path, strokes: u32, points: usize) {
+    let project = create_image_project(create(path), cancel()).await.unwrap();
+    draw(&project, 0x60, 0..strokes, points).await;
     project.close().await.unwrap();
 }
 /// The phone's mirror of the closed host page, with the page's original.
-fn mirror_page(host: &Path, root: &Path) -> PathBuf {
+fn mirror_page(host: &Path, path: &Path, original: &[u8]) {
     let store = vw_store::ProjectStore::open(host).unwrap();
     let checkpoint = store.checkpoint_bytes().unwrap();
     let host_device = store.host_device().clone();
     drop(store);
-    let path = root.join("mirror");
     drop(
         vw_store::ProjectStore::create_authenticated_checkpoint(
-            &path,
+            path,
             &checkpoint,
             &host_device,
-            &DeviceId::from_bytes([9; 16]),
+            &DeviceId::from_bytes(PHONE),
             TIME,
         )
         .unwrap(),
     );
-    vw_store::BlobStore::new(&path)
+    vw_store::BlobStore::new(path)
         .unwrap()
-        .put(&source())
+        .put(original)
         .unwrap();
-    path
 }
 
 fn binding(info: &ProjectInfo) -> WorkflowBinding {
@@ -235,9 +265,43 @@ fn charged<T>(result: WorkflowResult<T>) -> u64 {
         Ok(_) => panic!("expected a charge, got an admission"),
     }
 }
-/// Erase across the middle of one of the last strokes, as one gesture does.
+/// With `VW_LARGE_PAGES_REPORT` set, print what a call used and its charge.
+fn report(what: &str, used: u64, charge: u64) {
+    if std::env::var_os("VW_LARGE_PAGES_REPORT").is_some() {
+        eprintln!(
+            "{what}: used {:.1} MiB, charge {:.1} MiB",
+            used as f64 / MIB as f64,
+            charge as f64 / MIB as f64
+        );
+    }
+}
+/// Commit `plan`, measured against what its commit admits at that moment.
+/// Returns that charge.
+async fn commit(plan: Arc<WorkflowPlan>, what: &str) -> u64 {
+    let charge = plan.commit_charge().await.unwrap();
+    let (receipt, used) = peak(plan.commit(cancel())).await;
+    receipt.unwrap();
+    plan.dispose();
+    report(&format!("{what} commit"), used, charge);
+    assert!(
+        used <= charge,
+        "{what}: commit used {used} > charge {charge}"
+    );
+    charge
+}
+
+/// A page and where its last strokes are, for the eraser.
+#[derive(Clone, Copy)]
+struct Page {
+    strokes: u32,
+    points: usize,
+    /// Every object of the page, for the layers panel.
+    objects: u64,
+}
+/// Erase across the middle of one of the PC's last strokes, another one
+/// every round.
 fn erase(info: &ProjectInfo, page: Page, round: u32) -> VectorEraseOptions {
-    let target = page.strokes - round;
+    let target = page.strokes - 1 - round % page.strokes;
     let stroke = pen(target, page.points);
     let (x, y) = (stroke.x[page.points / 2], stroke.y[page.points / 2]);
     VectorEraseOptions {
@@ -245,7 +309,7 @@ fn erase(info: &ProjectInfo, page: Page, round: u32) -> VectorEraseOptions {
         binding: binding(info),
         metadata: metadata(info, 0x70, round),
         targets: vec![VectorEraseTarget {
-            object_id: stroke_id(target),
+            object_id: stroke_id(0x60, target),
             replacement_id: wide_id(0x71, round),
         }],
         centers: vec![
@@ -260,39 +324,69 @@ fn erase(info: &ProjectInfo, page: Page, round: u32) -> VectorEraseOptions {
         ],
         radius: 4.0,
         memory_budget_bytes: BUDGET,
-        max_output_vertices: 65_536,
+        // What the apps pass.
+        max_output_vertices: 8_192,
         max_work_units: 64_000_000,
     }
 }
 
-/// The workflows that only read the page in place, or commit in place: the
-/// layers panel, selections, the eraser and a file export. Admitted on a
-/// page of any size the store holds, each within its charge. The layers
-/// panel lists at most 4,096 objects of a document, whatever their size.
-/// Returns the eraser's charge.
+/// The layers panel and a layer rename. The panel lists at most 4,096
+/// objects, whatever their size. Returns the rename's commit charge.
+async fn layers_panel(project: &Arc<ProjectSession>, page: Page, round: u32) -> Option<u64> {
+    let (snapshot, used) = peak(project.document_controls_snapshot(id(2), BUDGET, cancel())).await;
+    if page.objects > 4_096 {
+        assert!(matches!(snapshot, Err(WorkflowError::Limit)));
+        return None;
+    }
+    snapshot.unwrap();
+    let rows = RESERVE + page.objects * PANEL_ROW;
+    assert!(used <= rows, "layers panel used {used} > {rows}");
+    let info = project.info().await.unwrap();
+    let (plan, used) = peak(project.clone().prepare_document_control(
+        binding(&info),
+        metadata(&info, 0x75, round),
+        rename(&format!("Ink {round}")),
+        BUDGET,
+        cancel(),
+    ))
+    .await;
+    let plan = plan.unwrap();
+    let charge = plan.commit_charge().await.unwrap();
+    // Planning reads the page in place; its rows are the panel's work.
+    assert!(
+        used <= charge + page.objects * PANEL_ROW,
+        "planning a rename used {used} > {}",
+        charge + page.objects * PANEL_ROW
+    );
+    Some(commit(plan, "layer rename").await)
+}
+
+/// The workflows that read the page in place or commit in place: the layers
+/// panel, selections, the eraser and a file export. Returns the rename's
+/// commit charge.
 async fn borrowing_workflows(
     project: &Arc<ProjectSession>,
     page: Page,
     round: u32,
     dir: &Path,
-) -> u64 {
-    layers_panel(project, page.strokes, round).await;
-    // Selections borrow the page and charge only their pixels.
+) -> Option<u64> {
+    let rename = layers_panel(project, page, round).await;
     let (selection, used) = peak(project.selection_document(id(2), cancel())).await;
     selection.unwrap();
     assert!(used <= RESERVE, "selection document used {used}");
-    // The eraser reports the charge it was admitted for.
+    // The eraser reports the charge its commit was admitted with.
     let info = project.info().await.unwrap();
     let (erased, used) =
         peak(project.erase_vector_strokes(erase(&info, page, round), cancel())).await;
     let receipt = erased.unwrap_or_else(|error| panic!("round {round}: {error:?}"));
     assert!(!receipt.changed.is_empty());
+    report("eraser", used, receipt.estimated_peak_bytes);
     assert!(
         used <= receipt.estimated_peak_bytes,
         "eraser used {used} > charge {}",
         receipt.estimated_peak_bytes
     );
-    // Exporting the marked page to a file.
+    // Exporting the marked page to a file, within what its preflight admits.
     let mut export = options();
     export.marked = true;
     let request = FileExportOptions {
@@ -305,49 +399,22 @@ async fn borrowing_workflows(
         max_encoded_bytes: 8 * MIB,
         max_scratch_bytes: 400_000_000,
     };
-    project
-        .preflight_image_file(request.clone(), cancel())
-        .await
-        .unwrap();
-    project
-        .export_transfer_file(request, cancel())
-        .await
-        .unwrap();
-    receipt.estimated_peak_bytes
-}
-/// The layers panel: its charge is the reserve and its own work.
-async fn layers_panel(project: &Arc<ProjectSession>, strokes: u32, round: u32) {
-    let info = project.info().await.unwrap();
-    let (snapshot, used) = peak(project.document_controls_snapshot(id(2), BUDGET, cancel())).await;
-    if strokes > 4_096 {
-        assert!(matches!(snapshot, Err(WorkflowError::Limit)));
-        return;
-    }
-    snapshot.unwrap();
-    assert!(used <= RESERVE + CONTROL_WORK, "layers panel used {used}");
-    let (renamed, used) = peak(async {
-        let plan = project
-            .clone()
-            .prepare_document_control(
-                binding(&info),
-                metadata(&info, 0x75, round),
-                rename(&format!("Ink {round}")),
-                BUDGET,
-                cancel(),
-            )
-            .await?;
-        let receipt = plan.commit(cancel()).await;
-        plan.dispose();
-        receipt
-    })
-    .await;
-    renamed.unwrap();
-    assert!(used <= RESERVE + CONTROL_WORK, "layer rename used {used}");
+    let (preflight, used) = peak(project.preflight_image_file(request.clone(), cancel())).await;
+    let preflight = preflight.unwrap();
+    assert!(used <= RESERVE, "export preflight used {used}");
+    let (exported, used) = peak(project.export_transfer_file(request, cancel())).await;
+    exported.unwrap();
+    assert!(
+        used <= RESERVE + preflight.estimated_peak_bytes,
+        "file export used {used} > {}",
+        RESERVE + preflight.estimated_peak_bytes
+    );
+    rename
 }
 
-/// Instructions hash the whole visible page once. Each call stays within its
-/// charge without the instruction work beside it: the charge of the page
-/// alone covers the hash.
+/// Instructions hash the whole visible page once. A read or a plan stays
+/// within its charge without the instruction work beside it: the charge of
+/// the page alone covers the hash.
 async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, admitted: bool) {
     if !admitted {
         assert!(matches!(
@@ -363,51 +430,35 @@ async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, admitt
     );
     let (document, used) = peak(project.instruction_document(id(2), BUDGET, cancel())).await;
     let document = document.unwrap();
+    report("instruction document", used, charge - INSTRUCTION_WORK);
     assert!(
         used <= charge - INSTRUCTION_WORK,
         "instruction document used {used} > charge {}",
         charge - INSTRUCTION_WORK
     );
     let info = project.info().await.unwrap();
-    let charge = charged(
-        project
-            .clone()
-            .prepare_instruction(
-                document.binding.clone(),
-                metadata(&info, 0x72, round),
-                marker(round),
-                INSTRUCTION_WORK + 1,
-                cancel(),
-            )
-            .await,
-    );
-    let (placed, used) = peak(async {
-        let plan = project
-            .clone()
-            .prepare_instruction(
-                document.binding.clone(),
-                metadata(&info, 0x72, round),
-                marker(round),
-                BUDGET,
-                cancel(),
-            )
-            .await?;
-        let receipt = plan.commit(cancel()).await;
-        plan.dispose();
-        receipt
-    })
-    .await;
-    placed.unwrap();
+    let prepare = |budget| {
+        project.clone().prepare_instruction(
+            document.binding.clone(),
+            metadata(&info, 0x72, round),
+            marker(round),
+            budget,
+            cancel(),
+        )
+    };
+    let charge = charged(prepare(INSTRUCTION_WORK + 1).await);
+    let (plan, used) = peak(prepare(BUDGET)).await;
+    let plan = plan.unwrap();
     assert!(
         used <= charge - INSTRUCTION_WORK,
-        "placing a marker used {used} > charge {}",
+        "planning a marker used {used} > charge {}",
         charge - INSTRUCTION_WORK
     );
+    commit(plan, "placing a marker").await;
     let document = project
         .instruction_document(id(2), BUDGET, cancel())
         .await
         .unwrap();
-    assert_eq!(document.markers.len(), round as usize);
     let (projection, used) =
         peak(project.export_instructions(document.binding, BUDGET, cancel())).await;
     projection.unwrap();
@@ -417,50 +468,44 @@ async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, admitt
     );
 }
 
-/// What a mirror allocates when it takes a queued edit back: a copy of the
-/// authoritative project with a fresh state hasher over it.
-async fn replay_bytes(mirror: &Path) -> u64 {
-    let store = vw_store::ProjectStore::open(mirror).unwrap();
-    let (_, used) = peak(async {
-        let copy = store.project().clone();
-        let mut hasher = vw_model::StateHasher::default();
-        hasher.hash(&copy).unwrap();
-        (copy, hasher)
-    })
-    .await;
-    used
+/// A tone preview decided on a private host built from a copy of the page:
+/// admitted, and within what its read admission charges beside its pixels.
+async fn tone_preview(project: &Arc<ProjectSession>) {
+    let view = project
+        .tone_controls_snapshot(id(2), BUDGET, cancel())
+        .await
+        .unwrap();
+    let set = ToneControlCommand::Set {
+        layer_id: wide_id(0x77, 1),
+        object_id: wide_id(0x78, 1),
+        settings: ImageToneSettings {
+            brightness: -0.3,
+            contrast: 0.1,
+            input_black: 0.1,
+            input_white: 0.9,
+            gamma: 1.2,
+            output_black: 0.1,
+            output_white: 0.8,
+        },
+        enabled: true,
+        opacity: 0.5,
+    };
+    let region = SelectionRegion {
+        x: 3,
+        y: 5,
+        width: 17,
+        height: 13,
+    };
+    let (preview, used) =
+        peak(project.preview_tone_control(view.binding, Some(set), region, true, BUDGET, cancel()))
+            .await;
+    preview.unwrap();
+    assert!(used <= BUDGET, "tone preview used {used}");
 }
-/// Every commit on a mirror is charged that replay: read from the refusal of
-/// a layer rename whose budget leaves one byte beside the panel's work. (The
-/// eraser's charge, which also covers it, is checked on every page.)
-async fn commit_covers_replay(project: &Arc<ProjectSession>, replay: u64) {
-    let info = project.info().await.unwrap();
-    let charge = charged(
-        project
-            .clone()
-            .prepare_document_control(
-                binding(&info),
-                metadata(&info, 0x76, 1),
-                rename("Replay"),
-                RESERVE + CONTROL_WORK + 1,
-                cancel(),
-            )
-            .await,
-    );
-    assert!(
-        replay <= charge - RESERVE - CONTROL_WORK,
-        "replay used {replay} > commit charge {}",
-        charge - RESERVE - CONTROL_WORK
-    );
-}
-/// A page of `strokes` pen strokes of `points` samples each.
-#[derive(Clone, Copy)]
-struct Page {
-    strokes: u32,
-    points: usize,
-}
-/// Draw the page, then run the workflows on its host and on the phone's
-/// mirror of it. `instructions` is whether hashing the page fits the budget.
+
+/// The page on its host and then on the phone's mirror of it. On the mirror
+/// every commit carries the replay of its queue, which is checked against a
+/// real replay. `instructions` is whether hashing the page fits the budget.
 async fn page(page: Page, instructions: bool) {
     let root = tempfile::tempdir().unwrap();
     let host = root.path().join("host");
@@ -476,48 +521,294 @@ async fn page(page: Page, instructions: bool) {
             "hashing the page used only {used}"
         );
     }
-    let project = open_project(host.to_string_lossy().into(), cancel())
-        .await
-        .unwrap();
+    let project = open(&host).await;
     instruction_workflows(&project, 1, instructions).await;
     borrowing_workflows(&project, page, 1, root.path()).await;
+    if instructions {
+        tone_preview(&project).await;
+    }
     project.close().await.unwrap();
-    let mirror = mirror_page(&host, root.path());
-    let replay = replay_bytes(&mirror).await;
-    let project = open_project(mirror.to_string_lossy().into(), cancel())
+    let mirror = root.path().join("mirror");
+    mirror_page(&host, &mirror, &source());
+    let project = open(&mirror).await;
+    instruction_workflows(&project, 2, instructions).await;
+    borrowing_workflows(&project, page, 2, root.path()).await;
+    project.close().await.unwrap();
+}
+
+/// A real replay of the mirror's queue, built as the phone builds it when it
+/// opens the project: taking recovered work, then taking the last queued
+/// edit back as an outbox refusal does. Each measured above the replica it
+/// starts from; returns the larger.
+fn replay(mirror: &Path) -> u64 {
+    let store = vw_store::ProjectStore::open(mirror).unwrap();
+    let host =
+        vw_ops::HostSequencer::from_checkpoint_bytes(&store.checkpoint_bytes().unwrap()).unwrap();
+    let mut replica =
+        vw_ops::Replica::new(store.local_device().unwrap(), host.snapshot().unwrap()).unwrap();
+    drop(host);
+    let queued = store.pending().unwrap();
+    assert!(!queued.is_empty());
+    let (recovered, recovering) = peak_of(|| replica.queue_recovered_batch(queued));
+    recovered.unwrap();
+    let last = Id::from_proto(
+        replica
+            .pending()
+            .last()
+            .unwrap()
+            .transaction
+            .txn_id
+            .as_ref(),
+    )
+    .unwrap();
+    let (discarded, discarding) = peak_of(|| replica.discard_pending(&last));
+    discarded.unwrap();
+    recovering.max(discarding)
+}
+/// The phone draws `pending` strokes on its mirror while offline: they stay
+/// queued. A real replay of that queue stays within the charge a commit on
+/// the mirror then carries, and the mirror's workflows stay admitted.
+async fn offline_phone(page: Page, pending: u32) {
+    let root = tempfile::tempdir().unwrap();
+    let host = root.path().join("host");
+    draw_page(&host, page.strokes, page.points).await;
+    let mirror = root.path().join("mirror");
+    mirror_page(&host, &mirror, &source());
+    let project = open(&mirror).await;
+    draw(&project, 0x50, 0..pending, page.points).await;
+    project.close().await.unwrap();
+    let replayed = replay(&mirror);
+    let project = open(&mirror).await;
+    let info = project.info().await.unwrap();
+    let plan = project
+        .clone()
+        .prepare_document_control(
+            binding(&info),
+            metadata(&info, 0x76, 1),
+            rename("Offline"),
+            BUDGET,
+            cancel(),
+        )
         .await
         .unwrap();
-    if page.strokes <= 4_096 {
-        commit_covers_replay(&project, replay).await;
-    }
-    instruction_workflows(&project, 2, instructions).await;
-    let erase = borrowing_workflows(&project, page, 2, root.path()).await;
-    assert!(
-        replay <= erase,
-        "replay used {replay} > erase charge {erase}"
+    let charge = plan.commit_charge().await.unwrap();
+    plan.dispose();
+    report(
+        &format!("replay of {pending} queued"),
+        replayed,
+        charge - RESERVE,
     );
+    assert!(
+        replayed <= charge - RESERVE,
+        "replaying {pending} queued strokes used {replayed} > commit charge {}",
+        charge - RESERVE
+    );
+    let page = Page {
+        objects: page.objects + u64::from(pending),
+        ..page
+    };
+    instruction_workflows(&project, 3, true).await;
+    borrowing_workflows(&project, page, 3, root.path()).await;
     project.close().await.unwrap();
 }
 
 #[tokio::test]
 async fn pages_of_hundreds_and_thousands_of_strokes_keep_every_workflow_within_its_charge() {
     let _serial = TESTS.lock().await;
-    page(
+    for strokes in [500, 2_000] {
+        let objects = u64::from(strokes);
+        page(
+            Page {
+                strokes,
+                points: 100,
+                objects,
+            },
+            true,
+        )
+        .await;
+    }
+}
+
+#[tokio::test]
+async fn a_phone_that_queued_strokes_offline_is_charged_the_replay_of_its_queue() {
+    let _serial = TESTS.lock().await;
+    // An almost empty page on which the phone draws two thousand strokes, a
+    // page of five hundred with three hundred more from the phone, and one
+    // of two thousand with twenty more.
+    offline_phone(
+        Page {
+            strokes: 2,
+            points: 100,
+            objects: 2,
+        },
+        2_000,
+    )
+    .await;
+    offline_phone(
         Page {
             strokes: 500,
             points: 100,
+            objects: 500,
         },
-        true,
+        300,
     )
     .await;
-    page(
+    offline_phone(
         Page {
             strokes: 2_000,
             points: 100,
+            objects: 2_000,
         },
-        true,
+        20,
     )
     .await;
+}
+
+/// An image whose asset carries a large ICC profile: a hash or a rewrite of
+/// that asset turns every profile byte into a 32-byte JSON value.
+fn profiled_page(profile: usize) -> Project {
+    let author = DeviceId::try_from(device()).unwrap();
+    let mut project = Project::new(Id::try_from(id(1)).unwrap(), "Profiled page".into(), author);
+    let original = source();
+    let asset = AssetId::hash(&original);
+    let mut icc = vec![0u8; profile];
+    for (index, byte) in icc.iter_mut().enumerate() {
+        *byte = (index * 31 % 251) as u8;
+    }
+    project.assets.insert(
+        asset.clone(),
+        pb::AddAsset {
+            asset_id: asset.to_string(),
+            format: "png".into(),
+            width: 64,
+            height: 64,
+            orientation: 1,
+            bit_depth: 8,
+            has_alpha: true,
+            color_space: "ICC".into(),
+            icc_profile: icc,
+            byte_size: original.len() as u64,
+            source: "import".into(),
+            captured_at_ms: 0,
+            metadata_json: "{}".into(),
+        },
+    );
+    project.documents.insert(
+        Id::try_from(id(2)).unwrap(),
+        Document {
+            definition: pb::CreateDocument {
+                document_id: Some(Id::try_from(id(2)).unwrap().to_proto()),
+                kind: pb::DocumentKind::Image as i32,
+                schema_version: 1,
+                title: "Profiled".into(),
+                primary_asset_id: asset.to_string(),
+                capture: None,
+            },
+            pages: vec![],
+            created_at_ms: TIME,
+        },
+    );
+    project.layers.insert(
+        Id::try_from(id(3)).unwrap(),
+        Layer {
+            definition: pb::CreateLayer {
+                layer_id: Some(Id::try_from(id(3)).unwrap().to_proto()),
+                document_id: Some(Id::try_from(id(2)).unwrap().to_proto()),
+                page_index: -1,
+                name: "Ink".into(),
+                kind: "annotation".into(),
+                order_key: "V".into(),
+            },
+            visible: true,
+            locked: false,
+            opacity: 1.0,
+            blend: "normal".into(),
+        },
+    );
+    project
+}
+/// A selection imported over that image adds a mask asset beside the large
+/// one, a rename rewrites the members in front of `objects`, and reading
+/// instructions hashes the profile: each within its charge, on the host and
+/// on the phone's mirror.
+#[tokio::test]
+async fn a_large_icc_profile_is_charged_where_it_is_hashed_or_rewritten() {
+    let _serial = TESTS.lock().await;
+    let root = tempfile::tempdir().unwrap();
+    let host = root.path().join("host");
+    drop(
+        vw_store::ProjectStore::create(
+            &host,
+            profiled_page(2 * 1024 * 1024),
+            DeviceId::try_from(device()).unwrap(),
+            TIME,
+        )
+        .unwrap(),
+    );
+    vw_store::BlobStore::new(&host)
+        .unwrap()
+        .put(&source())
+        .unwrap();
+    let project = open(&host).await;
+    draw(&project, 0x60, 0..300, 100).await;
+    project.close().await.unwrap();
+    let page = Page {
+        strokes: 300,
+        points: 100,
+        objects: 300,
+    };
+    let mirror = root.path().join("mirror");
+    mirror_page(&host, &mirror, &source());
+    for (round, path) in [(1, &host), (2, &mirror)] {
+        let project = open(path).await;
+        instruction_workflows(&project, round, true).await;
+        let rename = layers_panel(&project, page, round).await;
+        assert!(rename.is_some());
+        let document = project.selection_document(id(2), cancel()).await.unwrap();
+        let mut coverage = vec![0u8; 64 * 64];
+        coverage[..64].fill(255);
+        let edit = |budget| SelectionEdit {
+            binding: document.binding.clone(),
+            transaction_id: wide_id(0x79, round),
+            device_id: document.revision.device_id.clone(),
+            lamport: document.revision.next_lamport,
+            created_at_ms: TIME + 2_000_000 + i64::from(round),
+            target: SelectionTarget::New {
+                object_id: wide_id(0x7a, round),
+                layer_id: wide_id(0x7b, round),
+            },
+            operation: SelectionOperation::ImportCoverage {
+                width: 64,
+                height: 64,
+                coverage: coverage.clone(),
+                combine: SelectionCombine::Add,
+            },
+            memory_budget_bytes: budget,
+        };
+        // Each stage refuses a budget short of its charge with that charge;
+        // the import admitted with the largest of them stays within it.
+        let mut budget = RESERVE + 1;
+        let used = loop {
+            let (result, used) = peak(project.apply_selection(edit(budget), cancel())).await;
+            match result {
+                Ok(_) => break used,
+                Err(SelectionError::Memory { estimated, .. }) if estimated > budget => {
+                    assert!(
+                        estimated <= BUDGET,
+                        "a selection import charged {estimated}"
+                    );
+                    budget = estimated;
+                }
+                Err(other) => panic!("expected a charge, got {other:?}"),
+            }
+        };
+        report("selection import", used, budget);
+        assert!(
+            used <= budget,
+            "importing a selection used {used} > charge {budget}"
+        );
+        project.close().await.unwrap();
+    }
 }
 
 /// 8,000 strokes of 50 samples: the store holds this page (of 100 samples it
@@ -531,6 +822,7 @@ async fn a_page_of_eight_thousand_strokes_refuses_only_what_cannot_fit() {
         Page {
             strokes: 8_000,
             points: 50,
+            objects: 8_000,
         },
         false,
     )

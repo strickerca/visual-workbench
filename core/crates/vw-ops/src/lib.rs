@@ -11,7 +11,7 @@ mod undo;
 pub use draft::{Touched, Work};
 pub use gesture::GestureStore;
 pub use host::{Acceptance, HostSequencer, HostSnapshot, InversePreview};
-pub use replica::{PendingTransaction, Replica};
+pub use replica::{PendingTransaction, Replica, UndoPreviews};
 pub use undo::UndoManager;
 
 /// Rejections are typed and do not include captured text or private payloads.

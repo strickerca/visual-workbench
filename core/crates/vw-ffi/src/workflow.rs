@@ -196,8 +196,8 @@ pub(crate) const RESERVE: u64 = 4 * 1024 * 1024;
 // * `commit_workspace`: deciding a transaction in place, as validation and
 //   commit both do: its own representations, and the entities it changes or
 //   removes, which are copied, journaled as `Value`s and hashed again; on a
-//   mirror also the copy of the authoritative project that taking a queued
-//   edit back replays from. Every commit is admitted by it (directly or by
+//   mirror also the replay of its queued work that an outbox refusal makes.
+//   Every commit is admitted by it (directly or by
 //   `admit_transaction`) after any hashing of the same workflow has ended,
 //   so a mutation's earlier admission charges nothing more than a read.
 //
@@ -251,22 +251,49 @@ fn visible_cost(state: &ProjectState) -> WorkflowResult<Option<cost::JsonCost>> 
 fn visible_hash_bytes(state: &ProjectState) -> WorkflowResult<Option<u64>> {
     Ok(visible_cost(state)?.map(cost::JsonCost::hashed))
 }
-/// What a mirror allocates to take a queued edit back when its outbox refuses
-/// it: a copy of the authoritative project (the mirror store's project), and
-/// a fresh state hasher over the copy, whose pages of canonical bytes grow by
-/// doubling.
+/// What a mirror allocates to take its queued work back, as the replay does
+/// when the outbox refuses a new edit (`discard_pending`) or takes recovered
+/// work (`queue_recovered_batch`), beside the replica's resident state:
 ///
-/// Not counted: the copy of the undo previews of this device's own accepted
-/// edits that the same replay makes. Their size is private to
-/// `vw_ops::Replica`; it is about the `Value` tree of what this device drew,
-/// more after many of its own deletions or undos.
+/// * a copy of the authoritative project (the mirror store's project), which
+///   grows by everything the queue creates: at most the queue's content;
+/// * a copy of the queue itself;
+/// * a new state hasher over the resulting visible project;
+/// * the copy of this device's accepted undo previews the replay starts
+///   from, and a new preview for every queued edit, of the same entities as
+///   the preview held for it now; the held set stays alive until the new
+///   one is installed.
+///
+/// The queue and the previews are counted on every call: they are this
+/// device's own unsent and undoable work, not the project's history.
 fn replay_bytes(state: &ProjectState) -> WorkflowResult<Option<u64>> {
-    if state.replica.is_none() {
+    let Some(replica) = &state.replica else {
         return Ok(Some(0));
-    }
+    };
     let store = state.store()?;
-    Ok(project_cost(store.project(), store.state_hash()?)?
-        .map(|counted| counted.copy.saturating_add(counted.text.saturating_mul(2))))
+    let authoritative = project_cost(store.project(), store.state_hash()?)?;
+    let visible = project_cost(replica.project(), replica.state_hash())?;
+    let queue = measure(&Queue(replica.pending()))?;
+    let previews = measure(&replica.undo_previews())?;
+    let (Some(authoritative), Some(visible), Some(queue), Some(previews)) =
+        (authoritative, visible, queue, previews)
+    else {
+        return Ok(None);
+    };
+    Ok(Some(
+        authoritative
+            .copy
+            .saturating_add(queue.copy.saturating_mul(2))
+            .saturating_add(visible.hasher())
+            .saturating_add(previews.tree),
+    ))
+}
+/// A mirror's queued transactions, serialized as a sequence.
+struct Queue<'a>(&'a [vw_ops::PendingTransaction]);
+impl serde::Serialize for Queue<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(self.0.iter().map(|pending| &pending.transaction))
+    }
 }
 /// The reserve and `parts`, refused once they pass `budget`. A part that is
 /// `None` was past `MAX_MEMORY` and passes any budget.
@@ -336,21 +363,30 @@ fn commit_parts(
     let representations = (single <= MAX_MEMORY / 16).then(|| single * 16);
     Ok([
         representations,
-        touched_bytes(state.project()?, transaction)?,
+        touched_bytes(state.project()?, visible_cost(state)?, transaction)?,
         replay_bytes(state)?,
     ])
 }
 /// The entities `transaction` changes or removes, as deciding it holds them
 /// at once: the copy kept to restore each, the `Value`s before and after
 /// that the journal and the conflict check keep, the removed entity's
-/// journal value, and its bytes written again into the state hasher. Four
-/// hashed costs per entity cover those; two more of the largest cover the
-/// pair of values the journal diff converts one entity at a time. Created
-/// entities are content of the transaction, charged with it. An undo touches
-/// what its target touched, which only the history knows: the whole project
-/// stands in for it.
+/// journal value, and the entity as the state hasher writes it again (a
+/// `Value` and its bytes). Four hashed costs per entity cover those; two
+/// more of the largest cover the pair of values the journal diff converts
+/// one entity at a time. Created entities are content of the transaction,
+/// charged with it.
+///
+/// A change to any member other than `objects` also makes the state hasher
+/// join that member's bytes and those in front of or behind `objects` again,
+/// untouched entities included: five times the text of those members covers
+/// the old and new bytes of both joins.
+///
+/// An undo touches what its target touched, entities it deleted included,
+/// which only the history holds: it is refused here rather than charged
+/// from the current project. No workflow plans one.
 fn touched_bytes(
     project: &vw_model::Project,
+    counted: Option<cost::JsonCost>,
     transaction: &pb::Transaction,
 ) -> WorkflowResult<Option<u64>> {
     use pb::op::Kind;
@@ -360,6 +396,8 @@ fn touched_bytes(
             .into_iter()
             .filter_map(|value| Id::from_proto(Some(value)).ok())
     }
+    // Entities the ops name, each once; entities a layer or group holds are
+    // counted where they are found, without a list of them.
     let mut documents = BTreeSet::new();
     let mut layers = BTreeSet::new();
     let mut objects = BTreeSet::new();
@@ -367,20 +405,26 @@ fn touched_bytes(
     let mut instructions = BTreeSet::new();
     let mut results = BTreeSet::new();
     let mut masks = BTreeSet::new();
-    let mut undo = false;
+    let mut members = false;
+    let mut total = 0u64;
+    let mut largest = 0u64;
+    let mut add = |entity: Option<cost::JsonCost>| -> Option<()> {
+        let hashed = entity?.hashed();
+        total = total.saturating_add(hashed);
+        largest = largest.max(hashed);
+        Some(())
+    };
     for op in &transaction.ops {
         match &op.kind {
             Some(Kind::UpdateDocument(value)) => documents.extend(ids(&value.document_id)),
             Some(Kind::UpdateLayer(value)) => layers.extend(ids(&value.layer_id)),
             Some(Kind::DeleteLayer(value)) => {
                 layers.extend(ids(&value.layer_id));
-                objects.extend(
-                    project
-                        .objects
-                        .iter()
-                        .filter(|(_, object)| object.state.layer_id == value.layer_id)
-                        .map(|(id, _)| id.clone()),
-                );
+                for object in project.objects.values() {
+                    if object.state.layer_id == value.layer_id && add(measure(object)?).is_none() {
+                        return Ok(None);
+                    }
+                }
             }
             Some(Kind::SetProperty(value)) => objects.extend(ids(&value.object_id)),
             Some(Kind::DeleteObject(value)) => objects.extend(ids(&value.object_id)),
@@ -394,21 +438,17 @@ fn touched_bytes(
             }
             Some(Kind::Ungroup(value)) => {
                 let group = ids(&value.group_id).next();
-                objects.extend(
-                    project
-                        .objects
-                        .iter()
-                        .filter(|(_, object)| object.state.group_id == value.group_id)
-                        .map(|(id, _)| id.clone()),
-                );
+                for object in project.objects.values() {
+                    if object.state.group_id == value.group_id && add(measure(object)?).is_none() {
+                        return Ok(None);
+                    }
+                }
                 if let Some(group) = group {
-                    groups.extend(
-                        project
-                            .groups
-                            .iter()
-                            .filter(|(_, child)| child.parent.as_ref() == Some(&group))
-                            .map(|(id, _)| id.clone()),
-                    );
+                    for child in project.groups.values() {
+                        if child.parent.as_ref() == Some(&group) && add(measure(child)?).is_none() {
+                            return Ok(None);
+                        }
+                    }
                     groups.insert(group);
                 }
             }
@@ -418,48 +458,50 @@ fn touched_bytes(
             }
             Some(Kind::UpdateResult(value)) => results.extend(ids(&value.result_id)),
             Some(Kind::MaskOp(value)) => masks.extend(ids(&value.output_object_id)),
-            Some(Kind::UndoTransaction(_)) => undo = true,
+            Some(Kind::UndoTransaction(_)) => return Ok(None),
             // New entities, or ops a host refuses before it touches anything.
             _ => {}
         }
+        members |= !matches!(
+            &op.kind,
+            Some(
+                Kind::CreateObject(_)
+                    | Kind::SetProperty(_)
+                    | Kind::DeleteObject(_)
+                    | Kind::Reorder(_)
+            )
+        );
     }
-    let mut counted = Vec::new();
-    if undo {
-        counted.push(measure(project)?);
-    }
-    for id in &documents {
-        counted.extend(project.documents.get(id).map(measure).transpose()?);
-    }
-    for id in &layers {
-        counted.extend(project.layers.get(id).map(measure).transpose()?);
-    }
-    for id in &objects {
-        counted.extend(project.objects.get(id).map(measure).transpose()?);
-    }
-    for id in &groups {
-        counted.extend(project.groups.get(id).map(measure).transpose()?);
-    }
-    for id in &instructions {
-        counted.extend(project.instructions.get(id).map(measure).transpose()?);
-    }
-    for id in &results {
-        counted.extend(project.results.get(id).map(measure).transpose()?);
-    }
-    for id in &masks {
-        counted.extend(project.mask_versions.get(id).map(measure).transpose()?);
-    }
-    let mut total = 0u64;
-    let mut largest = 0u64;
-    for entity in counted {
-        let Some(entity) = entity else {
-            return Ok(None);
+    macro_rules! named {
+        ($ids:ident, $collection:ident) => {
+            for id in &$ids {
+                if let Some(value) = project.$collection.get(id)
+                    && add(measure(value)?).is_none()
+                {
+                    return Ok(None);
+                }
+            }
         };
-        total = total.saturating_add(entity.hashed());
-        largest = largest.max(entity.hashed());
     }
+    named!(documents, documents);
+    named!(layers, layers);
+    named!(objects, objects);
+    named!(groups, groups);
+    named!(instructions, instructions);
+    named!(results, results);
+    named!(masks, mask_versions);
+    let rejoined = if members {
+        match counted {
+            Some(counted) => counted.shell_text().saturating_mul(5),
+            None => return Ok(None),
+        }
+    } else {
+        0
+    };
     let bytes = total
         .saturating_mul(4)
-        .saturating_add(largest.saturating_mul(2));
+        .saturating_add(largest.saturating_mul(2))
+        .saturating_add(rejoined);
     Ok((bytes <= MAX_MEMORY).then_some(bytes))
 }
 /// Admit `workspace` (counted within what `extra` leaves of `budget`) and
@@ -521,9 +563,9 @@ pub(crate) fn admit_transaction(
 }
 /// A preview decided on a private host built from a copy of the visible
 /// project: the transaction and what it touches, the copy, and the new host,
-/// which writes the project into its state hasher and counts its checkpoint
-/// length from a `Value` tree of it (together less than one hashed cost).
-/// The private host never replays a mirror's queue.
+/// which hashes the copy with a new state hasher and counts its checkpoint
+/// length from a `Value` tree of it. The private host never replays a
+/// mirror's queue.
 pub(crate) fn admit_isolated_host(
     state: &ProjectState,
     transaction: &pb::Transaction,
@@ -532,8 +574,12 @@ pub(crate) fn admit_isolated_host(
 ) -> WorkflowResult<()> {
     admit_with(budget, extra, |left| {
         let [representations, touched, _] = commit_parts(state, transaction)?;
-        let host =
-            visible_cost(state)?.and_then(|counted| counted.copy.checked_add(counted.hashed()));
+        let host = visible_cost(state)?.map(|counted| {
+            counted
+                .copy
+                .saturating_add(counted.hasher())
+                .saturating_add(counted.tree)
+        });
         charge(left, &[representations, touched, host])
     })
 }
@@ -720,6 +766,24 @@ impl WorkflowPlan {
         if let Ok(mut prepared) = self.prepared.lock() {
             *prepared = None;
         }
+    }
+}
+impl WorkflowPlan {
+    /// What `commit` would admit now beside the workflow's own work, for tests
+    /// that measure a commit against it. Not part of the bindings.
+    #[doc(hidden)]
+    pub async fn commit_charge(&self) -> WorkflowResult<u64> {
+        let prepared = self.prepared()?;
+        self.worker
+            .call(move |state| {
+                Ok(
+                    match commit_workspace(state, &prepared.transaction, MAX_MEMORY) {
+                        Err(WorkflowError::Memory { estimated, .. }) => Ok(estimated),
+                        other => other,
+                    },
+                )
+            })
+            .await?
     }
 }
 impl Drop for WorkflowPlan {
