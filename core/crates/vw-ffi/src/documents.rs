@@ -407,59 +407,15 @@ impl ProjectSession {
         self.worker
             .call(move |state| {
                 cancellation.check()?;
-                let descriptor = descriptor(state, &document_id)?.ok_or(CoreError::Unsupported)?;
-                let geometry = descriptor
-                    .pages
-                    .get(page as usize)
-                    .filter(|item| item.page == page)
-                    .ok_or(CoreError::Invalid)?;
-                let (width, height) = dimensions(geometry)?;
-                let project = state.project()?;
-                let id = Id::try_from(document_id.clone())?;
-                let mut layers = project
-                    .layers
-                    .iter()
-                    .filter(|(_, layer)| {
-                        layer.definition.document_id.as_ref() == Some(&id.to_proto())
-                            && layer.definition.page_index
-                                == if descriptor.kind == EditableDocumentKind::Pdf {
-                                    page as i32
-                                } else {
-                                    -1
-                                }
-                    })
-                    .collect::<Vec<_>>();
-                layers.sort_by(|(a, l), (b, r)| {
-                    l.definition
-                        .order_key
-                        .cmp(&r.definition.order_key)
-                        .then(a.cmp(b))
-                });
-                let layers = layers
-                    .into_iter()
-                    .map(|(id, l)| LayerInfo {
-                        id: id.to_string(),
-                        name: l.definition.name.clone(),
-                        visible: l.visible,
-                        locked: l.locked,
-                        opacity: l.opacity,
-                        blend: l.blend.clone(),
-                    })
-                    .collect();
+                let frame = page_frame(state, &document_id, page)?;
                 let render = crate::queries::render_list_page(state, &document_id, page, None)?;
                 let result = DocumentSnapshot {
                     document_id,
-                    title: project
-                        .documents
-                        .get(&id)
-                        .ok_or(CoreError::Invalid)?
-                        .definition
-                        .title
-                        .clone(),
-                    width,
-                    height,
+                    title: frame.title,
+                    width: frame.width,
+                    height: frame.height,
                     bit_depth: 8,
-                    layers,
+                    layers: frame.layers,
                     render,
                     has_tone_adjustments: false,
                 };
@@ -469,6 +425,102 @@ impl ProjectSession {
             })
             .await
     }
+    /// `editable_document_page` with every stroke outline packed, as
+    /// `document_snapshot_packed` is to `document_snapshot`.
+    pub async fn editable_document_page_packed(
+        &self,
+        document_id: String,
+        page: u32,
+        cancellation: Arc<Cancellation>,
+    ) -> Result<PackedDocumentSnapshot> {
+        self.check_open()?;
+        self.worker
+            .call(move |state| {
+                cancellation.check()?;
+                let frame = page_frame(state, &document_id, page)?;
+                let render = crate::queries::packed_render_list(state, &document_id, Some(page))?;
+                let result = PackedDocumentSnapshot {
+                    document_id,
+                    title: frame.title,
+                    width: frame.width,
+                    height: frame.height,
+                    bit_depth: 8,
+                    layers: frame.layers,
+                    render,
+                    has_tone_adjustments: false,
+                };
+                crate::payload::packed_document_bytes(&result)?;
+                cancellation.check()?;
+                Ok(result)
+            })
+            .await
+    }
+}
+
+/// What a page read returns besides its display list.
+struct PageFrame {
+    title: String,
+    width: u32,
+    height: u32,
+    layers: Vec<LayerInfo>,
+}
+fn page_frame(
+    state: &crate::project::ProjectState,
+    document_id: &str,
+    page: u32,
+) -> Result<PageFrame> {
+    let descriptor = descriptor(state, document_id)?.ok_or(CoreError::Unsupported)?;
+    let geometry = descriptor
+        .pages
+        .get(page as usize)
+        .filter(|item| item.page == page)
+        .ok_or(CoreError::Invalid)?;
+    let (width, height) = dimensions(geometry)?;
+    let project = state.project()?;
+    let id = Id::try_from(document_id.to_owned())?;
+    let mut layers = project
+        .layers
+        .iter()
+        .filter(|(_, layer)| {
+            layer.definition.document_id.as_ref() == Some(&id.to_proto())
+                && layer.definition.page_index
+                    == if descriptor.kind == EditableDocumentKind::Pdf {
+                        page as i32
+                    } else {
+                        -1
+                    }
+        })
+        .collect::<Vec<_>>();
+    layers.sort_by(|(a, l), (b, r)| {
+        l.definition
+            .order_key
+            .cmp(&r.definition.order_key)
+            .then(a.cmp(b))
+    });
+    let layers = layers
+        .into_iter()
+        .map(|(id, l)| LayerInfo {
+            id: id.to_string(),
+            name: l.definition.name.clone(),
+            visible: l.visible,
+            locked: l.locked,
+            opacity: l.opacity,
+            blend: l.blend.clone(),
+        })
+        .collect();
+    let title = project
+        .documents
+        .get(&id)
+        .ok_or(CoreError::Invalid)?
+        .definition
+        .title
+        .clone();
+    Ok(PageFrame {
+        title,
+        width,
+        height,
+        layers,
+    })
 }
 
 /// Shared atomic page admission for ordinary edits and vector erasure. The

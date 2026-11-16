@@ -79,8 +79,6 @@ public data class Camera(public val center: Point, public val scale: Double, pub
 public data class StrokeOptions(public val gestureId: String, public val transactionId: String, public val objectId: String, public val documentId: String, public val layerId: String, public val deviceId: String, public val lamport: ULong, public val createdAtMs: Long, public val family: String, public val width: Double, public val rgba: UInt, public val stabilization: Float = 0f, public val pressureCurve: List<Double> = emptyList())
 /** Immutable owned batch; callers must not mutate arrays after submitting it. */
 public data class SampleBatch(public val sequence: ULong, public val x: DoubleArray, public val y: DoubleArray, public val timeMs: UIntArray, public val pressure: FloatArray, public val tilt: FloatArray = floatArrayOf(), public val orientation: FloatArray = floatArrayOf())
-/** Compound NONZERO fill in 1/256 D units; draw together once, never alpha-blend each contour. */
-public data class Contours(public val x: LongArray, public val y: LongArray, public val ends: UIntArray)
 public data class InkUpdate(public val sequence: ULong, public val firstPolygon: ULong, public val sampleCount: ULong, public val contours: Contours)
 public data class ObjectStyle(public val rgba: UInt, public val width: Double, public val screenConstantWidth: Boolean = false, public val fill: UInt? = null)
 public sealed interface Outline {

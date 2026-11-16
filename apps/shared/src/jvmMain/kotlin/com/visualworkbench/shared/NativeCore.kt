@@ -91,11 +91,11 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
             val held = heldStrokes.get()?.takeIf { it.documentId == documentId }?.strokes.orEmpty()
             val known = if (previous == null || previous.documentId != documentId) emptyMap()
                 else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
-            val d = handle.documentSnapshotChanges(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest, it.cost) }, cancel)
+            val d = handle.documentSnapshotChangesPacked(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest, it.cost) }, cancel)
             val next = HashMap<String, HeldStroke>(d.items.size)
             val items = d.items.map { change ->
                 val sent = change.item
-                val item = if (sent != null) nativeRenderItem(sent) else {
+                val item = if (sent != null) nativePackedItem(sent) else {
                     // Kept: the core vouches for exactly the bytes named to it.
                     val kept = known[change.objectId]?.takeIf { it.digest.contentEquals(change.digest) } ?: throw CoreFailure(CoreFailureKind.Worker)
                     val old = kept.item
@@ -150,7 +150,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
         EditableSource(value.descriptor.documentCommon(),value.bytes)
     }
     override suspend fun documentPage(documentId: String,page: UInt): DocumentSnapshot = documentNativeCall {
-        checkDocumentOpen(); handle.editableDocumentPage(documentId,page,it).documentCommon().copy(page=page)
+        checkDocumentOpen(); handle.editableDocumentPagePacked(documentId,page,it).common().copy(page=page)
     }
     override suspend fun selectDocumentPage(documentId: String,page: UInt): DocumentSnapshot {
         val value=documentPage(documentId,page)
@@ -199,10 +199,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
         if(documentDescriptor(documentId)!=null)return documentPage(documentId,selectedDocumentPage(documentId))
         return imageDocument(documentId)
     }
-    private suspend fun imageDocument(documentId: String): DocumentSnapshot = call { cancel ->
-        val d=handle.documentSnapshot(documentId,cancel)
-        DocumentSnapshot(d.documentId,d.title,d.width,d.height,d.bitDepth,d.layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },d.render.common(),hasToneAdjustments=d.hasToneAdjustments)
-    }
+    private suspend fun imageDocument(documentId: String): DocumentSnapshot = call { cancel -> handle.documentSnapshotPacked(documentId,cancel).common() }
     override suspend fun background(documentId: String,memoryBudgetBytes: ULong,assumeUntaggedSrgb: Boolean): BackgroundImage = call { cancel ->
         val b=handle.backgroundImage(documentId,memoryBudgetBytes,assumeUntaggedSrgb,cancel)
         BackgroundImage(b.width,b.height,b.rgba,b.sourceAssetId,b.sourceBitDepth,b.iccProfile)
@@ -303,6 +300,13 @@ private fun DrawShape.common(): Shape = when(this) {
 }
 private fun NRender.common(): RenderList = RenderList(revision.common(),items.map { RenderItem(it.objectId,it.layerId,it.layerOpacity,it.layerBlend,it.bounds.common(),it.strokeContours.common(),it.transform.common(),it.style.common(),it.shape.common(),it.locked) })
 internal fun nativeRenderItem(item: com.visualworkbench.bindings.core.RenderItem): RenderItem = RenderItem(item.objectId,item.layerId,item.layerOpacity,item.layerBlend,item.bounds.common(),item.strokeContours.common(),item.transform.common(),item.style.common(),item.shape.common(),item.locked)
+/** The outline stays in the ByteArray the bindings made: no boxed list, no second copy. */
+internal fun nativePackedItem(item: PackedRenderItem): RenderItem {
+    val contours = try { Contours.packed(item.contours) } catch (error: IllegalArgumentException) { throw CoreFailure(CoreFailureKind.Worker, error) }
+    return RenderItem(item.objectId,item.layerId,item.layerOpacity,item.layerBlend,item.bounds.common(),contours,item.transform.common(),item.style.common(),item.shape.common(),item.locked)
+}
+private fun PackedDocumentSnapshot.common(): DocumentSnapshot = DocumentSnapshot(documentId,title,width,height,bitDepth,layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },
+    RenderList(render.revision.common(),render.items.map(::nativePackedItem)),hasToneAdjustments=hasToneAdjustments)
 internal fun nativeProjectHandle(project: WorkbenchProject): ProjectSession = (project as? NativeProject)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
 private fun EditOptions.native(): NEditOptions = NEditOptions(transactionId,documentId,deviceId,lamport,createdAtMs)
 private fun Shape.newNative(): NewShape = when(this) {

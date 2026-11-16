@@ -55,6 +55,35 @@ internal data class CanvasScene(
     val keepDryPicture: Boolean = false,
 )
 
+/** The path commands of a stroke's contours, in f32 coordinates around an f64
+ * origin: per contour one move, its lines and a close. Every stroke path is
+ * built with this arithmetic, from arrays and from packed contours alike. */
+internal interface ContourCommands : ContourVisitor {
+    val originX: Double
+    val originY: Double
+    /** Whether the current contour has had its first vertex. */
+    var started: Boolean
+    fun moveTo(x: Float, y: Float)
+    fun lineTo(x: Float, y: Float)
+    fun close()
+    override fun begin(vertexCount: Int) { require(vertexCount >= 3); started = false }
+    override fun vertex(x: Long, y: Long) {
+        val px = (x.toDouble() / 256.0 - originX).toFloat()
+        val py = (y.toDouble() / 256.0 - originY).toFloat()
+        if (started) lineTo(px, py) else { moveTo(px, py); started = true }
+    }
+    override fun end() = close()
+}
+
+/** A stroke path that takes its own contours, so building it allocates
+ * nothing besides the path. */
+internal class ContourPath(override val originX: Double, override val originY: Double) : Path(), ContourCommands {
+    override var started: Boolean = false
+    override fun moveTo(x: Float, y: Float) = super.moveTo(x, y)
+    override fun lineTo(x: Float, y: Float) = super.lineTo(x, y)
+    override fun close() = super.close()
+}
+
 internal object EditorDrawing {
     fun argb(rgba: UInt): Int = ((rgba shr 8) or (rgba shl 24)).toInt()
     fun rgba(argb: Long): UInt = ((argb.toUInt() shl 8) or (argb.toUInt() shr 24))
@@ -69,22 +98,12 @@ internal object EditorDrawing {
         setValues(floatArrayOf(t.a.toFloat(), t.c.toFloat(), t.e.toFloat(), t.b.toFloat(), t.d.toFloat(), t.f.toFloat(), 0f, 0f, 1f))
     }
 
+    /** Reads [contours] in whichever form it is held, without unpacking or
+     * boxing it; the path itself is the only allocation. */
     fun contourPath(contours: Contours, origin: Point = Point(0.0, 0.0)): Path {
-        require(contours.x.size == contours.y.size && contours.x.size <= 1_000_000)
-        val path = Path().apply { fillType = Path.FillType.WINDING }
-        var first = 0
-        for (endValue in contours.ends) {
-            require(endValue <= contours.x.size.toUInt())
-            val end = endValue.toInt()
-            require(end >= first + 3)
-            for (i in first until end) {
-                val x = (contours.x[i].toDouble() / 256.0 - origin.x).toFloat()
-                val y = (contours.y[i].toDouble() / 256.0 - origin.y).toFloat()
-                if (i == first) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            path.close(); first = end
-        }
-        require(first == contours.x.size)
+        require(contours.vertexCount <= 1_000_000)
+        val path = ContourPath(origin.x, origin.y).apply { fillType = Path.FillType.WINDING }
+        contours.visit(path)
         return path
     }
 
@@ -99,21 +118,23 @@ internal object EditorDrawing {
         } }
     }
 
+    /** The local origin [objectPath] builds [item]'s path around. */
+    fun objectOrigin(item: RenderItem): Point = when (val shape = item.shape) {
+        is Shape.Result -> Point(0.0,0.0)
+        is Shape.Text -> shape.anchor
+        is Shape.Stroke -> Point(item.contours.firstX.toDouble() / 256, item.contours.firstY.toDouble() / 256)
+        is Shape.Line -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
+        is Shape.Arrow -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
+        is Shape.Polygon -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
+        is Shape.Rectangle -> Point(shape.rectangle.x, shape.rectangle.y)
+        is Shape.Ellipse -> Point(shape.rectangle.x, shape.rectangle.y)
+        is Shape.Guide -> Point(shape.rectangle.x, shape.rectangle.y)
+        else -> throw UnsupportedOperationException("This document contains an object the Android editor cannot display yet. Its original and edits are preserved.")
+    }
+
     fun objectPath(item: RenderItem): DrawObject {
         val shape = item.shape
-        val origin = when (shape) {
-            is Shape.Result -> Point(0.0,0.0)
-            is Shape.Text -> shape.anchor
-            is Shape.Stroke -> Point(item.contours.x.firstOrNull()?.toDouble()?.div(256) ?: 0.0,
-                item.contours.y.firstOrNull()?.toDouble()?.div(256) ?: 0.0)
-            is Shape.Line -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
-            is Shape.Arrow -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
-            is Shape.Polygon -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
-            is Shape.Rectangle -> Point(shape.rectangle.x, shape.rectangle.y)
-            is Shape.Ellipse -> Point(shape.rectangle.x, shape.rectangle.y)
-            is Shape.Guide -> Point(shape.rectangle.x, shape.rectangle.y)
-            else -> throw UnsupportedOperationException("This document contains an object the Android editor cannot display yet. Its original and edits are preserved.")
-        }
+        val origin = objectOrigin(item)
         fun poly(points: List<Point>, closed: Boolean = false) = Path().apply {
             points.forEachIndexed { index, p ->
                 if (index == 0) moveTo((p.x - origin.x).toFloat(), (p.y - origin.y).toFloat())
