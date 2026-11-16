@@ -2,9 +2,11 @@ package com.visualworkbench.android.editor
 
 import android.os.SystemClock
 import android.util.Log
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicLongArray
+import java.util.concurrent.locks.ReentrantLock
 
 /** Lifecycle diagnostics of the canvas surface, for telling a slow device from a
  * redraw the canvas lost. One log tag; fixed words and numbers only (ordinal
@@ -19,10 +21,11 @@ import java.util.concurrent.atomic.AtomicLongArray
  * Strictly observational while on: the thread that sees an event (Main, a
  * drawing thread, a commit callback) reads the clock once and writes a few
  * numbers into a preallocated ring ([CanvasLifeRing]). It formats nothing and
- * writes no log. The log's own low-priority thread turns the records into lines
- * every [WRITE_PERIOD_MS], and the on-screen test drains them before it writes or
- * reads lines itself. No transaction, listener or callback is added to the
- * window, the surface or a frame for the log's sake. */
+ * writes no log. The log's own low-priority thread ([CanvasLifeRecorder]) turns
+ * the records into lines while a canvas made with the log on is open, and the
+ * on-screen test drains them before it writes or reads lines itself. No
+ * transaction, listener or callback is added to the window, the surface or a
+ * frame for the log's sake. */
 internal object CanvasLife {
     const val TAG = "VW_CANVAS_LIFE"
     /** On-screen tests only. */
@@ -31,18 +34,30 @@ internal object CanvasLife {
     private val history = CanvasLifeHistory(240)
     /** Made with the first surface that has the log on; null until then, so a
      * process that never switches the log on allocates and starts nothing for it. */
-    @Volatile private var recorder: Recorder? = null
+    @Volatile private var recorder: CanvasLifeRecorder? = null
     private const val RING_RECORDS = 1_024
     private const val WRITE_PERIOD_MS = 100L
+    /** The writer stops one second after the last canvas left and nothing more arrived. */
+    private const val LINGER_ROUNDS = 10
+    /** The longest an on-screen test waits for the writer before it writes its own line. */
+    private const val LINE_WAIT_MS = 50L
 
     fun enabled(): Boolean = forced || Log.isLoggable(TAG, Log.VERBOSE)
 
-    /** Main, for a surface made while the log is on: its number. Starts the writer. */
+    /** Main, for a surface made while the log is on: its number. */
     fun nextSurface(): Int {
-        val current = recorder ?: synchronized(this) { recorder ?: Recorder().also { recorder = it } }
-        current.startWriter()
+        if (recorder == null) synchronized(this) {
+            if (recorder == null) recorder = CanvasLifeRecorder(RING_RECORDS, SystemClock::uptimeMillis, ::emit, ::startWriter,
+                ::pause, LINGER_ROUNDS, LINE_WAIT_MS)
+        }
         return surfaces.incrementAndGet()
     }
+
+    /** Main: a canvas made while the log is on was attached; the writer runs from now. */
+    fun opened() { recorder?.opened() }
+
+    /** Main: that canvas has left its window and its retirement is confirmed. */
+    fun closed() { recorder?.closed() }
 
     /** Any thread, for a surface made while the log is on: one record. The caller
      * has read the clock; this writes the numbers into the ring and returns. */
@@ -58,10 +73,10 @@ internal object CanvasLife {
         if (current == null) emit("t=${SystemClock.uptimeMillis()} $text") else current.line(text)
     }
 
-    /** On-screen tests: the newest lines, oldest first, including every record drained now. */
+    /** On-screen tests: the newest lines in the order of their `t`, including the records drained now. */
     fun recent(): List<String> {
         recorder?.drain()
-        return history.snapshot()
+        return history.snapshot().sortedBy { it.substringAfter("t=").substringBefore(' ').toLongOrNull() ?: 0L }
     }
 
     private fun emit(line: String) {
@@ -69,46 +84,108 @@ internal object CanvasLife {
         Log.i(TAG, line)
     }
 
-    /** The log's state once a surface had it on: the ring and its writer thread. */
-    private class Recorder {
-        val ring = CanvasLifeRing(RING_RECORDS)
-        /** Orders drained records and the test's own lines in the history and the log. Never taken on Main. */
-        private val drainLock = Any()
-        private val sink = CanvasLifeRing.Sink { kind, surface, timeMs, values -> emit(formatCanvasLifeRecord(kind, surface, timeMs, values)) }
-        /** Under this recorder's monitor, which Main takes only when a surface is made. */
-        private var writer: Thread? = null
+    private fun startWriter(task: Runnable) {
+        Thread(task, "VwCanvasLife").apply { isDaemon = true; priority = Thread.MIN_PRIORITY; start() }
+    }
 
-        fun startWriter() {
-            synchronized(this) {
-                if (writer == null) writer = Thread(::writeRecords, "VwCanvasLife").apply {
-                    isDaemon = true; priority = Thread.MIN_PRIORITY; start()
-                }
-            }
+    private fun pause(): Boolean = try { Thread.sleep(WRITE_PERIOD_MS); true } catch (_: InterruptedException) { false }
+}
+
+/** The lifecycle log's writer, once a canvas had the log on. It runs while at least
+ * one such canvas is open (from its attach until its retirement after detach is
+ * confirmed), and afterwards until every record claimed is written and
+ * [lingerRounds] rounds passed with nothing new, so a retired canvas's last
+ * records are written too; the next canvas starts it again. Each round drains the
+ * ring in batches of [WRITER_BATCH], so an on-screen test that wants to write a
+ * line waits at most one batch, and never longer than [lineWaitMs].
+ *
+ * [startWriter] starts a thread that runs the task given; [pause] waits one round
+ * and returns false when the thread was interrupted. */
+internal class CanvasLifeRecorder(
+    capacity: Int,
+    private val clock: () -> Long,
+    private val emit: (String) -> Unit,
+    private val startWriter: (Runnable) -> Unit,
+    private val pause: () -> Boolean,
+    private val lingerRounds: Int,
+    private val lineWaitMs: Long,
+) {
+    val ring = CanvasLifeRing(capacity)
+    /** Orders drained records and the test's own lines. Main never takes it. */
+    private val drainLock = ReentrantLock()
+    private val sink = CanvasLifeRing.Sink { kind, surface, timeMs, values -> emit(formatCanvasLifeRecord(kind, surface, timeMs, values)) }
+    // Under this recorder's monitor, which Main takes only to open or close a canvas.
+    private var open = 0
+    private var writing = false
+    private var quietRounds = 0
+    init { require(lingerRounds > 0 && lineWaitMs >= 0) }
+
+    /** Whether the writer runs now. */
+    val writerRunning: Boolean get() = synchronized(this) { writing }
+
+    /** Main: a canvas opened; starts the writer when none runs. */
+    fun opened() {
+        val start = synchronized(this) {
+            open++; quietRounds = 0
+            if (writing) false else { writing = true; true }
         }
+        if (start) startWriter(Runnable { while (writeRound()) if (!pause()) { synchronized(this) { writing = false }; return@Runnable } })
+    }
 
-        fun line(text: String) {
-            synchronized(drainLock) { drainLocked(); emit("t=${SystemClock.uptimeMillis()} $text") }
+    /** Main: a canvas that opened has closed. */
+    fun closed() { synchronized(this) { if (open > 0) open-- } }
+
+    /** The writer: one round. Writes every record ready, then tells whether to go on;
+     * false once no canvas is open, nothing claimed is left and the round was the
+     * last of [lingerRounds] quiet ones. */
+    fun writeRound(): Boolean {
+        val delivered = drainInBatches()
+        // Asked outside this monitor, so Main never waits behind a drain for it.
+        val left = ring.undelivered()
+        synchronized(this) {
+            quietRounds = if (open > 0 || delivered > 0 || left) 0 else quietRounds + 1
+            if (quietRounds < lingerRounds) return true
+            writing = false
+            return false
         }
+    }
 
-        /** Records delivered now. */
-        fun drain(): Int = synchronized(drainLock) { drainLocked() }
+    /** On-screen tests: writes the records ready, then [text]. */
+    fun line(text: String) {
+        val locked = lockBriefly()
+        try { if (locked) drainLocked(Int.MAX_VALUE); emit("t=${clock()} $text") }
+        finally { if (locked) drainLock.unlock() }
+    }
 
-        private fun drainLocked(): Int {
-            val delivered = ring.drain(sink)
-            val lost = ring.takeDropped()
-            if (lost > 0) emit("t=${SystemClock.uptimeMillis()} records_dropped count=$lost")
-            return delivered
+    /** On-screen tests: writes the records ready. */
+    fun drain() {
+        if (!lockBriefly()) return
+        try { drainLocked(Int.MAX_VALUE) } finally { drainLock.unlock() }
+    }
+
+    private fun drainInBatches(): Int {
+        var total = 0
+        while (true) {
+            drainLock.lock()
+            val delivered = try { drainLocked(WRITER_BATCH) } finally { drainLock.unlock() }
+            total += delivered
+            if (delivered < WRITER_BATCH) return total
         }
+    }
 
-        /** The writer thread: drains until the log is off and nothing more arrives. */
-        private fun writeRecords() {
-            while (true) {
-                val delivered = drain()
-                synchronized(this) { if (delivered == 0 && !enabled()) { writer = null; return } }
-                try { Thread.sleep(WRITE_PERIOD_MS) }
-                catch (_: InterruptedException) { synchronized(this) { writer = null }; return }
-            }
-        }
+    /** Under [drainLock]: records delivered now, then a line for any lost since the last one. */
+    private fun drainLocked(max: Int): Int {
+        val delivered = ring.drain(max, sink)
+        val lost = ring.takeDropped()
+        if (lost > 0) emit("t=${clock()} records_dropped count=$lost")
+        return delivered
+    }
+
+    private fun lockBriefly(): Boolean =
+        try { drainLock.tryLock(lineWaitMs, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { Thread.currentThread().interrupt(); false }
+
+    companion object {
+        const val WRITER_BATCH = 32
     }
 }
 
@@ -220,10 +297,10 @@ internal fun formatCanvasLifeRecord(kind: Int, surface: Int, timeMs: Long, value
  * one without locks, allocation or formatting: it claims the next record number,
  * marks the slot as being written, stores the numbers with a check value and
  * publishes the slot. One reader at a time drains the records in the order they
- * were claimed. A record still being written holds back the ones after it until
- * the next drain. A record overwritten before it was drained (the ring was full),
- * or mixed with another (a writer stalled mid-record while the ring wrapped round),
- * is counted as dropped, never delivered. */
+ * were claimed. A record its writer is still storing holds back the ones after it
+ * until the next drain. A record overwritten before it was drained (the ring was
+ * full), mixed with another, or missing from its slot when due (its writer stalled
+ * while the ring wrapped round) is counted as dropped, never delivered. */
 internal class CanvasLifeRing(private val capacity: Int) {
     fun interface Sink {
         /** [values] is only valid during the call. */
@@ -242,8 +319,16 @@ internal class CanvasLifeRing(private val capacity: Int) {
     init { require(capacity > 0) }
 
     fun write(kind: Int, surface: Int, timeMs: Long, a: Long, b: Long, c: Long, d: Long, e: Long, f: Long,
-              g: Long, h: Long, i: Long, j: Long, k: Long, l: Long) {
-        val number = claimed.getAndIncrement()
+              g: Long, h: Long, i: Long, j: Long, k: Long, l: Long) =
+        put(claim(), kind, surface, timeMs, a, b, c, d, e, f, g, h, i, j, k, l)
+
+    /** A writer's first step: the next record number. Tests call it apart from [put]
+     * to stand for a writer stalled between the two steps. */
+    fun claim(): Long = claimed.getAndIncrement()
+
+    /** A writer's second step: stores record [number] in its slot and publishes it. */
+    fun put(number: Long, kind: Int, surface: Int, timeMs: Long, a: Long, b: Long, c: Long, d: Long, e: Long, f: Long,
+            g: Long, h: Long, i: Long, j: Long, k: Long, l: Long) {
         val slot = (number % capacity).toInt()
         val base = slot * STRIDE
         marks.set(slot, -(number + 1))
@@ -258,12 +343,16 @@ internal class CanvasLifeRing(private val capacity: Int) {
         marks.set(slot, number + 1)
     }
 
-    /** Delivers every complete record not delivered yet, oldest first; returns how many. */
-    @Synchronized fun drain(sink: Sink): Int {
+    /** Delivers the complete records not delivered yet, oldest first and at most
+     * [max] of them; returns how many. Only a record its own writer is still
+     * storing holds back the ones after it. A slot that holds anything else than
+     * the record due (a later record, an older one whose writer stalled while the
+     * ring wrapped round, or nothing yet) counts the record due as dropped. */
+    @Synchronized fun drain(max: Int = Int.MAX_VALUE, sink: Sink): Int {
         val end = claimed.get()
         if (end - next > capacity) { dropped += end - next - capacity; next = end - capacity }
         var delivered = 0
-        while (next < end) {
+        while (next < end && delivered < max) {
             val slot = (next % capacity).toInt()
             val complete = next + 1
             val mark = marks.get(slot)
@@ -277,12 +366,15 @@ internal class CanvasLifeRing(private val capacity: Int) {
                     sink.record(read[0].toInt(), read[1].toInt(), read[2], values)
                     delivered++
                 } else dropped++ // Overwritten while it was read, or mixed with another record.
-            } else if (mark > complete || -mark > complete) dropped++ // A later record took the slot.
-            else break // Still being written: it and the records after it wait for the next drain.
+            } else if (mark == -complete) break // Its writer is storing it: it and the ones after wait for the next drain.
+            else dropped++
             next++
         }
         return delivered
     }
+
+    /** Whether a record has been claimed that was neither delivered nor dropped yet. */
+    @Synchronized fun undelivered(): Boolean = claimed.get() > next
 
     /** Records lost since the last call, then zero. */
     @Synchronized fun takeDropped(): Long = dropped.also { dropped = 0 }

@@ -143,8 +143,9 @@ class EditorSurfaceInstrumentedTest {
      * a persistent one. Screenshots stay in memory and are recycled immediately. */
     private fun assertPresented(scenario: ActivityScenario<MainActivity>, phase: String, deadlineMs: Long = 2_000, observeMs: Long = 800) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val start = SystemClock.uptimeMillis()
+        // Writing out what the canvas recorded so far happens before the deadline's clock starts.
         CanvasLife.line("check_begin phase=$phase")
+        val start = SystemClock.uptimeMillis()
         var samples = 0; var blackSamples = 0; var bandSamples = 0; var firstBlackMs = -1L; var lastBlackMs = -1L
         var firstPresentedMs = -1L; var lastPresented = false; var detail = "canvas-unavailable"
         while (true) {

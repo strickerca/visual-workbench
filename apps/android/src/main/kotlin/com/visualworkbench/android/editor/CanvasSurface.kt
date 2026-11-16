@@ -138,6 +138,9 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     private var generationNumbers = 0
     private var lifeWaitReason: String? = null
     private var lifeUnownedScenes = 0
+    /** Main, lifecycle diagnostics: this canvas keeps the log's writer running, from
+     * its attach until its retirement after detach is confirmed. */
+    private var lifeOpened = false
 
     init {
         contentDescription = "Document canvas. Pen draws; one finger pans; two fingers zoom and rotate."
@@ -187,7 +190,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow(); attached = true
-        if (lifeOn) life(CanvasLifeEvent.Attach)
+        if (lifeOn) { lifeOpen(); life(CanvasLifeEvent.Attach) }
         controller.attachCanvas(::publish,retirementHook,::ensureRenderer,{retirementProgress.current})
         ensureRenderer()
     }
@@ -200,7 +203,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         // successor canvas forever and leaves the recreated canvas black.
         val detachedMs = SystemClock.uptimeMillis()
         retireRenderer(CanvasRetirementReason.WindowDetached).invokeOnCompletion{main.post{if(!attached){
-            if (lifeOn) { val now = SystemClock.uptimeMillis(); life(CanvasLifeEvent.RetirementConfirmed, now - detachedMs, timeMs = now) }
+            if (lifeOn) { val now = SystemClock.uptimeMillis(); life(CanvasLifeEvent.RetirementConfirmed, now - detachedMs, timeMs = now); lifeClose() }
             controller.canvasRendererRetired(retirementHook)
         }}}
         finishRedraws("detached")
@@ -607,6 +610,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                      g: Long = 0, h: Long = 0, i: Long = 0, j: Long = 0, k: Long = 0, l: Long = 0,
                      timeMs: Long = SystemClock.uptimeMillis()) =
         CanvasLife.record(event, surfaceNumber, timeMs, a, b, c, d, e, f, g, h, i, j, k, l)
+
+    /** Main: see [lifeOpened]. A canvas attached again before its retirement was confirmed stays open. */
+    private fun lifeOpen() { if (!lifeOpened) { lifeOpened = true; CanvasLife.opened() } }
+    private fun lifeClose() { if (lifeOpened) { lifeOpened = false; CanvasLife.closed() } }
 
     private fun flag(value: Boolean): Long = if (value) 1 else 0
     private fun lifeRev(scene: CanvasScene?): Long = if (scene == null) 0 else scene.revision

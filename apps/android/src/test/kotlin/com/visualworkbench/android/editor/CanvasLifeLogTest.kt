@@ -2,7 +2,9 @@ package com.visualworkbench.android.editor
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.Collections
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class CanvasLifeRingTest {
     private class Taken(val kind: Int, val surface: Int, val timeMs: Long, val values: List<Long>)
@@ -14,32 +16,32 @@ class CanvasLifeRingTest {
     }
 
     /** A record whose twelve numbers are [first], [first] + 1, ... */
-    private fun CanvasLifeRing.put(kind: Int, surface: Int = 1, timeMs: Long = 0, first: Long = 0) =
+    private fun CanvasLifeRing.add(kind: Int, surface: Int = 1, timeMs: Long = 0, first: Long = 0) =
         write(kind, surface, timeMs, first, first + 1, first + 2, first + 3, first + 4, first + 5, first + 6, first + 7,
             first + 8, first + 9, first + 10, first + 11)
 
     @Test fun recordsComeOutOnceInTheOrderTheyWereWritten() {
         val ring = CanvasLifeRing(8)
         assertEquals(0, ring.drain { _, _, _, _ -> fail("nothing was written") })
-        ring.put(3, surface = 2, timeMs = 100, first = 10); ring.put(4, surface = 5, timeMs = 101, first = -20)
+        ring.add(3, surface = 2, timeMs = 100, first = 10); ring.add(4, surface = 5, timeMs = 101, first = -20)
         val taken = ring.take()
         assertEquals(listOf(3, 4), taken.map { it.kind }); assertEquals(listOf(2, 5), taken.map { it.surface })
         assertEquals(listOf(100L, 101L), taken.map { it.timeMs })
         assertEquals((10L..21L).toList(), taken[0].values); assertEquals((-20L..-9L).toList(), taken[1].values)
         assertTrue("a record is delivered once", ring.take().isEmpty())
-        ring.put(7)
+        ring.add(7)
         assertEquals(listOf(7), ring.take().map { it.kind })
         assertEquals(0L, ring.takeDropped())
     }
 
     @Test fun aFullRingKeepsTheNewestRecordsAndCountsTheRest() {
         val ring = CanvasLifeRing(4)
-        for (kind in 1..10) ring.put(kind, first = kind * 100L)
+        for (kind in 1..10) ring.add(kind, first = kind * 100L)
         val taken = ring.take()
         assertEquals(listOf(7, 8, 9, 10), taken.map { it.kind })
         assertEquals(700L, taken.first().values.first())
         assertEquals(6L, ring.takeDropped()); assertEquals(0L, ring.takeDropped())
-        ring.put(11); ring.put(12)
+        ring.add(11); ring.add(12)
         assertEquals(listOf(11, 12), ring.take().map { it.kind }); assertEquals(0L, ring.takeDropped())
     }
 
@@ -67,14 +69,155 @@ class CanvasLifeRingTest {
             }
         } }
         threads.forEach { it.start() }; start.countDown()
-        while (threads.any { it.isAlive }) ring.drain(sink)
+        while (threads.any { it.isAlive }) ring.drain(sink = sink)
         threads.forEach { it.join() }
-        ring.drain(sink)
+        ring.drain(sink = sink)
         assertEquals(writers.toLong() * each, delivered + ring.takeDropped())
         assertTrue(delivered >= 64)
     }
 
+    /** A writer claims record 0 and stalls while four more records wrap the ring
+     * round; when it resumes it overwrites record 4 in the same slot. Record 4 is
+     * counted as lost and the records after it are not held back. */
+    @Test fun aWriterStalledWhileTheRingWrapsCostsOnlyTheRecordItOverwrites() {
+        val ring = CanvasLifeRing(4)
+        val stalled = ring.claim()
+        for (kind in 1..6) ring.add(kind)
+        ring.put(stalled, 99, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        assertTrue(ring.undelivered())
+        assertEquals(listOf(3, 5, 6), ring.take().map { it.kind })
+        assertEquals("0 to 2 fell out of the ring, 4 was overwritten", 4L, ring.takeDropped())
+        assertFalse(ring.undelivered())
+        ring.add(7)
+        assertEquals(listOf(7), ring.take().map { it.kind }); assertEquals(0L, ring.takeDropped())
+    }
+
+    /** A writer that claimed a record but stored nothing yet holds nothing back: its
+     * record is counted as lost, and storing it afterwards delivers nothing twice. */
+    @Test fun aWriterStalledBeforeItsFirstStoreHoldsNothingBack() {
+        val ring = CanvasLifeRing(8)
+        ring.add(1)
+        val stalled = ring.claim()
+        ring.add(3)
+        assertEquals(listOf(1, 3), ring.take().map { it.kind }); assertEquals(1L, ring.takeDropped())
+        ring.put(stalled, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        assertTrue(ring.take().isEmpty()); assertEquals(0L, ring.takeDropped())
+    }
+
+    @Test fun aDrainTakesAtMostTheRecordsAskedFor() {
+        val ring = CanvasLifeRing(8)
+        for (kind in 1..5) ring.add(kind)
+        val first = mutableListOf<Int>()
+        assertEquals(2, ring.drain(max = 2) { kind, _, _, _ -> first += kind })
+        assertEquals(listOf(1, 2), first); assertTrue(ring.undelivered())
+        assertEquals(listOf(3, 4, 5), ring.take().map { it.kind })
+    }
+
     @Test(expected = IllegalArgumentException::class) fun needsRoomForOneRecord() { CanvasLifeRing(0) }
+}
+
+class CanvasLifeRecorderTest {
+    private class Harness(capacity: Int = 64, linger: Int = 3, lineWaitMs: Long = 50,
+                          emitted: (String) -> Unit = {}) {
+        val lines: MutableList<String> = Collections.synchronizedList(mutableListOf())
+        val started = mutableListOf<Runnable>()
+        val recorder = CanvasLifeRecorder(capacity, { 1_000L }, { emitted(it); lines += it }, { started += it }, { true },
+            linger, lineWaitMs)
+
+        fun record(event: CanvasLifeEvent, a: Long = 0) =
+            recorder.ring.write(event.ordinal, 1, 500, a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    }
+
+    @Test fun theWriterStartsWithTheFirstOpenCanvasAndOnlyOnce() {
+        val harness = Harness()
+        assertFalse(harness.recorder.writerRunning); assertTrue(harness.started.isEmpty())
+        harness.recorder.opened(); harness.recorder.opened()
+        assertEquals(1, harness.started.size); assertTrue(harness.recorder.writerRunning)
+    }
+
+    /** Whatever the switch says now: the writer runs while a canvas is open, and
+     * stops only after the last one left and [linger] rounds passed with nothing. */
+    @Test fun itRunsWhileACanvasIsOpenAndStopsAfterTheLastLeft() {
+        val harness = Harness(linger = 3)
+        val recorder = harness.recorder
+        recorder.opened(); recorder.opened()
+        assertTrue((1..20).all { recorder.writeRound() })
+        recorder.closed()
+        assertTrue((1..20).all { recorder.writeRound() })
+        recorder.closed()
+        assertEquals(listOf(true, true, false), List(3) { recorder.writeRound() })
+        assertFalse(recorder.writerRunning)
+        recorder.opened()
+        assertEquals("the next canvas starts it again", 2, harness.started.size)
+    }
+
+    @Test fun theLastRecordsOfACanvasThatLeftAreWrittenBeforeTheWriterStops() {
+        val harness = Harness(linger = 2)
+        val recorder = harness.recorder
+        recorder.opened(); harness.record(CanvasLifeEvent.Attach)
+        recorder.closed()
+        harness.record(CanvasLifeEvent.RetirementConfirmed, 7)
+        assertTrue(recorder.writeRound())
+        assertTrue(recorder.writeRound())
+        harness.record(CanvasLifeEvent.ReleaseSettled, 3)
+        assertTrue("a record arriving while it lingers starts the quiet rounds again", recorder.writeRound())
+        assertEquals(listOf(true, false), List(2) { recorder.writeRound() })
+        assertEquals(listOf("t=500 surface=1 attach", "t=500 surface=1 retirement_confirmed after_detach_ms=7",
+            "t=500 surface=1 release_settled gen=3 after_ms=0 reader_closed=false releases=0"), harness.lines)
+    }
+
+    @Test fun lostRecordsAreReportedInOneLineAfterTheOnesWritten() {
+        val harness = Harness(capacity = 4)
+        for (gen in 1L..6L) harness.record(CanvasLifeEvent.KeptRestored, gen)
+        harness.recorder.writeRound()
+        assertEquals((3..6).map { "t=500 surface=1 kept_restored gen=$it" } + "t=1000 records_dropped count=2", harness.lines)
+        harness.recorder.writeRound()
+        assertEquals("nothing is reported twice", 5, harness.lines.size)
+    }
+
+    @Test fun aTestLineFollowsTheRecordsWrittenBeforeIt() {
+        val harness = Harness()
+        harness.record(CanvasLifeEvent.Attach); harness.record(CanvasLifeEvent.SurfaceDestroyed)
+        harness.recorder.line("check_begin phase=x")
+        assertEquals(listOf("t=500 surface=1 attach", "t=500 surface=1 surface_destroyed", "t=1000 check_begin phase=x"),
+            harness.lines)
+    }
+
+    /** The writer is stuck in the middle of writing a batch: a test line waits for it
+     * only [lineWaitMs], then is written anyway; the record follows once the writer goes on. */
+    @Test fun aTestLineWaitsForTheWriterOnlyBriefly() {
+        val inWriter = CountDownLatch(1); val goOn = CountDownLatch(1)
+        lateinit var writer: Thread
+        val harness = Harness(lineWaitMs = 50, emitted = {
+            if (Thread.currentThread() === writer) { inWriter.countDown(); goOn.await() }
+        })
+        harness.record(CanvasLifeEvent.Attach)
+        writer = Thread { harness.recorder.writeRound() }
+        writer.start()
+        assertTrue(inWriter.await(10, TimeUnit.SECONDS))
+        val before = System.nanoTime()
+        harness.recorder.line("check_begin phase=x")
+        val waitedMs = (System.nanoTime() - before) / 1_000_000
+        assertTrue("waited $waitedMs ms", waitedMs < 5_000)
+        assertEquals(listOf("t=1000 check_begin phase=x"), harness.lines.toList())
+        goOn.countDown(); writer.join(10_000)
+        assertEquals(listOf("t=1000 check_begin phase=x", "t=500 surface=1 attach"), harness.lines.toList())
+    }
+
+    /** With a real thread: a canvas that opens and closes at once still has every
+     * record written, and the thread ends after it left. */
+    @Test fun theWriterThreadWritesEverythingAndEndsAfterTheLastCanvasLeft() {
+        val lines: MutableList<String> = Collections.synchronizedList(mutableListOf())
+        val recorder = CanvasLifeRecorder(64, { 0L }, { lines += it }, { Thread(it).apply { isDaemon = true }.start() },
+            { Thread.sleep(1); true }, 3, 50)
+        val writers = (1..2).map { Thread { repeat(20) { recorder.ring.write(CanvasLifeEvent.Attach.ordinal, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) } } }
+        writers.forEach { it.start() }; writers.forEach { it.join() }
+        recorder.opened(); recorder.closed()
+        val deadline = System.nanoTime() + 10_000_000_000L
+        while (recorder.writerRunning && System.nanoTime() < deadline) Thread.sleep(1)
+        assertFalse(recorder.writerRunning)
+        assertEquals(List(40) { "t=0 surface=1 attach" }, lines.toList())
+    }
 }
 
 class CanvasLifeEventTest {
