@@ -1875,14 +1875,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val binding = WorkflowBinding(revision.projectId, snapshot.documentId, revision.hostSeq, revision.stateHash)
         val token = epoch
         val ticket = refreshAdmission.capture()
-        // The receipt belongs to the revision it was read for. An ordered
-        // change observed meanwhile (the core replays Opened to each new
-        // subscriber) leaves it valid while that revision is shown; the
-        // refresh such a change queues reads it again. Dropping it here left
-        // the open path to decode without it.
+        // Kept while its revision is shown, even past an ordered change
+        // (keepsFormatReceipt); dropping it left the open path to decode
+        // without it. Readers that depend on the revision (approvedAssumption,
+        // the background and giant loads) match its binding; the others read
+        // fields fixed for the document (rawPreview, sourceAssetId).
         fun current(): Boolean = !disposing && project === owner && epoch == token &&
-            refreshAdmission.judge(ticket) != RefreshAdmission.Verdict.Dropped &&
-            document?.let { it.documentId == binding.documentId && originalFormatRevisionMatches(it.render.revision, binding) } == true
+            keepsFormatReceipt(refreshAdmission, ticket, document, binding)
         if (!current()) return
         originalFormatNotice = null; originalFormat = null
         try {
@@ -1896,25 +1895,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (current()) originalFormatNotice = "Original-image page information could not be checked. Reopen the project to retry."
         }
     }
-    /** The current page's plain background request; null while the editor
-     * shows anything else (see [PlainBackgroundLoads]). */
-    private fun plainBackgroundRequest(): PlainBackgroundRequest? {
-        val doc = document ?: return null
-        if (disposing || project == null || streamDraftOnly || doc.hasToneAdjustments || giantDisplayRequired(doc) ||
-            documents.state.value.descriptor != null) return null
-        val revision = doc.render.revision
-        return PlainBackgroundRequest(BackgroundPage(epoch, refreshAdmission.capture().epoch, doc.documentId, doc.page),
-            WorkflowBinding(revision.projectId, doc.documentId, revision.hostSeq, revision.stateHash), approvedAssumption(doc))
-    }
-    /** Each further pass needs a decode that a newer revision or color approval
-     * of the same plain page overtook; it never polls. */
-    private suspend fun loadBackground() { do { val again = loadBackgroundOnce() } while (again) }
-    /** True: decode this plain page again now ([PlainBackgroundLoads.again]). */
-    private suspend fun loadBackgroundOnce(): Boolean {
-        val current = project ?: return false
-        val doc = document ?: return false
+    /** A plain background request for [doc]; null while the editor shows
+     * anything else (see [PlainBackgroundLoads.request]). */
+    private fun plainBackgroundRequest(doc: DocumentSnapshot? = document, attachment: Long = epoch,
+        admission: Long = refreshAdmission.capture().epoch): PlainBackgroundRequest? =
+        PlainBackgroundLoads.request(doc, !disposing && project != null, documents.state.value.descriptor != null,
+            streamDraftOnly, attachment, admission, colorAssumedSourceAsset.takeIf { colorAssumed })
+    // AfterRefresh follows a revision adopted during the decode, which only a
+    // refresh holding refreshMutex can do; so this load never holds it then.
+    private suspend fun loadBackground() = plainLoads.load({ loadBackgroundOnce() }) { refreshMutex.withLock {} }
+    private suspend fun loadBackgroundOnce(): PlainPass {
+        val current = project ?: return PlainPass.Done
+        val doc = document ?: return PlainPass.Done
         if(streamDraftOnly){
-            background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return false
+            background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return PlainPass.Done
         }
         val token = epoch
         val ticket = refreshAdmission.capture()
@@ -1923,8 +1917,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         fun stillCurrent(): Boolean = !disposing && project === current && token == epoch && refreshAdmission.accepts(ticket) &&
             document?.let { it.documentId == doc.documentId && it.page == doc.page &&
                 WorkflowBinding(it.render.revision.projectId,it.documentId,it.render.revision.hostSeq,it.render.revision.stateHash) == binding } == true
-        if(documents.state.value.descriptor!=null){detachGiant();background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return false}
-        if(giantDisplayRequired(doc)){loadGiantBackground(current,doc);return false}
+        if(documents.state.value.descriptor!=null){detachGiant();background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return PlainPass.Done}
+        if(giantDisplayRequired(doc)){loadGiantBackground(current,doc);return PlainPass.Done}
         if(giantMode||giantOwner.retaining)detachGiant()
         val composed = doc.hasToneAdjustments
         val format = originalFormat?.takeIf { it.binding == binding }
@@ -1935,21 +1929,21 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 needsColorConsent=false
                 blockingMessage=if(format?.rawPreview==true) "Saved tone composition is unavailable for an embedded RAW preview. The sensor original remains unchanged."
                     else "The saved tone composition needs verified source information. Reopen the project to retry."
-                publish();return false
+                publish();return PlainPass.Done
             }
             if(format.untagged && !approvedAssumption(doc)){
                 needsColorConsent=true
                 blockingMessage="Tone display requires explicit sRGB consent for this untagged original. The original remains unchanged."
-                publish();return false
+                publish();return PlainPass.Done
             }
         }
         val assumed = approvedAssumption(doc)
         // A plain page: adopted while its read revision is shown, decoded again
-        // when a newer one or a color approval arrived. Composed keeps its fence.
-        val plain = if(composed) null else PlainBackgroundRequest(BackgroundPage(token,ticket.epoch,doc.documentId,doc.page),binding,assumed)
+        // when a newer one or a consent arrived. Composed keeps its fence.
+        val plain = if(composed) null else plainBackgroundRequest(doc,token,ticket.epoch)
         fun adoptable(): Boolean = if(plain==null) stillCurrent() else project === current && plainLoads.adopts(plain,plainBackgroundRequest())
-        fun again(): Boolean = plain!=null && project === current && plainLoads.again(plain,plainBackgroundRequest())
-        if(plain!=null && !plainLoads.begin(plain.page))return false // The decode in flight checks this page again when it ends.
+        fun next(): PlainPass = if(plain!=null && project === current) plainLoads.next(plain,plainBackgroundRequest()) else PlainPass.Done
+        if(plain!=null && !plainLoads.begin(plain.page))return PlainPass.Done // The decode in flight checks this page again when it ends.
         try {
             val image = if(composed){
                 val value=imageFrameWorkflows(current).editingBackground(binding,assumed)
@@ -1961,7 +1955,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 BackgroundImage(value.width,value.height,value.rgba,value.sourceAssetId,value.sourceBitDepth,value.iccProfile)
             }else current.background(doc.documentId, assumeUntaggedSrgb = assumed)
             currentCoroutineContext().ensureActive()
-            if(!adoptable())return again()
+            if(!adoptable())return next()
             val bitmap = withContext(Dispatchers.Default) {
                 require(image.width in 1u..50_000u && image.height in 1u..50_000u)
                 val width = image.width.toInt(); val height = image.height.toInt()
@@ -1984,7 +1978,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             var adopted=false
             try {
                 currentCoroutineContext().ensureActive()
-                if(!adoptable())return again()
+                if(!adoptable())return next()
                 background = bitmap
                 composedBackground = if(composed) ComposedBackgroundOwner(current,token,doc.documentId,doc.page,binding) else null
                 blockingMessage = null; needsColorConsent = false
@@ -1993,8 +1987,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             } finally { if(!adopted) bitmap.recycle() }
         } catch (cancel: CancellationException) { throw cancel }
         catch (error: CoreFailure) {
-            if(again())return true
-            if(!adoptable())return false
+            next().let { if(it!=PlainPass.Done)return it }
+            if(!adoptable())return PlainPass.Done
             needsColorConsent = error.kind == CoreFailureKind.Raster && !approvedAssumption(doc) && format?.untagged==true
             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
                 "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
@@ -2005,13 +1999,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             else "The image could not be displayed safely. Its original remains saved; no smaller replacement was created."
         } catch(error: Exception){
             currentCoroutineContext().ensureActive()
-            if(again())return true
-            if(!adoptable())return false
+            next().let { if(it!=PlainPass.Done)return it }
+            if(!adoptable())return PlainPass.Done
             blockingMessage=if(composed) "The saved tone composition could not be displayed. Retry or reopen before editing; saved data is intact."
                 else "The image could not be displayed safely. Its original remains saved."
         } finally { if(plain!=null) plainLoads.end(plain.page) }
         publish()
-        return false
+        return PlainPass.Done
     }
     fun assumeSrgb() {
         if (busy || !needsColorConsent) return
