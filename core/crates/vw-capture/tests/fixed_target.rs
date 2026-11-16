@@ -1,3 +1,5 @@
+// Synthetic integration fixtures deliberately assert setup and codec results.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use vw_capture::*;
 fn target() -> WindowTarget {
     WindowTarget {
