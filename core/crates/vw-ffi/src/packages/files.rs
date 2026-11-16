@@ -163,7 +163,7 @@ pub(super) fn lock(root: &Path) -> PackageResult<RootLock> {
     if f.metadata()?.len() != 0 {
         return Err(PackageError::Integrity);
     }
-    fs2::FileExt::try_lock_exclusive(&f).map_err(|_| PackageError::Busy)?;
+    vw_store::os_fs::try_lock_exclusive(&f).map_err(|_| PackageError::Busy)?;
     Ok(RootLock { _file: f })
 }
 

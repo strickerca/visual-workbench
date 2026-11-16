@@ -180,7 +180,7 @@ pub struct ProjectStore {
 struct ProjectLock(File);
 impl Drop for ProjectLock {
     fn drop(&mut self) {
-        let _ = fs2::FileExt::unlock(&self.0);
+        let _ = crate::os_fs::unlock(&self.0);
     }
 }
 
@@ -1327,9 +1327,9 @@ fn lock_project(root: &Path) -> Result<ProjectLock, StoreError> {
     blobs::no_follow(&mut options);
     let file = options.open(path)?;
     blobs::check_regular_metadata(&file.metadata()?)?;
-    fs2::FileExt::try_lock_exclusive(&file).map_err(|e| {
+    crate::os_fs::try_lock_exclusive(&file).map_err(|e| {
         if e.kind() == std::io::ErrorKind::WouldBlock
-            || e.raw_os_error() == fs2::lock_contended_error().raw_os_error()
+            || e.raw_os_error() == crate::os_fs::lock_contended_error().raw_os_error()
         {
             StoreError::Busy
         } else {

@@ -7,6 +7,7 @@ mod conflict_review;
 mod database;
 mod local_views;
 mod migrations;
+pub mod os_fs;
 mod projections;
 mod verification_review;
 pub use archive::*;

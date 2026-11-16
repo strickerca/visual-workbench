@@ -76,7 +76,7 @@ impl Reservation {
                 return Err(Error::Invalid("budget reparse point"));
             }
         }
-        fs2::FileExt::try_lock_exclusive(&file)?;
+        crate::file_lock::try_lock_exclusive(&file)?;
         if file.metadata()?.len() > 131_072 {
             return Err(Error::Limit("budget ledger bytes"));
         }

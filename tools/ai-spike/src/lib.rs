@@ -2,6 +2,7 @@
 
 pub mod budget;
 pub mod config;
+mod file_lock;
 pub mod geometry;
 pub mod pixels;
 pub mod platform;
