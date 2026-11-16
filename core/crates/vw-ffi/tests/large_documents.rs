@@ -14,7 +14,13 @@
 //! workflow is refused only when what it really needs passes the budget.
 //!
 //! Measurements are process-wide: the tests of this binary take one lock, so
-//! nothing else allocates while a single call is measured.
+//! nothing else allocates while a single call is measured, and every session
+//! holds its checkpoint upkeep, which otherwise runs between calls.
+//!
+//! A build of vw-ops with `cross-check` (the workspace's test build: vw-store
+//! and vw-sim turn it on for their own tests) hashes the whole project after
+//! every edit it decides. Commits are charged that there too, so there the
+//! largest pages may refuse an edit, but only for what those checks add.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod support;
 use std::{
@@ -108,6 +114,7 @@ const BUDGET: u64 = 256 * MIB;
 /// panel's work constant covers (`document_controls.rs`).
 const RESERVE: u64 = 4 * MIB;
 const INSTRUCTION_WORK: u64 = 48 * MIB;
+const CONTROL_WORK: u64 = 32 * MIB;
 const PANEL_ROW: u64 = 1024;
 /// The device of the phone that mirrors the page.
 const PHONE: [u8; 16] = [9; 16];
@@ -175,14 +182,18 @@ async fn draw(project: &Arc<ProjectSession>, kind: u8, numbers: Range<u32>, poin
         gesture.shutdown().await.unwrap();
     }
 }
+/// Open a project, its checkpoint upkeep held.
 async fn open(path: &Path) -> Arc<ProjectSession> {
-    open_project(path.to_string_lossy().into(), cancel())
+    let project = open_project(path.to_string_lossy().into(), cancel())
         .await
-        .unwrap()
+        .unwrap();
+    project.hold_checkpoint_upkeep(true);
+    project
 }
 /// A closed host project of `strokes` pen strokes.
 async fn draw_page(path: &Path, strokes: u32, points: usize) {
     let project = create_image_project(create(path), cancel()).await.unwrap();
+    project.hold_checkpoint_upkeep(true);
     draw(&project, 0x60, 0..strokes, points).await;
     project.close().await.unwrap();
 }
@@ -275,6 +286,28 @@ fn report(what: &str, used: u64, charge: u64) {
         );
     }
 }
+/// What every commit is charged for the checks of a cross-checking build.
+async fn verification(project: &Arc<ProjectSession>) -> u64 {
+    project.cross_check_charge().await.unwrap()
+}
+/// A workflow the apps' budget admits. A cross-checking build may refuse it,
+/// but only when its charge without those checks fits the budget.
+fn admitted<T>(result: WorkflowResult<T>, verification: u64, what: &str) -> Option<T> {
+    match result {
+        Ok(value) => Some(value),
+        Err(WorkflowError::Memory { estimated, .. })
+            if verification > 0 && estimated.saturating_sub(verification) <= BUDGET =>
+        {
+            report(
+                &format!("{what} refused for the cross-checks"),
+                0,
+                estimated,
+            );
+            None
+        }
+        Err(error) => panic!("{what}: {error:?}"),
+    }
+}
 /// Commit `plan`, measured against what its commit admits at that moment.
 /// Returns that charge.
 async fn commit(plan: Arc<WorkflowPlan>, what: &str) -> u64 {
@@ -332,16 +365,17 @@ fn erase(info: &ProjectInfo, page: Page, round: u32) -> VectorEraseOptions {
 
 /// The layers panel and a layer rename. The panel lists at most 4,096
 /// objects, whatever their size. Returns the rename's commit charge.
-async fn layers_panel(project: &Arc<ProjectSession>, page: Page, round: u32) -> Option<u64> {
+async fn layers_panel(project: &Arc<ProjectSession>, page: Page, round: u32) {
     let (snapshot, used) = peak(project.document_controls_snapshot(id(2), BUDGET, cancel())).await;
     if page.objects > 4_096 {
         assert!(matches!(snapshot, Err(WorkflowError::Limit)));
-        return None;
+        return;
     }
     snapshot.unwrap();
     let rows = RESERVE + page.objects * PANEL_ROW;
     assert!(used <= rows, "layers panel used {used} > {rows}");
     let info = project.info().await.unwrap();
+    let verification = verification(project).await;
     let (plan, used) = peak(project.clone().prepare_document_control(
         binding(&info),
         metadata(&info, 0x75, round),
@@ -350,7 +384,9 @@ async fn layers_panel(project: &Arc<ProjectSession>, page: Page, round: u32) -> 
         cancel(),
     ))
     .await;
-    let plan = plan.unwrap();
+    let Some(plan) = admitted(plan, verification, "planning a rename") else {
+        return;
+    };
     let charge = plan.commit_charge().await.unwrap();
     // Planning reads the page in place; its rows are the panel's work.
     assert!(
@@ -358,34 +394,30 @@ async fn layers_panel(project: &Arc<ProjectSession>, page: Page, round: u32) -> 
         "planning a rename used {used} > {}",
         charge + page.objects * PANEL_ROW
     );
-    Some(commit(plan, "layer rename").await)
+    commit(plan, "layer rename").await;
 }
 
 /// The workflows that read the page in place or commit in place: the layers
-/// panel, selections, the eraser and a file export. Returns the rename's
-/// commit charge.
-async fn borrowing_workflows(
-    project: &Arc<ProjectSession>,
-    page: Page,
-    round: u32,
-    dir: &Path,
-) -> Option<u64> {
-    let rename = layers_panel(project, page, round).await;
+/// panel, selections, the eraser and a file export.
+async fn borrowing_workflows(project: &Arc<ProjectSession>, page: Page, round: u32, dir: &Path) {
+    layers_panel(project, page, round).await;
     let (selection, used) = peak(project.selection_document(id(2), cancel())).await;
     selection.unwrap();
     assert!(used <= RESERVE, "selection document used {used}");
     // The eraser reports the charge its commit was admitted with.
     let info = project.info().await.unwrap();
+    let verification = verification(project).await;
     let (erased, used) =
         peak(project.erase_vector_strokes(erase(&info, page, round), cancel())).await;
-    let receipt = erased.unwrap_or_else(|error| panic!("round {round}: {error:?}"));
-    assert!(!receipt.changed.is_empty());
-    report("eraser", used, receipt.estimated_peak_bytes);
-    assert!(
-        used <= receipt.estimated_peak_bytes,
-        "eraser used {used} > charge {}",
-        receipt.estimated_peak_bytes
-    );
+    if let Some(receipt) = admitted(erased, verification, "eraser") {
+        assert!(!receipt.changed.is_empty());
+        report("eraser", used, receipt.estimated_peak_bytes);
+        assert!(
+            used <= receipt.estimated_peak_bytes,
+            "eraser used {used} > charge {}",
+            receipt.estimated_peak_bytes
+        );
+    }
     // Exporting the marked page to a file, within what its preflight admits.
     let mut export = options();
     export.marked = true;
@@ -409,14 +441,13 @@ async fn borrowing_workflows(
         "file export used {used} > {}",
         RESERVE + preflight.estimated_peak_bytes
     );
-    rename
 }
 
 /// Instructions hash the whole visible page once. A read or a plan stays
 /// within its charge without the instruction work beside it: the charge of
 /// the page alone covers the hash.
-async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, admitted: bool) {
-    if !admitted {
+async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, fits: bool) {
+    if !fits {
         assert!(matches!(
             project.instruction_document(id(2), BUDGET, cancel()).await,
             Err(WorkflowError::Memory { .. })
@@ -447,14 +478,18 @@ async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, admitt
         )
     };
     let charge = charged(prepare(INSTRUCTION_WORK + 1).await);
+    let verification = verification(project).await;
     let (plan, used) = peak(prepare(BUDGET)).await;
-    let plan = plan.unwrap();
-    assert!(
-        used <= charge - INSTRUCTION_WORK,
-        "planning a marker used {used} > charge {}",
-        charge - INSTRUCTION_WORK
-    );
-    commit(plan, "placing a marker").await;
+    if let Some(plan) = admitted(plan, verification, "planning a marker") {
+        // Planning hashes the page, then decides the marker in place, which
+        // is what its commit is charged.
+        let planning = (charge - INSTRUCTION_WORK).max(plan.commit_charge().await.unwrap());
+        assert!(
+            used <= planning,
+            "planning a marker used {used} > charge {planning}"
+        );
+        commit(plan, "placing a marker").await;
+    }
     let document = project
         .instruction_document(id(2), BUDGET, cancel())
         .await
@@ -496,11 +531,13 @@ async fn tone_preview(project: &Arc<ProjectSession>) {
         width: 17,
         height: 13,
     };
+    let verification = verification(project).await;
     let (preview, used) =
         peak(project.preview_tone_control(view.binding, Some(set), region, true, BUDGET, cancel()))
             .await;
-    preview.unwrap();
-    assert!(used <= BUDGET, "tone preview used {used}");
+    if admitted(preview, verification, "tone preview").is_some() {
+        assert!(used <= BUDGET, "tone preview used {used}");
+    }
 }
 
 /// The page on its host and then on the phone's mirror of it. On the mirror
@@ -580,7 +617,8 @@ async fn offline_phone(page: Page, pending: u32) {
     let replayed = replay(&mirror);
     let project = open(&mirror).await;
     let info = project.info().await.unwrap();
-    let plan = project
+    let verification = verification(&project).await;
+    let planned = project
         .clone()
         .prepare_document_control(
             binding(&info),
@@ -589,10 +627,24 @@ async fn offline_phone(page: Page, pending: u32) {
             BUDGET,
             cancel(),
         )
-        .await
-        .unwrap();
-    let charge = plan.commit_charge().await.unwrap();
-    plan.dispose();
+        .await;
+    // The commit charge, or, where a cross-checking build refuses the plan,
+    // the same charge read from that refusal beside the panel's work.
+    let charge = match planned {
+        Ok(plan) => {
+            let charge = plan.commit_charge().await.unwrap();
+            plan.dispose();
+            charge
+        }
+        Err(WorkflowError::Memory { estimated, .. }) => {
+            assert!(
+                verification > 0 && estimated - verification <= BUDGET,
+                "a rename was refused at {estimated}"
+            );
+            estimated - CONTROL_WORK
+        }
+        Err(error) => panic!("planning a rename: {error:?}"),
+    };
     report(
         &format!("replay of {pending} queued"),
         replayed,
@@ -762,8 +814,7 @@ async fn a_large_icc_profile_is_charged_where_it_is_hashed_or_rewritten() {
     for (round, path) in [(1, &host), (2, &mirror)] {
         let project = open(path).await;
         instruction_workflows(&project, round, true).await;
-        let rename = layers_panel(&project, page, round).await;
-        assert!(rename.is_some());
+        layers_panel(&project, page, round).await;
         let document = project.selection_document(id(2), cancel()).await.unwrap();
         let mut coverage = vec![0u8; 64 * 64];
         coverage[..64].fill(255);
@@ -787,20 +838,28 @@ async fn a_large_icc_profile_is_charged_where_it_is_hashed_or_rewritten() {
         };
         // Each stage refuses a budget short of its charge with that charge;
         // the import admitted with the largest of them stays within it.
+        let verification = verification(&project).await;
         let mut budget = RESERVE + 1;
         let used = loop {
             let (result, used) = peak(project.apply_selection(edit(budget), cancel())).await;
             match result {
-                Ok(_) => break used,
+                Ok(_) => break Some(used),
                 Err(SelectionError::Memory { estimated, .. }) if estimated > budget => {
-                    assert!(
-                        estimated <= BUDGET,
-                        "a selection import charged {estimated}"
-                    );
+                    if estimated > BUDGET {
+                        assert!(
+                            verification > 0 && estimated - verification <= BUDGET,
+                            "a selection import charged {estimated}"
+                        );
+                        break None;
+                    }
                     budget = estimated;
                 }
                 Err(other) => panic!("expected a charge, got {other:?}"),
             }
+        };
+        let Some(used) = used else {
+            project.close().await.unwrap();
+            continue;
         };
         report("selection import", used, budget);
         assert!(

@@ -118,6 +118,8 @@ const QUIET_LOOKS: u32 = 2;
 /// merely due.
 struct CheckpointUpkeep {
     drawing: Arc<AtomicUsize>,
+    /// Set by `ProjectSession::hold_checkpoint_upkeep`: no look at all.
+    held: Arc<AtomicBool>,
     /// The revision at the last look, and how many looks it has stayed.
     revision: Option<u64>,
     quiet: u32,
@@ -126,6 +128,9 @@ struct CheckpointUpkeep {
 }
 impl CheckpointUpkeep {
     fn look(&mut self, state: &mut ProjectState) {
+        if self.held.load(Ordering::Acquire) {
+            return;
+        }
         let Some(store) = state.store.as_mut() else {
             return;
         };
@@ -280,6 +285,16 @@ pub struct ProjectSession {
     events: Arc<EventHub>,
     pub(crate) network_active: Arc<AtomicBool>,
     pub(crate) network_changed: Arc<tokio::sync::Notify>,
+    upkeep_held: Arc<AtomicBool>,
+}
+impl ProjectSession {
+    /// Hold, or let go of, the recovery checkpoint the project writes by
+    /// itself between calls once it has been left alone, so that a test
+    /// measuring a single call measures only that call. Not in the bindings.
+    #[doc(hidden)]
+    pub fn hold_checkpoint_upkeep(&self, held: bool) {
+        self.upkeep_held.store(held, Ordering::Release);
+    }
 }
 impl Drop for ProjectSession {
     fn drop(&mut self) {
@@ -374,8 +389,10 @@ impl ProjectSession {
         let events = EventHub::new(initial);
         let changed = Arc::new(tokio::sync::Notify::new());
         let active_gestures = Arc::new(AtomicUsize::new(0));
+        let upkeep_held = Arc::new(AtomicBool::new(false));
         let mut upkeep = CheckpointUpkeep {
             drawing: active_gestures.clone(),
+            held: upkeep_held.clone(),
             revision: None,
             quiet: 0,
             failed: None,
@@ -408,6 +425,7 @@ impl ProjectSession {
             events,
             network_active: Arc::new(AtomicBool::new(false)),
             network_changed: changed,
+            upkeep_held,
         }))
     }
     pub(crate) fn check_open(&self) -> Result<()> {
@@ -830,6 +848,7 @@ mod tests {
             .call(move |state| {
                 let mut upkeep = CheckpointUpkeep {
                     drawing,
+                    held: Arc::new(AtomicBool::new(false)),
                     revision: None,
                     quiet: 0,
                     failed: None,
@@ -843,6 +862,10 @@ mod tests {
                     seen.push((upkeep.revision, upkeep.quiet, upkeep.failed));
                 }
                 upkeep.drawing.store(0, Ordering::Release);
+                // Held, a look does nothing at all, not even count.
+                upkeep.held.store(true, Ordering::Release);
+                upkeep.look(state);
+                seen.push((upkeep.revision, upkeep.quiet, upkeep.failed));
                 Ok(seen)
             })
             .await
@@ -856,6 +879,7 @@ mod tests {
                 (Some(0), 0, None),
                 (Some(0), 1, None),
                 (Some(0), 2, None),
+                (Some(0), 3, None),
                 (Some(0), 3, None)
             ]
         );

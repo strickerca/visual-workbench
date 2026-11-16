@@ -31,6 +31,11 @@ pub struct PendingTransaction {
     pub blocked_reason: Option<String>,
 }
 
+/// Whether this build checks every incremental state hash against a hash of
+/// the whole project (the `cross-check` feature, which the workspace's test
+/// build turns on): every decided edit then also hashes the whole project.
+pub const CROSS_CHECKED: bool = cfg!(feature = "cross-check");
+
 /// A replica's undo previews as `Replica::undo_previews` lends them: those
 /// of its accepted edits, then those it holds for its queued edits. Their
 /// serialized shape is the shape of the `serde_json::Value`s they hold.
