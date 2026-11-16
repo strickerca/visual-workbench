@@ -28,7 +28,12 @@ async fn stroke_on_top(project: &Arc<ProjectSession>, number: u32) -> ProjectInf
     options.created_at_ms = TIME + 10 + i64::from(number);
     let gesture = project.clone().begin_stroke(options).await.unwrap();
     gesture.append_samples(batch()).await.unwrap();
-    gesture.commit(cancel()).await.unwrap()
+    let info = gesture.commit(cancel()).await.unwrap();
+    // A stroke counts as being drawn until its worker has ended, which shutdown
+    // waits for; a gesture merely dropped ends it later, and settling would be
+    // refused in between.
+    gesture.shutdown().await.unwrap();
+    info
 }
 
 async fn order_keys(project: &Arc<ProjectSession>) -> Vec<(String, String)> {
