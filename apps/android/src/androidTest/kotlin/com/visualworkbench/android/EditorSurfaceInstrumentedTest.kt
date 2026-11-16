@@ -52,7 +52,11 @@ class EditorSurfaceInstrumentedTest {
         scenario.onActivity { activity ->
             val editor = activity.editor
             val closeDetail = editor.retirementTimeoutSuffix
-            detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} $closeDetail"
+            // Which part of a canvas wait failed: the scene, its background or the surface.
+            detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} " +
+                "scene=${editor.scene != null} background=${editor.scene?.background != null} " +
+                "surface_valid=${canvas(activity.window.decorView)?.holder?.surface?.isValid == true} " +
+                "instructions_busy=${editor.instructionEditor.state.value.busy} semantics_busy=${editor.semanticEditor.state.value.busy} $closeDetail"
         }
         fail("Timed out in $phase: $detail")
     }
