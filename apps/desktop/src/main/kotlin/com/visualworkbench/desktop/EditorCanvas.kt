@@ -76,10 +76,18 @@ internal fun overlayItems(state:EditorState):List<RenderItem>{
 private fun color(rgba:UInt):Color = Color(((rgba and 255u) shl 24 or (rgba shr 8)).toInt())
 internal fun Transform.matrix():Matrix = Matrix(floatArrayOf(a.toFloat(),b.toFloat(),0f,0f,c.toFloat(),d.toFloat(),0f,0f,0f,0f,1f,0f,e.toFloat(),f.toFloat(),0f,1f))
 internal fun Path.transformed(value:Transform):Path = Path().also{it.addPath(this);it.transform(value.matrix())}
-private fun Contours.path(checkCancelled:()->Unit):Path = Path().apply {
-    fillType=PathFillType.NonZero
-    var start=0
-    for(end in ends){val stop=end.toInt();if(stop>start){moveTo(x[start]/256f,y[start]/256f);for(i in start+1 until stop){if(i%4096==0)checkCancelled();lineTo(x[i]/256f,y[i]/256f)};close()};start=stop}
+/** Reads the contours in whichever form they are held, without unpacking them. */
+private fun Contours.path(checkCancelled:()->Unit):Path = Path().also{path->
+    path.fillType=PathFillType.NonZero
+    visit(object:ContourVisitor{
+        var index=0;var start=0
+        override fun begin(vertexCount:Int){start=index}
+        override fun vertex(x:Long,y:Long){
+            if(index==start)path.moveTo(x/256f,y/256f) else {if(index%4096==0)checkCancelled();path.lineTo(x/256f,y/256f)}
+            index++
+        }
+        override fun end(){if(index>start)path.close()}
+    })
 }
 private fun List<Outline>.path(checkCancelled:()->Unit):Path = Path().apply {
     fillType=PathFillType.NonZero

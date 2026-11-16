@@ -61,6 +61,29 @@ class DesktopRenderTest {
         assertEquals(128f/255f,pixels[15,15].alpha,1f/255f)
         assertEquals(pixels[15,15].alpha,pixels[30,30].alpha,0f)
     }
+
+    @Test fun packedContoursPaintAndHitExactlyAsTheirArrays(){
+        val vertices=listOf(10 to 10,40 to 10,40 to 40,10 to 40,20 to 20,50 to 20,50 to 50,20 to 50,60 to 60,90 to 61,70 to 80)
+        val x=vertices.map{it.first*256L+3}.toLongArray();val y=vertices.map{it.second*256L-5}.toLongArray();val ends=uintArrayOf(4u,8u,11u)
+        val arrays=item(Shape.Stroke("highlighter"),ObjectStyle(0xff000080u,10.0)).copy(contours=Contours(x,y,ends))
+        val packed=arrays.copy(contours=Contours.packed(pack(x,y,ends)))
+        assertTrue(packed.contours.isPacked)
+        val expected=render{drawGeometry(arrays,prepareGeometry(arrays),null,1.0)}.toPixelMap()
+        val actual=render{drawGeometry(packed,prepareGeometry(packed),null,1.0)}.toPixelMap()
+        for(py in 0 until 96)for(px in 0 until 128)assertEquals("pixel $px,$py",expected[px,py],actual[px,py])
+        assertTrue(desktopPaintedArea(arrays,1.0).equals(desktopPaintedArea(packed,1.0)))
+    }
+}
+
+/** The packed layout the core sends, written from its description. */
+private fun pack(x:LongArray,y:LongArray,ends:UIntArray):ByteArray{
+    val out=java.io.ByteArrayOutputStream()
+    fun put(value:Long){var v=value;while(v.toULong()>=0x80uL){out.write(v.toInt() and 0x7f or 0x80);v=v ushr 7};out.write(v.toInt())}
+    fun signed(value:Long)=put((value shl 1) xor (value shr 63))
+    put(1);put(ends.size.toLong());put(x.size.toLong())
+    var first=0;var px=0L;var py=0L
+    for(end in ends){put(end.toLong()-first);for(i in first until end.toInt()){signed(x[i]-px);signed(y[i]-py);px=x[i];py=y[i]};first=end.toInt()}
+    return out.toByteArray()
 }
 
 private fun item(shape:Shape,style:ObjectStyle,transform:Transform=Transform())=RenderItem("object","layer",1.0,"normal",Rect(0.0,0.0,128.0,96.0),Contours(longArrayOf(),longArrayOf(),uintArrayOf()),transform,style,shape,false)

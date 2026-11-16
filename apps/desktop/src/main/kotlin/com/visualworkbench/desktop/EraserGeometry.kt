@@ -76,15 +76,18 @@ internal fun desktopPaintedArea(item: RenderItem, scale: Double, markerText: Tex
     fun rectangle(value: Rect): Rectangle2D.Double = Rectangle2D.Double(value.x, value.y, value.width, value.height)
     when (val shape = item.shape) {
         is Shape.Stroke -> {
-            val c = item.contours; require(c.x.size == c.y.size)
-            val path = Path2D.Double(Path2D.WIND_NON_ZERO); var first = 0
-            for (raw in c.ends) {
-                val end = raw.toLong(); require(end in (first + 3).toLong()..c.x.size.toLong())
-                path.moveTo(c.x[first] / 256.0, c.y[first] / 256.0)
-                for (i in first + 1 until end.toInt()) { if (i % 256 == 0) check(); path.lineTo(c.x[i] / 256.0, c.y[i] / 256.0) }
-                path.closePath(); first = end.toInt()
-            }
-            require(first == c.x.size); fill(path, item.style.rgba)
+            val path = Path2D.Double(Path2D.WIND_NON_ZERO)
+            item.contours.visit(object : ContourVisitor {
+                var index = 0; var start = 0
+                override fun begin(vertexCount: Int) { require(vertexCount >= 3); start = index }
+                override fun vertex(x: Long, y: Long) {
+                    if (index == start) path.moveTo(x / 256.0, y / 256.0)
+                    else { if (index % 256 == 0) check(); path.lineTo(x / 256.0, y / 256.0) }
+                    index++
+                }
+                override fun end() = path.closePath()
+            })
+            fill(path, item.style.rgba)
         }
         is Shape.Text -> fill(outline(shape.outline, check).apply { transform(AffineTransform.getTranslateInstance(shape.anchor.x, shape.anchor.y)) }, item.style.rgba)
         is Shape.Line -> stroke(poly(shape.points, check = check))

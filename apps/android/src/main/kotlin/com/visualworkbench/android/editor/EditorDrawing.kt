@@ -69,22 +69,20 @@ internal object EditorDrawing {
         setValues(floatArrayOf(t.a.toFloat(), t.c.toFloat(), t.e.toFloat(), t.b.toFloat(), t.d.toFloat(), t.f.toFloat(), 0f, 0f, 1f))
     }
 
+    /** Reads [contours] in whichever form it is held, without unpacking or boxing it. */
     fun contourPath(contours: Contours, origin: Point = Point(0.0, 0.0)): Path {
-        require(contours.x.size == contours.y.size && contours.x.size <= 1_000_000)
+        require(contours.vertexCount <= 1_000_000)
         val path = Path().apply { fillType = Path.FillType.WINDING }
-        var first = 0
-        for (endValue in contours.ends) {
-            require(endValue <= contours.x.size.toUInt())
-            val end = endValue.toInt()
-            require(end >= first + 3)
-            for (i in first until end) {
-                val x = (contours.x[i].toDouble() / 256.0 - origin.x).toFloat()
-                val y = (contours.y[i].toDouble() / 256.0 - origin.y).toFloat()
-                if (i == first) path.moveTo(x, y) else path.lineTo(x, y)
+        contours.visit(object : ContourVisitor {
+            private var first = true
+            override fun begin(vertexCount: Int) { require(vertexCount >= 3); first = true }
+            override fun vertex(x: Long, y: Long) {
+                val px = (x.toDouble() / 256.0 - origin.x).toFloat()
+                val py = (y.toDouble() / 256.0 - origin.y).toFloat()
+                if (first) { path.moveTo(px, py); first = false } else path.lineTo(px, py)
             }
-            path.close(); first = end
-        }
-        require(first == contours.x.size)
+            override fun end() = path.close()
+        })
         return path
     }
 
@@ -104,8 +102,7 @@ internal object EditorDrawing {
         val origin = when (shape) {
             is Shape.Result -> Point(0.0,0.0)
             is Shape.Text -> shape.anchor
-            is Shape.Stroke -> Point(item.contours.x.firstOrNull()?.toDouble()?.div(256) ?: 0.0,
-                item.contours.y.firstOrNull()?.toDouble()?.div(256) ?: 0.0)
+            is Shape.Stroke -> Point(item.contours.firstX.toDouble() / 256, item.contours.firstY.toDouble() / 256)
             is Shape.Line -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
             is Shape.Arrow -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
             is Shape.Polygon -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
