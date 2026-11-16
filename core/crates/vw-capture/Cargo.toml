@@ -10,19 +10,19 @@ publish = false
 workspace = true
 
 [dependencies]
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
-thiserror = "=2.0.21"
-png = "=0.18.1"
-blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
-ring = "=0.17.14"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+png.workspace = true
+blake3 = { workspace = true, features = ["std", "pure"] }
+ring.workspace = true
 vw-model = { path = "../vw-model", version = "=0.1.0" }
 vw-geom = { path = "../vw-geom", version = "=0.1.0" }
 vw-stream = { path = "../vw-stream", version = "=0.1.0" }
 vw-proto = { path = "../vw-proto", version = "=0.1.0" }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "=0.62.2", features = [
+windows = { workspace = true, features = [
     "Foundation", "Graphics_Capture", "Graphics_DirectX_Direct3D11",
     "Win32_Foundation", "Win32_Security", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11",
     "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi",
@@ -35,7 +35,7 @@ windows = { version = "=0.62.2", features = [
 ] }
 
 [dev-dependencies]
-tempfile = "=3.27.0"
+tempfile.workspace = true
 
 [[bin]]
 name = "vw-capture-helper"

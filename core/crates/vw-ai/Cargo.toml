@@ -10,20 +10,20 @@ publish = false
 workspace = true
 
 [dependencies]
-base64 = "=0.23.1"
-image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
-libm = { version = "=0.2.16", default-features = false }
-moxcms = "=0.8.1"
-png = "=0.18.1"
-rusqlite = { version = "=0.41.1", default-features = false, features = ["bundled", "limits"] }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
-sha2 = "=0.11.0"
-thiserror = "=2.0.21"
+base64.workspace = true
+image = { workspace = true, features = ["png", "jpeg"] }
+libm.workspace = true
+moxcms.workspace = true
+png.workspace = true
+rusqlite = { workspace = true, features = ["bundled", "limits"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+sha2.workspace = true
+thiserror.workspace = true
 vw-mask = { version = "=0.1.0", path = "../vw-mask" }
 vw-model = { version = "=0.1.0", path = "../vw-model" }
 vw-raster = { version = "=0.1.0", path = "../vw-raster" }
 
 [dev-dependencies]
-tempfile = "=3.27.0"
-proptest = { version = "=1.11.0", default-features = false, features = ["std"] }
+tempfile.workspace = true
+proptest = { workspace = true, features = ["std"] }

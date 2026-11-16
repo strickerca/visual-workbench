@@ -26,6 +26,36 @@ rust-version = "1.99"
 license = "LicenseRef-VisualWorkbench-Proprietary"
 publish = false
 
+[workspace.dependencies]
+base64 = "=0.23.1"
+blake3 = { version = "=1.8.7", default-features = false }
+bytes = "=1.12.1"
+getrandom = "=0.4.3"
+image = { version = "=0.25.10", default-features = false }
+jni = { version = "=0.22.4", default-features = false }
+libm = { version = "=0.2.16", default-features = false }
+moxcms = "=0.8.1"
+pdfium-render = { version = "=0.9.4", default-features = false }
+png = "=0.18.1"
+proptest = { version = "=1.11.0", default-features = false }
+quinn = { version = "=0.11.12", default-features = false }
+rcgen = { version = "=0.14.10", default-features = false }
+ring = "=0.17.14"
+rusqlite = { version = "=0.41.1", default-features = false }
+rustix = "=1.1.6"
+rustls = { version = "=0.23.46", default-features = false }
+serde = "=1.0.229"
+serde_json = "=1.0.151"
+sha2 = "=0.11.0"
+tempfile = "=3.27.0"
+thiserror = "=2.0.21"
+tiny-skia = { version = "=0.12.0", default-features = false }
+tokio = { version = "=1.53.3", default-features = false }
+uniffi = { version = "=0.32.2", default-features = false }
+windows = "=0.62.2"
+windows-sys = "=0.61.2"
+zeroize = "=1.9.0"
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 

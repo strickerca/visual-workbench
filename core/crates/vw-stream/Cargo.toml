@@ -10,9 +10,9 @@ publish = false
 vw-model = { path = "../vw-model", version = "=0.1.0" }
 vw-proto = { path = "../vw-proto", version = "=0.1.0" }
 vw-geom = { path = "../vw-geom", version = "=0.1.0" }
-image = { version = "=0.25.10", default-features = false, features = ["jpeg"] }
-png = "=0.18.1"
-thiserror = "=2.0.21"
+image = { workspace = true, features = ["jpeg"] }
+png.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
