@@ -34,7 +34,7 @@ use std::{
 };
 use support::*;
 use vw_core::*;
-use vw_model::{AssetId, DeviceId, Document, Id, Layer, Project};
+use vw_model::{AssetId, DeviceId, Document, Id, Layer, Object, OrderKey, Project};
 use vw_proto::v1 as pb;
 
 static TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -190,12 +190,111 @@ async fn open(path: &Path) -> Arc<ProjectSession> {
     project.hold_checkpoint_upkeep(true);
     project
 }
-/// A closed host project of `strokes` pen strokes.
+/// The object the PC saves for its stroke `number` drawn after `before`,
+/// built as a stroke gesture builds it.
+fn pen_object(number: u32, points: usize, before: Option<&OrderKey>) -> (Object, OrderKey) {
+    let options = stroke();
+    let mut brush = vw_ink::Brush::new(
+        vw_ink::BrushFamily::try_from(options.family.as_str()).unwrap(),
+        3.0,
+    )
+    .unwrap();
+    brush.stabilization = options.stabilization;
+    let samples = pen(number, points);
+    let order = OrderKey::between(before, None).unwrap();
+    let state = pb::ObjectState {
+        object_id: Some(Id::try_from(stroke_id(0x60, number)).unwrap().to_proto()),
+        layer_id: Some(Id::try_from(id(3)).unwrap().to_proto()),
+        order_key: order.as_str().into(),
+        transform: Some(pb::Affine {
+            a: 1.0,
+            d: 1.0,
+            ..Default::default()
+        }),
+        style: Some(pb::Style {
+            stroke: Some(pb::Color { rgba: options.rgba }),
+            width: 3.0,
+            ..Default::default()
+        }),
+        role: pb::Role::None as i32,
+        created_by: device(),
+        created_at_ms: TIME + 10 + i64::from(number),
+        shape: Some(pb::object_state::Shape::Stroke(pb::Stroke {
+            x: samples.x,
+            y: samples.y,
+            t_ms: samples.t_ms,
+            pressure: samples.pressure,
+            tilt: samples.tilt,
+            orientation: samples.orientation,
+            brush: Some(brush.to_proto()),
+        })),
+        ..Default::default()
+    };
+    let object = Object {
+        document_id: Id::try_from(id(2)).unwrap(),
+        state,
+    };
+    (object, order)
+}
+/// `project` with the PC's strokes `0..strokes` added, the objects drawing
+/// them one by one leaves (`ready_made_pages_hold_what_drawing_leaves`).
+fn with_strokes(mut project: Project, strokes: u32, points: usize) -> Project {
+    let mut before = None;
+    for number in 0..strokes {
+        let (object, order) = pen_object(number, points, before.as_ref());
+        project
+            .objects
+            .insert(Id::try_from(stroke_id(0x60, number)).unwrap(), object);
+        before = Some(order);
+    }
+    project
+}
+/// A new image project as the PC creates it, before anything is drawn.
+async fn blank_page(root: &Path) -> Project {
+    let path = root.join("blank");
+    create_image_project(create(&path), cancel())
+        .await
+        .unwrap()
+        .close()
+        .await
+        .unwrap();
+    let project = vw_store::ProjectStore::open(&path)
+        .unwrap()
+        .project()
+        .clone();
+    std::fs::remove_dir_all(&path).unwrap();
+    project
+}
+/// A closed host project of `strokes` pen strokes, made as the PC holds it
+/// once they are drawn. All but the last are made directly, without the
+/// history of drawing them; the last is drawn, so that the PC's undo
+/// history has an edit on top, as after drawing, for the calls that read
+/// whether one can be undone. No charge and no other measured call reads
+/// the PC's history (a cross-checking build's undo copy aside, which is
+/// checked against whatever history the page has). Drawing every stroke
+/// in a cross-checking build would hash the whole page every stroke.
 async fn draw_page(path: &Path, strokes: u32, points: usize) {
-    let project = create_image_project(create(path), cancel()).await.unwrap();
-    project.hold_checkpoint_upkeep(true);
-    draw(&project, 0x60, 0..strokes, points).await;
+    let root = path.parent().unwrap();
+    let project = with_strokes(blank_page(root).await, strokes - 1, points);
+    created(path, project);
+    draw_last(path, strokes, points).await;
+}
+/// Draw the PC's last stroke, `strokes - 1`, on the closed page at `path`.
+async fn draw_last(path: &Path, strokes: u32, points: usize) {
+    let project = open(path).await;
+    draw(&project, 0x60, strokes - 1..strokes, points).await;
     project.close().await.unwrap();
+}
+/// A host store holding `project`, with the page's original.
+fn created(path: &Path, project: Project) {
+    drop(
+        vw_store::ProjectStore::create(path, project, DeviceId::try_from(device()).unwrap(), TIME)
+            .unwrap(),
+    );
+    vw_store::BlobStore::new(path)
+        .unwrap()
+        .put(&source())
+        .unwrap();
 }
 /// The phone's mirror of the closed host page, with the page's original.
 fn mirror_page(host: &Path, path: &Path, original: &[u8]) {
@@ -687,13 +786,19 @@ async fn a_phone_that_queued_strokes_offline_is_charged_the_replay_of_its_queue(
     // An almost empty page on which the phone draws two thousand strokes, a
     // page of five hundred with three hundred more from the phone, and one
     // of two thousand with twenty more.
+    //
+    // A cross-checking build hashes the whole visible page for every stroke
+    // the phone queues, and refuses that first page's workflows for those
+    // checks alone; it queues five hundred there, which its replay check
+    // covers just as well, rather than spend minutes on the rest.
+    let queued = if vw_ops::CROSS_CHECKED { 500 } else { 2_000 };
     offline_phone(
         Page {
             strokes: 2,
             points: 100,
             objects: 2,
         },
-        2_000,
+        queued,
     )
     .await;
     offline_phone(
@@ -788,22 +893,11 @@ async fn a_large_icc_profile_is_charged_where_it_is_hashed_or_rewritten() {
     let _serial = TESTS.lock().await;
     let root = tempfile::tempdir().unwrap();
     let host = root.path().join("host");
-    drop(
-        vw_store::ProjectStore::create(
-            &host,
-            profiled_page(2 * 1024 * 1024),
-            DeviceId::try_from(device()).unwrap(),
-            TIME,
-        )
-        .unwrap(),
+    created(
+        &host,
+        with_strokes(profiled_page(2 * 1024 * 1024), 299, 100),
     );
-    vw_store::BlobStore::new(&host)
-        .unwrap()
-        .put(&source())
-        .unwrap();
-    let project = open(&host).await;
-    draw(&project, 0x60, 0..300, 100).await;
-    project.close().await.unwrap();
+    draw_last(&host, 300, 100).await;
     let page = Page {
         strokes: 300,
         points: 100,
@@ -868,6 +962,27 @@ async fn a_large_icc_profile_is_charged_where_it_is_hashed_or_rewritten() {
         );
         project.close().await.unwrap();
     }
+}
+
+/// A ready-made PC page holds exactly what drawing its strokes one by one
+/// leaves: the same project, object for object.
+#[tokio::test]
+async fn ready_made_pages_hold_what_drawing_leaves() {
+    let _serial = TESTS.lock().await;
+    let root = tempfile::tempdir().unwrap();
+    let drawn = root.path().join("drawn");
+    let project = create_image_project(create(&drawn), cancel())
+        .await
+        .unwrap();
+    draw(&project, 0x60, 0..5, 100).await;
+    project.close().await.unwrap();
+    let drawn = vw_store::ProjectStore::open(&drawn)
+        .unwrap()
+        .project()
+        .clone();
+    let made = with_strokes(blank_page(root.path()).await, 5, 100);
+    assert_eq!(drawn.objects.len(), 5);
+    assert!(drawn == made, "a ready-made page differs from a drawn one");
 }
 
 /// 8,000 strokes of 50 samples: the store holds this page (of 100 samples it
