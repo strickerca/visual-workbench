@@ -432,6 +432,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     // Native-operation admission must not wait for a Compose host or
     // global snapshot apply notifications. UI state remains observable.
     private val importReadiness = EditorReadiness()
+    private val backgroundSettle = BackgroundSettle(scope) { importReadiness.awaitReady() }
     private var busyState by mutableStateOf(true)
     var busy: Boolean
         get() = busyState
@@ -1360,7 +1361,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         cancelTool(); finishRemotePreview(sliderLink, sliderGesture, true)
         sliderGesture = null; sliderLink = null; sliderRevision = null; selectedStyleDraft = null; showBrush = false
         pairing.leave(); diagnostics.background(); hoverPoint = null; publish()
+        // The project stays open; it writes the checkpoint closing would write.
+        // A stream draft editor only borrows its private draft.
+        if (!streamDraftOnly) backgroundSettle.background(project) { project.takeIf { !disposing } }
     }
+    fun onForeground() { backgroundSettle.foreground() }
 
     private suspend fun refreshProjects() {
         projects = repository.list().map { ProjectCard(it.path, it.info?.title ?: "Unavailable project",

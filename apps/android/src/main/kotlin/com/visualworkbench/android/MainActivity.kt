@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (::editor.isInitialized) {
+            editor.onForeground()
             editor.airActivityResumed(airActivityOwner, true)
             editor.airActivityFocus(airActivityOwner, window.decorView.hasWindowFocus())
         }

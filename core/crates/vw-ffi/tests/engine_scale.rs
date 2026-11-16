@@ -221,6 +221,123 @@ async fn left_open_worker() {
     panic!("the owning test did not end this worker");
 }
 
+/// A phone app put in the background does not close its project, and the
+/// system freezes its process within seconds, before the project has been
+/// left alone long enough to write a checkpoint by itself. Going to the
+/// background, the app asks it to settle: the checkpoint closing would
+/// write is written then and the project stays open. Nothing is written
+/// while a stroke is being drawn, nor for strokes alone, which need none.
+#[tokio::test]
+async fn settling_writes_what_closing_would_and_keeps_the_project_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project");
+    let project = create_image_project(create(&path), cancel()).await.unwrap();
+    // The automatic upkeep is held; settling is asked for and runs anyway.
+    project.hold_checkpoint_upkeep(true);
+    for number in 10..16 {
+        stroke_on_top(&project, number).await;
+    }
+    assert!(!project.settle().await.unwrap());
+    costly_history(&project).await;
+    // A stroke being drawn refuses it.
+    let lamport = project.info().await.unwrap().next_lamport;
+    let mut options = stroke();
+    options.gesture_id = wide_id(0x41, 20);
+    options.transaction_id = wide_id(0x42, 20);
+    options.object_id = wide_id(0x60, 20);
+    options.lamport = lamport;
+    let gesture = project.clone().begin_stroke(options).await.unwrap();
+    gesture.append_samples(batch()).await.unwrap();
+    assert!(matches!(
+        project.settle().await,
+        Err(CoreError::Backpressure)
+    ));
+    gesture.commit(cancel()).await.unwrap();
+    gesture.shutdown().await.unwrap();
+    let before = core_diagnostics(0).latest_sequence;
+    assert!(project.settle().await.unwrap());
+    assert!(
+        core_diagnostics(before).events.iter().any(|event| {
+            event.kind == CoreDiagnosticKind::DurationMicros
+                && event.area == "project"
+                && event.name == "checkpoint on background"
+                && event.value > 0
+        }),
+        "how long the checkpoint took is not on record"
+    );
+    // Once written there is nothing left to write, and the project goes on.
+    assert!(!project.settle().await.unwrap());
+    let after = stroke_on_top(&project, 21).await;
+    project.close().await.unwrap();
+    assert!(matches!(project.settle().await, Err(CoreError::Closed)));
+    // The next open replays only the stroke drawn after settling.
+    let store = vw_store::ProjectStore::open(&path).unwrap();
+    assert_eq!(store.revision().unwrap().host_seq, after.host_seq);
+    assert_eq!(store.state_hash().unwrap().to_string(), after.state_hash);
+    assert_eq!(store.replayed_transactions(), 1);
+}
+
+/// What going to the background is for: a project settled there and then
+/// ended with its process leaves nothing to replay, although the checkpoint
+/// it writes by itself never came.
+#[tokio::test]
+async fn a_project_settled_in_the_background_and_then_killed_leaves_nothing_to_replay() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project");
+    let marker = dir.path().join("settled");
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--ignored", "--exact", "settled_worker"])
+        .env("VW_SETTLED_PROJECT", &path)
+        .env("VW_SETTLED_MARKER", &marker)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(120);
+    while !marker.exists() {
+        if child.try_wait().unwrap().is_some() || Instant::now() >= deadline {
+            let _ = child.kill();
+            child.wait().unwrap();
+            panic!("the project was not settled");
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    child.kill().unwrap();
+    assert!(!child.wait().unwrap().success());
+    let saved = std::fs::read_to_string(&marker).unwrap();
+    let (host_seq, state_hash) = saved.split_once(' ').unwrap();
+    let store = vw_store::ProjectStore::open(&path).unwrap();
+    assert_eq!(store.revision().unwrap().host_seq.to_string(), host_seq);
+    assert_eq!(store.state_hash().unwrap().to_string(), state_hash);
+    assert_eq!(store.replayed_transactions(), 0);
+}
+
+#[tokio::test]
+#[ignore = "private owned subprocess killed after it settles its project"]
+async fn settled_worker() {
+    let path = std::env::var_os("VW_SETTLED_PROJECT").expect("owned project");
+    let marker = std::path::PathBuf::from(std::env::var_os("VW_SETTLED_MARKER").expect("marker"));
+    let project = create_image_project(create(std::path::Path::new(&path)), cancel())
+        .await
+        .unwrap();
+    // Only settling may write it: the process is ended before the project
+    // would have been left alone long enough.
+    project.hold_checkpoint_upkeep(true);
+    costly_history(&project).await;
+    let saved = project.info().await.unwrap();
+    assert!(project.settle().await.unwrap());
+    let unfinished = marker.with_extension("tmp");
+    std::fs::write(
+        &unfinished,
+        format!("{} {}", saved.host_seq, saved.state_hash),
+    )
+    .unwrap();
+    std::fs::rename(&unfinished, &marker).unwrap();
+    tokio::time::sleep(Duration::from_secs(120)).await;
+    panic!("the owning test did not end this worker");
+}
+
 #[tokio::test]
 async fn one_layer_takes_far_more_than_768_objects_in_creation_order() {
     let dir = tempfile::tempdir().unwrap();

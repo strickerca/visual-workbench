@@ -67,7 +67,8 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchDeferredStrokes {
+private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchDeferredStrokes, WorkbenchSettling {
+    override suspend fun settle(): Boolean = call { handle.settle() }
     override fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke? {
         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
         if(options.family=="highlighter")return null

@@ -23,6 +23,45 @@ const RECLAIM_MIN_BYTES: i64 = 4 * 1024 * 1024;
 /// Compacting copies the live pages once. Up to this size the copy is held in
 /// memory, because not every platform gives SQLite a temporary directory.
 const RECLAIM_IN_MEMORY_BYTES: i64 = 256 * 1024 * 1024;
+/// Where a compaction's private copy is made, inside the project's `cache`.
+const RECLAIM_DIRECTORY: &str = "compaction-v1";
+const RECLAIM_PREFIX: &str = "compact-";
+
+/// Where an open puts the copy that compacting a database makes, when its
+/// live pages are more than fit in memory. Chosen per platform; injectable
+/// so that the Android path is tested on any machine.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LargeCopy {
+    /// SQLite's own temporary file, and the database is compacted in place.
+    Temporary,
+    /// A file of the project's own (`cache/compaction-v1`) that then replaces
+    /// the database file: Android gives SQLite no temporary directory, and
+    /// the SQLite built for it keeps every temporary file in memory.
+    Private,
+}
+
+/// How an open hands unused pages back. Injectable for tests.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Compaction {
+    /// Live pages up to this many bytes are copied in memory, on every
+    /// platform.
+    pub in_memory_bytes: i64,
+    /// Where a larger copy goes.
+    pub larger: LargeCopy,
+}
+impl Compaction {
+    /// What this platform does.
+    pub const PLATFORM: Self = Self {
+        in_memory_bytes: RECLAIM_IN_MEMORY_BYTES,
+        larger: if cfg!(target_os = "android") {
+            LargeCopy::Private
+        } else {
+            LargeCopy::Temporary
+        },
+    };
+}
 /// How long a write waits for another connection.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// The same while an open tidies the file: a connected reader makes a step
@@ -53,9 +92,13 @@ pub enum OpenStage {
     Compacting,
     /// The compaction is copying rows. Nothing of it is committed.
     Copying,
-    /// The compacted pages are committed to the write-ahead log.
+    /// The compacted pages are committed to the write-ahead log. With a
+    /// private copy (`LargeCopy::Private`): the copy is complete, checked and
+    /// on disk, and the database file is as it was.
     Vacuumed,
-    /// They are in the database file; the log is about to be emptied.
+    /// They are in the database file; the log is about to be emptied. With a
+    /// private copy: the copy has replaced the database file, which is not
+    /// open yet.
     Transferred,
     /// Unused pages were handed back, or there were too few to bother.
     Compacted,
@@ -348,6 +391,16 @@ impl ProjectStore {
         path: &Path,
         observer: F,
     ) -> Result<Self, StoreError> {
+        Self::open_compacting(path, observer, Compaction::PLATFORM)
+    }
+
+    /// `open_observed` with another platform's compaction, for tests.
+    #[doc(hidden)]
+    pub fn open_compacting<F: FnMut(OpenStage) + Send + 'static>(
+        path: &Path,
+        observer: F,
+        compaction: Compaction,
+    ) -> Result<Self, StoreError> {
         let observer = Arc::new(Mutex::new(observer));
         let mut observer = move |stage: OpenStage| {
             if let Ok(mut observer) = observer.lock() {
@@ -388,7 +441,7 @@ impl ProjectStore {
             mirror: false,
         };
         store.mirror = store.local_device()? != *store.host.host_device();
-        store.upkeep(&upkeep, &mut observer);
+        store.upkeep(&upkeep, &mut observer, compaction)?;
         observer(OpenStage::Compacted);
         Ok(store)
     }
@@ -398,17 +451,20 @@ impl ProjectStore {
     /// and one compaction, each all or nothing. If the disk refuses one (it
     /// is full, a reader holds the file), the project is open as it is and a
     /// later open tries again: an open has never needed room to write. What
-    /// happened is kept in the report.
+    /// happened is kept in the report. The one error: a private copy replaced
+    /// the database file and the file could not be opened again. The project
+    /// on disk is whole, and the next open opens it.
     fn upkeep<F: FnMut(OpenStage) + Clone + Send + 'static>(
         &mut self,
         upkeep: &Upkeep,
         observer: &mut F,
-    ) {
+        compaction: Compaction,
+    ) -> Result<(), StoreError> {
         if upkeep.unsettled {
             self.opened.tidy = Upkeeping::Skipped;
             self.opened.checkpoint = Upkeeping::Skipped;
             self.opened.compaction = Upkeeping::Skipped;
-            return;
+            return Ok(());
         }
         let _ = self.connection.busy_timeout(UPKEEP_BUSY_TIMEOUT);
         let started = Instant::now();
@@ -437,14 +493,17 @@ impl ProjectStore {
                 },
             );
             let started = Instant::now();
-            self.opened.compaction = match reclaim(&mut self.connection, observer) {
-                Ok(Reclaimed::Skipped) => Upkeeping::Skipped,
-                Ok(Reclaimed::NotDue) => Upkeeping::NotDue,
-                Ok(Reclaimed::Done) => Upkeeping::Done(started.elapsed()),
-                Err(error) => Upkeeping::Failed(started.elapsed(), error),
-            };
+            self.opened.compaction =
+                match reclaim(&mut self.connection, &self.root, compaction, observer) {
+                    Ok(Reclaimed::Skipped) => Upkeeping::Skipped,
+                    Ok(Reclaimed::NotDue) => Upkeeping::NotDue,
+                    Ok(Reclaimed::Done) => Upkeeping::Done(started.elapsed()),
+                    Err(Unreclaimed::Kept(error)) => Upkeeping::Failed(started.elapsed(), error),
+                    Err(Unreclaimed::Closed(error)) => return Err(error),
+                };
         }
         let _ = self.connection.busy_timeout(BUSY_TIMEOUT);
+        Ok(())
     }
 
     /// What this open did besides loading the project.
@@ -1825,20 +1884,54 @@ enum Reclaimed {
     Done,
 }
 
+/// Why a compaction did not finish.
+enum Unreclaimed {
+    /// The store's connection is open, to the database as it was or as
+    /// compacted with the note of the attempt still in it.
+    Kept(StoreError),
+    /// A private copy replaced the database file, or was about to, and the
+    /// file could not be opened again: the store has no connection.
+    Closed(StoreError),
+}
+impl From<StoreError> for Unreclaimed {
+    fn from(error: StoreError) -> Self {
+        Self::Kept(error)
+    }
+}
+impl From<rusqlite::Error> for Unreclaimed {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Kept(error.into())
+    }
+}
+impl From<std::io::Error> for Unreclaimed {
+    fn from(error: std::io::Error) -> Self {
+        Self::Kept(error.into())
+    }
+}
+
 /// Hand unused pages back to the filesystem when they are a large part of the
 /// database, which happens once after an old checkpoint pile is removed.
 ///
+/// Compacting copies the live pages once. A copy that fits
+/// `in_memory_bytes` is held in memory; a larger one goes where `larger`
+/// says: SQLite's temporary file, from which the pages are copied back in
+/// one transaction, or a private file that replaces the database file
+/// (`private_compaction`), where SQLite has no temporary directory.
+///
 /// A compaction that does not finish is not started again at every open. It
-/// is refused where the copy needs a temporary file and there is no directory
-/// for one, and it ends with the process when the system takes the process
-/// away for the memory the copy needs. So each start is noted in the
-/// database first and the note is removed when the compaction is through;
-/// with two starts noted, nothing is tried until there is a quarter more to
-/// hand back.
+/// ends with the process when the system takes the process away for the
+/// memory the copy needs. So each start is noted in the database first and
+/// the note is removed when the compaction is through; with two starts
+/// noted, nothing is tried until there is a quarter more to hand back.
 fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
     connection: &mut Connection,
+    root: &Path,
+    compaction: Compaction,
     observer: &mut F,
-) -> Result<Reclaimed, StoreError> {
+) -> Result<Reclaimed, Unreclaimed> {
+    if compaction.larger == LargeCopy::Private {
+        remove_private_copies(root)?;
+    }
     let pragma = |name: &str| -> Result<i64, StoreError> {
         Ok(connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))?)
     };
@@ -1850,12 +1943,7 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
     if free.saturating_mul(size) < RECLAIM_MIN_BYTES || free.saturating_mul(4) < pages {
         return Ok(Reclaimed::NotDue);
     }
-    let in_memory = (pages - free).saturating_mul(size) <= RECLAIM_IN_MEMORY_BYTES;
-    // Android gives SQLite no directory for the temporary file a larger copy
-    // needs, so there the attempt could only fail.
-    if !in_memory && cfg!(target_os = "android") {
-        return Ok(Reclaimed::Skipped);
-    }
+    let in_memory = (pages - free).saturating_mul(size) <= compaction.in_memory_bytes;
     let noted: Option<String> = connection
         .query_row(
             "SELECT value FROM meta WHERE key=?1",
@@ -1875,9 +1963,20 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
         return Ok(Reclaimed::Skipped);
     }
     let attempts = if more { 1 } else { attempts + 1 };
+    let private = if in_memory || compaction.larger == LargeCopy::Temporary {
+        None
+    } else {
+        Some(private_copy(root)?)
+    };
     connection
         .prepare("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")?
         .execute(params![RECLAIM_KEY, format!("{attempts} {free}")])?;
+    // A private copy has to be of the database it replaces: from here on,
+    // what other connections commit changes this.
+    let version = match &private {
+        Some(_) => data_version(connection)?,
+        None => 0,
+    };
     observer(OpenStage::Compacting);
     // Tell the observer once from inside the copy.
     let mut inside = Some(observer.clone());
@@ -1890,10 +1989,14 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
             false
         }),
     )?;
-    let compacted = if in_memory {
-        connection.execute_batch("PRAGMA temp_store=MEMORY; VACUUM")
-    } else {
-        connection.execute_batch("VACUUM")
+    let compacted = match &private {
+        Some(staging) => {
+            let copy = staging.path().join("project.sqlite");
+            crate::archive::sqlite_path(&copy)
+                .and_then(|copy| Ok(connection.execute("VACUUM INTO ?1", [copy]).map(|_| ())?))
+        }
+        None if in_memory => Ok(connection.execute_batch("PRAGMA temp_store=MEMORY; VACUUM")?),
+        None => Ok(connection.execute_batch("VACUUM")?),
     };
     // Whatever became of it, the connection goes back to how it was.
     let _ = connection.progress_handler(0, None::<fn() -> bool>);
@@ -1901,6 +2004,9 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
         let _ = connection.execute_batch("PRAGMA temp_store=DEFAULT");
     }
     compacted?;
+    if let Some(staging) = private {
+        return private_compaction(connection, root, staging, version, observer);
+    }
     connection.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
     // The compacted pages are in the write-ahead log. Move them into the
     // database file, then empty the log. With a reader connected either step
@@ -1910,6 +2016,156 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
     observer(OpenStage::Transferred);
     connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
     Ok(Reclaimed::Done)
+}
+
+/// Put the compacted copy `VACUUM INTO` made in `staging` in place of the
+/// database file, all or nothing. The copy is checked and on disk before
+/// the database file is touched, and one rename replaces the file, so a
+/// crash at any point leaves either the database as it was or the whole
+/// copy, which holds the same rows and the note of the attempt.
+///
+/// Only this store may have the file open. Its lock rules that out for
+/// every program that keeps to it, and on Android for any other, since an
+/// application's files are its own. What the lock cannot rule out stops
+/// the swap and leaves the database as it was: another connection that
+/// committed since the copy was made, or that still has the file open, as
+/// its write-ahead log shows, which the last connection to close removes.
+fn private_compaction<F: FnMut(OpenStage)>(
+    connection: &mut Connection,
+    root: &Path,
+    staging: tempfile::TempDir,
+    version: i64,
+    observer: &mut F,
+) -> Result<Reclaimed, Unreclaimed> {
+    let copy = staging.path().join("project.sqlite");
+    check_copy(&copy)?;
+    observer(OpenStage::Vacuumed);
+    if data_version(connection)? != version {
+        return Err(Unreclaimed::Kept(StoreError::Busy));
+    }
+    // Closing moves the write-ahead log into the database file and removes
+    // the log and its index, if no other connection has the file open.
+    let closing = std::mem::replace(connection, Connection::open_in_memory()?);
+    if let Err((kept, error)) = closing.close() {
+        *connection = kept;
+        return Err(Unreclaimed::Kept(error.into()));
+    }
+    let alone = [
+        "project.sqlite-wal",
+        "project.sqlite-shm",
+        "project.sqlite-journal",
+    ]
+    .iter()
+    .all(|name| {
+        matches!(fs::symlink_metadata(root.join(name)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+    });
+    let replaced = if alone {
+        fs::rename(&copy, root.join("project.sqlite")).map_err(StoreError::from)
+    } else {
+        Err(StoreError::Busy)
+    };
+    let synced = match replaced {
+        Ok(()) => {
+            let synced = blobs::sync_directory(root);
+            observer(OpenStage::Transferred);
+            synced
+        }
+        Err(_) => Ok(()),
+    };
+    // Whatever became of it, the store opens the database file again.
+    *connection = reopen(root).map_err(Unreclaimed::Closed)?;
+    replaced?;
+    synced?;
+    connection.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
+    connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
+    // The directory is empty now; dropping it removes it.
+    drop(staging);
+    Ok(Reclaimed::Done)
+}
+
+/// The copy is a whole database of this schema that SQLite finds sound, and
+/// it is on disk: `VACUUM INTO` does not sync what it writes.
+fn check_copy(copy: &Path) -> Result<(), StoreError> {
+    let checked = Connection::open_with_flags(
+        copy,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    checked.execute_batch("PRAGMA trusted_schema=OFF")?;
+    migrations::verify_schema(&checked, migrations::CURRENT_VERSION)?;
+    let verdict: String = checked.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+    checked
+        .close()
+        .map_err(|(_, error)| StoreError::Database(error))?;
+    if verdict != "ok" {
+        return Err(StoreError::Corrupt("compacted copy"));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true).write(true);
+    blobs::no_follow(&mut options);
+    let file = options.open(copy)?;
+    blobs::check_regular_metadata(&file.metadata()?)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+/// The store's connection to the database file, as `open` makes it.
+fn reopen(root: &Path) -> Result<Connection, StoreError> {
+    let connection = connect(root, false)?;
+    connection.busy_timeout(UPKEEP_BUSY_TIMEOUT)?;
+    migrations::verify_schema(&connection, migrations::CURRENT_VERSION)?;
+    Ok(connection)
+}
+
+fn data_version(connection: &Connection) -> Result<i64, StoreError> {
+    Ok(connection.query_row("PRAGMA data_version", [], |row| row.get(0))?)
+}
+
+/// A new, empty private directory for a compaction's copy, in the project's
+/// own storage.
+fn private_copy(root: &Path) -> Result<tempfile::TempDir, StoreError> {
+    blobs::check_directory(root)?;
+    let cache = root.join("cache");
+    blobs::ensure_directory(&cache)?;
+    let directory = cache.join(RECLAIM_DIRECTORY);
+    blobs::ensure_directory(&directory)?;
+    Ok(tempfile::Builder::new()
+        .prefix(RECLAIM_PREFIX)
+        .tempdir_in(directory)?)
+}
+
+/// Remove the copies of compactions that ended with their process. Nothing
+/// else uses the directory, and the store's lock is held.
+fn remove_private_copies(root: &Path) -> Result<(), StoreError> {
+    let directory = root.join("cache").join(RECLAIM_DIRECTORY);
+    match fs::symlink_metadata(&directory) {
+        Ok(_) => blobs::check_directory(&directory)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    }
+    for entry in fs::read_dir(&directory)? {
+        let entry = entry?;
+        if !entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with(RECLAIM_PREFIX)
+        {
+            continue;
+        }
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)?;
+        if blobs::is_link(&metadata) {
+            return Err(StoreError::Invalid("linked storage path"));
+        }
+        if metadata.is_dir() {
+            fs::remove_dir_all(&path)?;
+        } else {
+            fs::remove_file(&path)?;
+        }
+    }
+    Ok(())
 }
 
 /// How replaying a stretch of the log ended.
