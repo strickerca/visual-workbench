@@ -3342,16 +3342,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vw-avif-os"
-version = "0.1.0"
-dependencies = [
- "thiserror",
- "vw-model",
- "vw-raster",
- "windows",
-]
-
-[[package]]
 name = "vw-capture"
 version = "0.1.0"
 dependencies = [
@@ -3446,7 +3436,6 @@ dependencies = [
  "vw-ai-provider",
  "vw-assets",
  "vw-assets-win",
- "vw-avif-os",
  "vw-capture",
  "vw-codec-os",
  "vw-document-protocol",

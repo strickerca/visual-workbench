@@ -2938,7 +2938,7 @@
       ],
       "verified_by": [
         "core/crates/vw-ffi/tests/ordinary_formats.rs::admitted_avif_reports_missing_codec_before_any_project_is_published",
-        "core/crates/vw-avif-os/tests/admission.rs::source_and_exact_color_declaration_survive"
+        "core/crates/vw-codec-os/tests/avif_admission.rs::source_and_exact_color_declaration_survive"
       ],
       "impl_status": "in_progress",
       "verify_status": "not_tested",

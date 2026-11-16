@@ -151,7 +151,7 @@ visual-workbench/
   tools/       diagnostics/ diag-win/ pen-trace/ pen-inject/ bench/ pair-cli/ hello/ check_plan_coverage.py
   fixtures/    images/ pdf/ svg/ malformed/ traces/ (generator scripts + hashes; big outputs in git-ignored generated/)
   core/crates/ vw-geom vw-model vw-ops vw-store vw-ink vw-raster vw-assets vw-formats
-               vw-codec-os vw-avif-os vw-pdf vw-svg vw-mask vw-package vw-instructions
+               vw-codec-os vw-pdf vw-svg vw-mask vw-package vw-instructions
                vw-semantics vw-capture vw-stream vw-remote vw-document-protocol vw-ai
                vw-ai-platform vw-ai-provider vw-proto vw-net vw-sim vw-ffi
   host-win/crates/ vw-host-win vw-host-ffi      (compile to stubs on non-Windows targets)

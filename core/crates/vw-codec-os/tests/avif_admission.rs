@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
-use vw_avif_os::{Decoded, Error, inspect, is_avif};
+use vw_codec_os::avif::{Decoded, Error, inspect, is_avif};
 const BUDGET: u64 = 256 * 1024 * 1024;
 fn bx(kind: &[u8; 4], payload: &[u8]) -> Vec<u8> {
     let mut v = ((payload.len() + 8) as u32).to_be_bytes().to_vec();
@@ -209,7 +209,7 @@ fn public_receipt_cannot_expand_the_restricted_adapter_capability() {
     header.orientation = 6;
     assert_eq!(header.admit(BUDGET), Err(Error::Orientation));
     header = admitted;
-    header.encoded_bytes = vw_avif_os::MAX_ENCODED as u64 + 1;
+    header.encoded_bytes = vw_codec_os::avif::MAX_ENCODED as u64 + 1;
     assert_eq!(header.admit(BUDGET), Err(Error::Limit));
 }
 

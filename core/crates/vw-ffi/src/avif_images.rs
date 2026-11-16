@@ -89,11 +89,11 @@ pub fn inspect_avif_image(
     encoded: Vec<u8>,
     memory_budget_bytes: u64,
 ) -> std::result::Result<AvifImageInfo, AvifImageError> {
-    let value = vw_avif_os::inspect(&encoded, memory_budget_bytes).map_err(os_error)?;
+    let value = vw_codec_os::avif::inspect(&encoded, memory_budget_bytes).map_err(os_error)?;
     info(&value, memory_budget_bytes)
 }
 fn info(
-    value: &vw_avif_os::Header,
+    value: &vw_codec_os::avif::Header,
     budget: u64,
 ) -> std::result::Result<AvifImageInfo, AvifImageError> {
     Ok(AvifImageInfo {
@@ -112,8 +112,8 @@ fn info(
         estimated_peak_bytes: value.admit(budget).map_err(os_error)?,
     })
 }
-fn os_error(value: vw_avif_os::Error) -> AvifImageError {
-    use vw_avif_os::Error as E;
+fn os_error(value: vw_codec_os::avif::Error) -> AvifImageError {
+    use vw_codec_os::avif::Error as E;
     match value {
         E::Invalid => AvifImageError::Invalid,
         E::Unsupported => AvifImageError::Unsupported,
@@ -148,7 +148,7 @@ pub(crate) fn decode(
     if cancel() {
         return Err(vw_raster::RasterError::Cancelled);
     }
-    if !vw_avif_os::is_avif(bytes) {
+    if !vw_codec_os::avif::is_avif(bytes) {
         return crate::os_images::decode(bytes, limits, cancel);
     }
     if bytes.len() > limits.max_encoded_bytes {
@@ -160,14 +160,14 @@ pub(crate) fn decode(
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
         .map_err(|_| vw_raster::RasterError::Allocation)?;
     let _slot = Slot;
-    let header = vw_avif_os::inspect(bytes, limits.max_memory_bytes)
+    let header = vw_codec_os::avif::inspect(bytes, limits.max_memory_bytes)
         .map_err(os_error)
         .map_err(raster_error)?;
     if u64::from(header.width) * u64::from(header.height) > limits.max_pixels {
         return Err(vw_raster::RasterError::Allocation);
     }
     #[cfg(windows)]
-    let pixels = vw_avif_os::decode(bytes, limits.max_memory_bytes, cancel)
+    let pixels = vw_codec_os::avif::decode(bytes, limits.max_memory_bytes, cancel)
         .map_err(os_error)
         .map_err(raster_error)?
         .rgba;
@@ -191,7 +191,7 @@ pub(crate) fn decode(
     if cancel() {
         return Err(vw_raster::RasterError::Cancelled);
     }
-    let decoded = vw_avif_os::Decoded {
+    let decoded = vw_codec_os::avif::Decoded {
         header: header.clone(),
         rgba: pixels,
     };

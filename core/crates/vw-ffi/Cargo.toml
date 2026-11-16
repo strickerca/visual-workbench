@@ -43,7 +43,6 @@ vw-formats = { version = "=0.1.0", path = "../vw-formats" }
 vw-assets = { version = "=0.1.0", path = "../vw-assets" }
 vw-stream = { version = "=0.1.0", path = "../vw-stream" }
 vw-capture = { version = "=0.1.0", path = "../vw-capture" }
-vw-avif-os = { version = "=0.1.0", path = "../vw-avif-os" }
 vw-package = { version = "=0.1.0", path = "../vw-package" }
 vw-codec-os = { version = "=0.1.0", path = "../vw-codec-os" }
 vw-instructions = { version = "=0.1.0", path = "../vw-instructions" }

@@ -1,6 +1,6 @@
 //! Nonallocating AV1 metadata admission for one reduced-still, opaque 8-bit
 //! profile-0 frame. OS decoding remains responsible for tile/entropy validity.
-use crate::{Error, Nclx, Result};
+use super::{Error, Nclx, Result};
 
 struct Bits<'a> {
     bytes: &'a [u8],

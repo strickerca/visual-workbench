@@ -1,4 +1,4 @@
-use crate::{Decoded, Error, Result, inspect};
+use super::{Decoded, Error, Result, inspect};
 use ::windows::Win32::{Foundation::*, Graphics::Imaging::*, System::Com::*};
 use std::sync::atomic::{AtomicBool, Ordering};
 static ACTIVE: AtomicBool = AtomicBool::new(false);
