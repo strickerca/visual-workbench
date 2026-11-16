@@ -43,7 +43,8 @@ pub(crate) fn info_bytes(info: &ProjectInfo) -> Result<usize> {
 /// copy as well. Kotlin reads the transfer buffer in place and the generated
 /// binding copies the bytes once into a ByteArray, which the shared facade
 /// keeps as it is; the transfer buffer is released once read. Four bytes per
-/// byte bound each of these phases.
+/// byte bound each of these phases. Building the outline holds more for a
+/// moment; `packed_build_bytes` counts that.
 pub(crate) const PACKED_BYTE: usize = 4;
 /// The fixed part, the strings and the shape geometry every item counts,
 /// whatever form its outline takes.
@@ -97,6 +98,53 @@ pub(crate) fn item_bytes(item: &RenderItem) -> Result<usize> {
     array(&mut n, item.stroke_contours.y.len(), 48)?;
     array(&mut n, item.stroke_contours.ends.len(), 32)?;
     Ok(n)
+}
+/// What building one stroke's packed outline holds, for a moment, beside the
+/// items already built: the samples vw-ink reads, its contours at their
+/// allocated size, the lists that collect them (the builder's, grown by
+/// doubling and briefly next to its previous block, and the geometry's), the
+/// working buffers of one contour (vw-ink caps a contour at 514 points), and
+/// the packed bytes, made while the geometry is still alive. All of it is
+/// released before the next item is built, so a read counts it once, on top
+/// of what it has counted so far: `admits` checks that sum before the bytes
+/// are made. It is known only once the geometry exists.
+pub(crate) fn packed_build_bytes(
+    samples: usize,
+    geometry: &vw_ink::Geometry,
+    packed: usize,
+) -> Result<usize> {
+    let mut n = 64 * 1024;
+    let polygons = geometry.polygons();
+    add(
+        &mut n,
+        samples
+            .checked_mul(std::mem::size_of::<vw_ink::Sample>())
+            .ok_or(CoreError::Backpressure)?,
+    )?;
+    add(
+        &mut n,
+        polygons
+            .len()
+            .checked_mul(3 * std::mem::size_of::<vw_ink::Polygon>())
+            .ok_or(CoreError::Backpressure)?,
+    )?;
+    for polygon in polygons {
+        add(
+            &mut n,
+            polygon
+                .points
+                .capacity()
+                .checked_mul(std::mem::size_of::<vw_ink::QPoint>())
+                .ok_or(CoreError::Backpressure)?,
+        )?;
+    }
+    add(&mut n, packed)?;
+    Ok(n)
+}
+/// Whether `transient` more bytes fit beside the `total` counted so far.
+pub(crate) fn admits(total: usize, transient: usize) -> Result<()> {
+    let mut n = total;
+    add(&mut n, transient)
 }
 pub(crate) fn packed_item_bytes(item: &PackedRenderItem) -> Result<usize> {
     let mut n = item_frame(

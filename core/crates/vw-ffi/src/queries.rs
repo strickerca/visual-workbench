@@ -416,7 +416,11 @@ fn render_entries(
                     });
                     continue;
                 }
-                encoded = Some(bytes);
+                // Only the lists form sends the stored bytes; the packed form
+                // does not hold them while the outline is built.
+                if form == OutlineForm::Lists {
+                    encoded = Some(bytes);
+                }
                 digest = Some(value);
             }
             let shape = draw_shape(&object.state, project)?;
@@ -470,18 +474,36 @@ fn render_entries(
                     shape,
                     locked,
                 }),
-                OutlineForm::Packed => DisplayItem::Packed(PackedRenderItem {
-                    object_id: id.to_string(),
-                    layer_id: layer_id.to_string(),
-                    layer_opacity: layer.opacity,
-                    layer_blend: layer.blend.clone(),
-                    bounds,
-                    contours: crate::packed_contours::pack(outline)?,
-                    transform,
-                    style,
-                    shape,
-                    locked,
-                }),
+                OutlineForm::Packed => {
+                    // The stroke's geometry is alive now and its packed bytes
+                    // are about to be made: what that holds counts once, on
+                    // top of everything counted so far, before the bytes are
+                    // allocated. The lists form keeps its 96 bytes a vertex,
+                    // well above this build peak with its lists beside it.
+                    let contours = crate::packed_contours::pack(outline, |length| {
+                        let (Some(geometry), Some(Shape::Stroke(stroke))) =
+                            (&geometry, &object.state.shape)
+                        else {
+                            return Ok(());
+                        };
+                        crate::payload::admits(
+                            bytes_total,
+                            crate::payload::packed_build_bytes(stroke.x.len(), geometry, length)?,
+                        )
+                    })?;
+                    DisplayItem::Packed(PackedRenderItem {
+                        object_id: id.to_string(),
+                        layer_id: layer_id.to_string(),
+                        layer_opacity: layer.opacity,
+                        layer_blend: layer.blend.clone(),
+                        bounds,
+                        contours,
+                        transform,
+                        style,
+                        shape,
+                        locked,
+                    })
+                }
             };
             // The working geometry is not kept once its outline is built.
             drop(geometry);

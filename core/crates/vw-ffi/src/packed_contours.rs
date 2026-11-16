@@ -36,9 +36,13 @@ fn walk(polygons: &[vw_ink::Polygon], vertices: usize, mut emit: impl FnMut(u64)
         }
     }
 }
-/// The packed outline of `polygons`, allocated at exactly its length. Empty
-/// when there is no contour. Refuses what `gesture::contours` refuses.
-pub(crate) fn pack(polygons: &[vw_ink::Polygon]) -> Result<Vec<u8>> {
+/// The packed outline of `polygons`, allocated at exactly its length once
+/// `admit` has accepted that length. Empty when there is no contour. Refuses
+/// what `gesture::contours` refuses.
+pub(crate) fn pack(
+    polygons: &[vw_ink::Polygon],
+    admit: impl FnOnce(usize) -> Result<()>,
+) -> Result<Vec<u8>> {
     let vertices = polygons.iter().try_fold(0usize, |n, polygon| {
         n.checked_add(polygon.points.len())
             .ok_or(CoreError::Invalid)
@@ -48,12 +52,15 @@ pub(crate) fn pack(polygons: &[vw_ink::Polygon]) -> Result<Vec<u8>> {
     }
     let mut out = Vec::new();
     if polygons.is_empty() {
+        admit(0)?;
         return Ok(out);
     }
-    // At most 4,000,000 vertices of 20 bytes plus one header per contour:
-    // far below usize::MAX, so the sum cannot overflow.
-    let mut length = 0usize;
-    walk(polygons, vertices, |value| length += varint_len(value));
+    let mut length = Some(0usize);
+    walk(polygons, vertices, |value| {
+        length = length.and_then(|n| n.checked_add(varint_len(value)));
+    });
+    let length = length.ok_or(CoreError::Invalid)?;
+    admit(length)?;
     out.try_reserve_exact(length)
         .map_err(|_| CoreError::Worker)?;
     walk(polygons, vertices, |value| put(&mut out, value));
@@ -120,7 +127,7 @@ mod tests {
             polygon(&[(512, -1), (768, 0), (512, 256)]),
         ];
         assert_eq!(
-            pack(&polygons).unwrap(),
+            pack(&polygons, |_| Ok(())).unwrap(),
             [
                 1, 2, 6, // version, contours, vertices
                 3, 0, 0, 128, 4, 0, 255, 3, 128, 4, // (0,0) (+256,0) (-256,+256)
@@ -128,7 +135,23 @@ mod tests {
                 4, // (+512,-257) (+256,+1) (-256,+256)
             ]
         );
-        assert!(pack(&[]).unwrap().is_empty());
+        assert!(pack(&[], |_| Ok(())).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_length_is_admitted_before_the_bytes_are_made() {
+        let polygons = [polygon(&[(0, 0), (256, 0), (0, 256)])];
+        let mut asked = None;
+        let packed = pack(&polygons, |length| {
+            asked = Some(length);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(asked, Some(packed.len()));
+        assert!(matches!(
+            pack(&polygons, |_| Err(CoreError::Backpressure)),
+            Err(CoreError::Backpressure)
+        ));
     }
 
     #[test]
@@ -158,7 +181,7 @@ mod tests {
         let limit =
             ((vw_ink::MAX_COORDINATE + vw_ink::MAX_BASE_WIDTH) * vw_ink::QUANTIZATION) as i64;
         polygons.push(polygon(&[(-limit, limit), (limit, -limit), (limit, limit)]));
-        let packed = pack(&polygons).unwrap();
+        let packed = pack(&polygons, |_| Ok(())).unwrap();
         assert_eq!(packed.capacity(), packed.len(), "allocated at its length");
         assert_eq!(
             unpack(&packed),
@@ -189,7 +212,7 @@ mod tests {
         };
         let geometry = vw_ink::geometry_from_stroke(&stroke).unwrap();
         let lists = crate::gesture::contours(geometry.polygons()).unwrap();
-        let packed = pack(geometry.polygons()).unwrap();
+        let packed = pack(geometry.polygons(), |_| Ok(())).unwrap();
         assert_eq!(unpack(&packed), lists);
         assert!(lists.x.len() > 10 * samples as usize);
         // Two i64 per vertex against a few bytes per vertex.

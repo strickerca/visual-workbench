@@ -70,6 +70,9 @@ class ContoursTest {
             byteArrayOf(1, 1, 4, 3, 0, 0, 0, 0, 0, 0), // fewer vertices than announced
             byteArrayOf(1, 1, 2, 3, 0, 0, 0, 0, 0, 0), // more vertices than announced
             byteArrayOf(1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2, 0), // a number past 64 bits
+            byteArrayOf(1, -128, -128, -128, -128, 8, 0), // 2^31 contours: more than Int.MAX_VALUE
+            byteArrayOf(1, 1, 3, -128, -128, -128, -128, 8, 0, 0, 0, 0, 0, 0), // a contour of 2^31 vertices
+            byteArrayOf(1, 1, -1, -1, -1, -1, 7, 3, 0, 0, 2, 0, 1, 1), // Int.MAX_VALUE vertices declared, three sent
         )) assertFailsWith<IllegalArgumentException> { Contours.packed(bytes) }
     }
 

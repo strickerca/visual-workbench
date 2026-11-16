@@ -1,8 +1,9 @@
 //! The packed document reads carry exactly the display list of the plain
 //! reads, with every stroke outline in its compact form. What they count is
 //! an upper bound of what a read allocates (measured here in Rust, reasoned
-//! for Kotlin), and so much less than the plain read that a page of
-//! handwriting the plain read refuses is read whole after every save.
+//! for Kotlin; the build peak of one very long stroke is measured in
+//! `packed_large_stroke.rs`), and so much less than the plain read that a
+//! page of handwriting the plain read refuses is read whole after every save.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod support;
 use std::{
