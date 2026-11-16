@@ -930,6 +930,15 @@ impl ProjectStore {
         integrity(&self.connection)
     }
 
+    /// The connection's `temp_store` setting (0 is SQLite's default), for
+    /// tests that an open's compaction leaves the connection as it was.
+    #[doc(hidden)]
+    pub fn temp_store(&self) -> Result<i64, StoreError> {
+        Ok(self
+            .connection
+            .query_row("PRAGMA temp_store", [], |row| row.get(0))?)
+    }
+
     /// How many bytes `checkpoint_bytes` would return. Every save keeps this
     /// up to date; nothing is serialized to answer it.
     pub fn checkpoint_len(&self) -> usize {
@@ -1930,7 +1939,7 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
     observer: &mut F,
 ) -> Result<Reclaimed, Unreclaimed> {
     if compaction.larger == LargeCopy::Private {
-        remove_private_copies(root)?;
+        remove_private_copies(root);
     }
     let pragma = |name: &str| -> Result<i64, StoreError> {
         Ok(connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))?)
@@ -1989,14 +1998,22 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
             false
         }),
     )?;
+    // Kept as a result, not returned: the connection is restored below
+    // whatever became of the copy.
     let compacted = match &private {
         Some(staging) => {
             let copy = staging.path().join("project.sqlite");
-            crate::archive::sqlite_path(&copy)
-                .and_then(|copy| Ok(connection.execute("VACUUM INTO ?1", [copy]).map(|_| ())?))
+            crate::archive::sqlite_path(&copy).and_then(|copy| {
+                connection
+                    .execute("VACUUM INTO ?1", [copy])
+                    .map(|_| ())
+                    .map_err(StoreError::from)
+            })
         }
-        None if in_memory => Ok(connection.execute_batch("PRAGMA temp_store=MEMORY; VACUUM")?),
-        None => Ok(connection.execute_batch("VACUUM")?),
+        None if in_memory => connection
+            .execute_batch("PRAGMA temp_store=MEMORY; VACUUM")
+            .map_err(StoreError::from),
+        None => connection.execute_batch("VACUUM").map_err(StoreError::from),
     };
     // Whatever became of it, the connection goes back to how it was.
     let _ = connection.progress_handler(0, None::<fn() -> bool>);
@@ -2021,8 +2038,8 @@ fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
 /// Put the compacted copy `VACUUM INTO` made in `staging` in place of the
 /// database file, all or nothing. The copy is checked and on disk before
 /// the database file is touched, and one rename replaces the file, so a
-/// crash at any point leaves either the database as it was or the whole
-/// copy, which holds the same rows and the note of the attempt.
+/// crash at any point leaves either the database as it was, with the note
+/// of the attempt, or the whole copy, which holds the same rows without it.
 ///
 /// Only this store may have the file open. Its lock rules that out for
 /// every program that keeps to it, and on Android for any other, since an
@@ -2038,7 +2055,7 @@ fn private_compaction<F: FnMut(OpenStage)>(
     observer: &mut F,
 ) -> Result<Reclaimed, Unreclaimed> {
     let copy = staging.path().join("project.sqlite");
-    check_copy(&copy)?;
+    prepare_copy(&copy)?;
     observer(OpenStage::Vacuumed);
     if data_version(connection)? != version {
         return Err(Unreclaimed::Kept(StoreError::Busy));
@@ -2077,16 +2094,16 @@ fn private_compaction<F: FnMut(OpenStage)>(
     *connection = reopen(root).map_err(Unreclaimed::Closed)?;
     replaced?;
     synced?;
-    connection.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
-    connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
     // The directory is empty now; dropping it removes it.
     drop(staging);
     Ok(Reclaimed::Done)
 }
 
-/// The copy is a whole database of this schema that SQLite finds sound, and
-/// it is on disk: `VACUUM INTO` does not sync what it writes.
-fn check_copy(copy: &Path) -> Result<(), StoreError> {
+/// Make the copy what replaces the database: without the note of this
+/// attempt, which a finished compaction does not leave, and checked to be a
+/// whole database of this schema that SQLite finds sound, on disk (`VACUUM
+/// INTO` does not sync what it writes).
+fn prepare_copy(copy: &Path) -> Result<(), StoreError> {
     let checked = Connection::open_with_flags(
         copy,
         OpenFlags::SQLITE_OPEN_READ_WRITE
@@ -2095,6 +2112,7 @@ fn check_copy(copy: &Path) -> Result<(), StoreError> {
     )?;
     checked.execute_batch("PRAGMA trusted_schema=OFF")?;
     migrations::verify_schema(&checked, migrations::CURRENT_VERSION)?;
+    checked.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
     let verdict: String = checked.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
     checked
         .close()
@@ -2136,17 +2154,25 @@ fn private_copy(root: &Path) -> Result<tempfile::TempDir, StoreError> {
         .tempdir_in(directory)?)
 }
 
-/// Remove the copies of compactions that ended with their process. Nothing
-/// else uses the directory, and the store's lock is held.
-fn remove_private_copies(root: &Path) -> Result<(), StoreError> {
-    let directory = root.join("cache").join(RECLAIM_DIRECTORY);
-    match fs::symlink_metadata(&directory) {
-        Ok(_) => blobs::check_directory(&directory)?,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error.into()),
+/// Remove the copies of compactions that ended with their process, as far
+/// as that goes: nothing else uses the directory and the store's lock is
+/// held, but whatever cannot be removed is left for a later open and stops
+/// nothing, neither the open nor a compaction. Nothing is removed through a
+/// link, and a link is never followed.
+fn remove_private_copies(root: &Path) {
+    let cache = root.join("cache");
+    let directory = cache.join(RECLAIM_DIRECTORY);
+    let real = |path: &Path| {
+        fs::symlink_metadata(path)
+            .is_ok_and(|metadata| !blobs::is_link(&metadata) && metadata.is_dir())
+    };
+    if !real(root) || !real(&cache) || !real(&directory) {
+        return;
     }
-    for entry in fs::read_dir(&directory)? {
-        let entry = entry?;
+    let Ok(entries) = fs::read_dir(&directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
         if !entry
             .file_name()
             .to_string_lossy()
@@ -2155,17 +2181,18 @@ fn remove_private_copies(root: &Path) -> Result<(), StoreError> {
             continue;
         }
         let path = entry.path();
-        let metadata = fs::symlink_metadata(&path)?;
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
         if blobs::is_link(&metadata) {
-            return Err(StoreError::Invalid("linked storage path"));
+            continue;
         }
-        if metadata.is_dir() {
-            fs::remove_dir_all(&path)?;
+        let _ = if metadata.is_dir() {
+            fs::remove_dir_all(&path)
         } else {
-            fs::remove_file(&path)?;
-        }
+            fs::remove_file(&path)
+        };
     }
-    Ok(())
 }
 
 /// How replaying a stretch of the log ended.

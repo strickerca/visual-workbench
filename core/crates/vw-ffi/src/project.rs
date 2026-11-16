@@ -968,6 +968,158 @@ mod tests {
         project.close().await.unwrap();
         assert!(matches!(project.settle().await, Err(CoreError::Closed)));
     }
+
+    /// A store whose next open would gain from a checkpoint: a page of 900
+    /// rectangles made directly, then one of them moved until one is due.
+    fn store_needing_a_checkpoint(path: &Path) -> ProjectStore {
+        let device = DeviceId::from_bytes([3; 16]);
+        let id = |n: u32| {
+            let mut entropy = [5; 10];
+            entropy[6..].copy_from_slice(&n.to_be_bytes());
+            Id::from_parts(1700000000000, entropy).unwrap()
+        };
+        let (project_id, document, layer) = (id(1), id(2), id(3));
+        let mut model = Project::new(project_id.clone(), "settle fixture".into(), device.clone());
+        model.documents.insert(
+            document.clone(),
+            Document {
+                definition: pb::CreateDocument {
+                    document_id: Some(document.to_proto()),
+                    kind: pb::DocumentKind::Image as i32,
+                    schema_version: 1,
+                    title: "page".into(),
+                    ..Default::default()
+                },
+                pages: vec![],
+                created_at_ms: 0,
+            },
+        );
+        model.layers.insert(
+            layer.clone(),
+            Layer {
+                definition: pb::CreateLayer {
+                    layer_id: Some(layer.to_proto()),
+                    document_id: Some(document.to_proto()),
+                    page_index: -1,
+                    name: "Annotations".into(),
+                    kind: "annotation".into(),
+                    order_key: "V".into(),
+                },
+                visible: true,
+                locked: false,
+                opacity: 1.0,
+                blend: "normal".into(),
+            },
+        );
+        for n in 0..900 {
+            let state = pb::ObjectState {
+                object_id: Some(id(1000 + n).to_proto()),
+                layer_id: Some(layer.to_proto()),
+                order_key: "V".into(),
+                transform: Some(pb::Affine {
+                    a: 1.0,
+                    d: 1.0,
+                    ..Default::default()
+                }),
+                style: Some(pb::Style {
+                    stroke: Some(pb::Color { rgba: 0x112233ff }),
+                    width: 1.0,
+                    ..Default::default()
+                }),
+                role: pb::Role::None as i32,
+                created_by: device.to_string(),
+                created_at_ms: 1,
+                shape: Some(pb::object_state::Shape::Rect(pb::RectD {
+                    x: f64::from(n % 50),
+                    y: f64::from(n / 50),
+                    w: 4.0,
+                    h: 3.0,
+                })),
+                ..Default::default()
+            };
+            let object = vw_model::Object {
+                document_id: document.clone(),
+                state,
+            };
+            model.objects.insert(id(1000 + n), object);
+        }
+        let mut store = ProjectStore::create(path, model, device.clone(), 0).unwrap();
+        let mut moves = 0;
+        while store.checkpoint_need() < CheckpointNeed::Due {
+            moves += 1;
+            assert!(moves < 5000, "no checkpoint came due");
+            let txn = pb::Transaction {
+                txn_id: Some(id(100_000 + moves).to_proto()),
+                project_id: Some(project_id.to_proto()),
+                device_id: device.to_string(),
+                base_revision: Some(store.revision().unwrap()),
+                created_at_wall_ms: i64::from(moves),
+                ops: vec![pb::Op {
+                    op_id: Some(pb::OpId {
+                        device_id: device.to_string(),
+                        lamport: u64::from(moves),
+                    }),
+                    kind: Some(pb::op::Kind::SetProperty(pb::SetProperty {
+                        object_id: Some(id(1000).to_proto()),
+                        property: "transform".into(),
+                        value: Some(pb::PropertyValue {
+                            value: Some(pb::property_value::Value::Transform(pb::Affine {
+                                a: 1.0,
+                                d: 1.0,
+                                e: f64::from(moves),
+                                ..Default::default()
+                            })),
+                        }),
+                    })),
+                }],
+                ..Default::default()
+            };
+            store.commit(&txn, &device, i64::from(moves)).unwrap();
+        }
+        store
+    }
+
+    /// The application cancels a settle (it came back to the foreground)
+    /// while the settle still waits behind other work: it never runs, and
+    /// the checkpoint is still due. One that is not cancelled writes it.
+    #[tokio::test]
+    async fn a_settle_cancelled_before_it_starts_writes_nothing_and_one_that_runs_writes_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("project");
+        let store = store_needing_a_checkpoint(&path);
+        let blobs = BlobStore::new(&path).unwrap();
+        let project =
+            ProjectSession::from_store(store, blobs, SessionPermit::acquire().unwrap()).unwrap();
+        project.hold_checkpoint_upkeep(true);
+        let need = || {
+            project
+                .worker
+                .call(|state| Ok(state.store()?.checkpoint_need()))
+        };
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, wait) = std::sync::mpsc::channel::<()>();
+        project
+            .worker
+            .enqueue(Box::new(move |_| {
+                let _ = started.send(());
+                wait.recv().unwrap();
+            }))
+            .unwrap();
+        ready.await.unwrap();
+        let mut settle = Box::pin(project.settle());
+        assert!(poll_fn(|cx| Poll::Ready(settle.as_mut().poll(cx).is_pending())).await);
+        drop(settle);
+        release.send(()).unwrap();
+        assert!(need().await.unwrap() >= CheckpointNeed::Due);
+        assert!(project.settle().await.unwrap());
+        assert_eq!(need().await.unwrap(), CheckpointNeed::None);
+        project.close().await.unwrap();
+        // It is the checkpoint the next open starts from.
+        assert_eq!(
+            ProjectStore::open(&path).unwrap().replayed_transactions(),
+            0
+        );
+    }
 }
 
 #[cfg(test)]
