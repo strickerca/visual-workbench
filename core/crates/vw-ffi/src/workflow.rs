@@ -398,7 +398,7 @@ fn verification_bytes(state: &ProjectState) -> WorkflowResult<Option<u64>> {
         .filter(|transaction| transaction.device_id == device.as_str());
     // An event keeps the bytes, its ID, kind and receipt, in a map node.
     let undo = own.fold(0u64, |total, transaction| {
-        total.saturating_add(transaction.encoded_len() as u64 + 1024)
+        total.saturating_add((transaction.encoded_len() as u64).saturating_add(1024))
     });
     Ok(visible_hash_bytes(state)?.map(|hash| hash.saturating_add(undo)))
 }

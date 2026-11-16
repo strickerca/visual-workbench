@@ -7,6 +7,13 @@ step "workspace tests"
 # Every test binary runs even after one fails, so a single failure cannot hide
 # others behind it; the step still fails at the end.
 cargo test --workspace --exclude vw-sim --locked --no-fail-fast
+# The workspace build switches on vw-ops's cross-check feature (a dev-dependency
+# feature of vw-store and vw-sim), where every edit re-hashes the whole project.
+# There the large-page admission test tolerates refusals the checks explain and
+# runs a smaller offline case. Run it once more as the apps build the core, so
+# the strict charges gate every push.
+step "large-page admission, as the apps build the core"
+cargo test --locked -p vw-ffi --test large_documents
 step "simulator tests (release)"
 cargo test --release --locked -p vw-sim
 # Speed budget: saving one stroke into a 2,000-stroke document must stay under

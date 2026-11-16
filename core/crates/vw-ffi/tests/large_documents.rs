@@ -387,7 +387,20 @@ fn report(what: &str, used: u64, charge: u64) {
 }
 /// What every commit is charged for the checks of a cross-checking build.
 async fn verification(project: &Arc<ProjectSession>) -> u64 {
-    project.cross_check_charge().await.unwrap()
+    let charge = project.cross_check_charge().await.unwrap();
+    // Unknown means the page's hash is past every memory limit; it would make
+    // every refusal look explained. No page here gets that large.
+    assert_ne!(charge, u64::MAX, "the cross-check charge is unknown");
+    charge
+}
+/// Whether a refusal at `estimated` is explained by a cross-checking build's
+/// checks: without them the charge fits the budget. Never in the apps' build,
+/// whose checks cost nothing.
+fn cross_checks_explain(estimated: u64, verification: u64) -> bool {
+    verification > 0
+        && estimated
+            .checked_sub(verification)
+            .is_some_and(|rest| rest <= BUDGET)
 }
 /// A workflow the apps' budget admits. A cross-checking build may refuse it,
 /// but only when its charge without those checks fits the budget.
@@ -395,7 +408,7 @@ fn admitted<T>(result: WorkflowResult<T>, verification: u64, what: &str) -> Opti
     match result {
         Ok(value) => Some(value),
         Err(WorkflowError::Memory { estimated, .. })
-            if verification > 0 && estimated.saturating_sub(verification) <= BUDGET =>
+            if cross_checks_explain(estimated, verification) =>
         {
             report(
                 &format!("{what} refused for the cross-checks"),
@@ -580,9 +593,16 @@ async fn instruction_workflows(project: &Arc<ProjectSession>, round: u32, fits: 
     let verification = verification(project).await;
     let (plan, used) = peak(prepare(BUDGET)).await;
     if let Some(plan) = admitted(plan, verification, "planning a marker") {
-        // Planning hashes the page, then decides the marker in place, which
-        // is what its commit is charged.
-        let planning = (charge - INSTRUCTION_WORK).max(plan.commit_charge().await.unwrap());
+        // Planning hashes the page, then decides the marker in place. In the
+        // apps' build that stays within the hash charge; a cross-checking
+        // build also re-hashes the whole project there, as the marker's
+        // commit is charged.
+        let hashed = charge - INSTRUCTION_WORK;
+        let planning = if vw_ops::CROSS_CHECKED {
+            hashed.max(plan.commit_charge().await.unwrap())
+        } else {
+            hashed
+        };
         assert!(
             used <= planning,
             "planning a marker used {used} > charge {planning}"
@@ -737,7 +757,7 @@ async fn offline_phone(page: Page, pending: u32) {
         }
         Err(WorkflowError::Memory { estimated, .. }) => {
             assert!(
-                verification > 0 && estimated - verification <= BUDGET,
+                cross_checks_explain(estimated, verification),
                 "a rename was refused at {estimated}"
             );
             estimated - CONTROL_WORK
@@ -941,7 +961,7 @@ async fn a_large_icc_profile_is_charged_where_it_is_hashed_or_rewritten() {
                 Err(SelectionError::Memory { estimated, .. }) if estimated > budget => {
                     if estimated > BUDGET {
                         assert!(
-                            verification > 0 && estimated - verification <= BUDGET,
+                            cross_checks_explain(estimated, verification),
                             "a selection import charged {estimated}"
                         );
                         break None;
