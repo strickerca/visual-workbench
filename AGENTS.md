@@ -53,9 +53,10 @@ product. If it doesn't, don't make it. If it already exists, delete it.
   commit. The same checks run by hand through `tools/ci/*.sh` on Linux and
   through `build.ps1` on the laptop. A green check is not a device result.
 - **Cloud sessions** can't run `build.ps1`, Windows-only code or the phone. They
-  work on the branch the session assigns, run the `tools/ci` scripts, read the
-  Windows and Kotlin results from the automatic checks, and deliver by pull
-  request. Anything that needs the laptop, Paint or the S23 stays pending and is
+  work on the branch the session assigns, run the `tools/ci` scripts (including
+  `windows-typecheck.sh`, which lints the Windows-only Rust code for Windows
+  without linking or running it), read the Windows and Kotlin results from the
+  automatic checks, and deliver by pull request. Anything that needs the laptop, Paint or the S23 stays pending and is
   said so.
 - Standing Git authorization (2026-10-01): commit validated task work, merge
   completed work into main, and push main to origin at each numbered phase

@@ -82,6 +82,7 @@ tools/ci/policy.sh               # IDs, plan coverage, licences, secret scan
 tools/ci/rust-lint.sh && tools/ci/rust-test.sh
 tools/ci/python-node.sh          # tooling tests and the MCP server tests
 tools/ci/kotlin-linux.sh         # Kotlin tests, lint and licence check
+tools/ci/windows-typecheck.sh    # Windows-only Rust code linted for Windows (not linked or run)
 ```
 
 Every push runs these through `.github/workflows/ci.yml`, plus the Rust
