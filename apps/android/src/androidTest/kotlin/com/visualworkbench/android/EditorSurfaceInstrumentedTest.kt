@@ -143,8 +143,9 @@ class EditorSurfaceInstrumentedTest {
      * a persistent one. Screenshots stay in memory and are recycled immediately. */
     private fun assertPresented(scenario: ActivityScenario<MainActivity>, phase: String, deadlineMs: Long = 2_000, observeMs: Long = 800) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val start = SystemClock.uptimeMillis()
+        // Writing out what the canvas recorded so far happens before the deadline's clock starts.
         CanvasLife.line("check_begin phase=$phase")
+        val start = SystemClock.uptimeMillis()
         var samples = 0; var blackSamples = 0; var bandSamples = 0; var firstBlackMs = -1L; var lastBlackMs = -1L
         var firstPresentedMs = -1L; var lastPresented = false; var detail = "canvas-unavailable"
         while (true) {
@@ -262,9 +263,10 @@ class EditorSurfaceInstrumentedTest {
             try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
     }
-    /** [lifecycleLog]: the canvases made for this test write their lifecycle lines
-     * (VW_CANVAS_LIFE) and a presentation failure quotes them. That log changes the
-     * canvas's timing, so the presentation tests also run with it off, as shipped. */
+    /** [lifecycleLog]: the canvases made for this test record their lifecycle
+     * (VW_CANVAS_LIFE) and a presentation failure quotes it. Recording only observes
+     * (a clock read and a few numbers per event; the log's own thread writes the
+     * lines), and the presentation tests still also run with it off, as shipped. */
     private fun withCanvas(lifecycleLog: Boolean = false, body: (ActivityScenario<MainActivity>, String) -> Unit) {
         var ownedProject: String? = null
         var storageClosed = false
