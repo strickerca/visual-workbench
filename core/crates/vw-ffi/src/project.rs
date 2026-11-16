@@ -488,8 +488,10 @@ impl ProjectSession {
     ///
     /// A checkpoint takes as long as the history is large and nothing else
     /// in the project runs meanwhile, so this runs after the work already
-    /// queued and is refused with `Backpressure`, writing nothing, while a
-    /// stroke is being drawn or saved. It runs whether or not the automatic
+    /// queued and is refused with `Backpressure`, writing nothing, while any
+    /// stroke gesture is alive: being drawn or saved, or committed but not
+    /// yet shut down (its worker holds the drawing permit until then, and
+    /// the automatic upkeep waits for it too). It runs whether or not the automatic
     /// upkeep is held. Returns whether a checkpoint was written: false when
     /// none is due. `Storage` when writing one failed; the cause is in the
     /// diagnostics, and closing or the next open writes it instead.

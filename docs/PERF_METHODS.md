@@ -238,7 +238,11 @@ largest real project:
    freeze.
 3. Close the app from Recents, reopen the project, and read
    `project: open took … ms` in the same report. Compare it with an open
-   after drawing as much and closing from Recents without waiting 15 s first.
+   after drawing as much and then ending the app before the 2 s grace runs
+   out: open Recents and swipe the app away within a second, or press Home and
+   at once run `adb shell am force-stop com.visualworkbench.android` from the
+   laptop. Opening Recents, or Settings, already counts as out of sight, so
+   lingering there lets the checkpoint run and spoils the comparison.
 
 A project with more than 256 MiB of live data also compacts once on the phone,
 when the project list or the project is next opened; note how long that list

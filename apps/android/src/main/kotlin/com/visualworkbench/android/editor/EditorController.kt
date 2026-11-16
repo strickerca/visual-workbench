@@ -1383,14 +1383,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         !documents.state.value.busy && transferJob == null && incomingJob == null && incomingProducer == null &&
         previewJob?.isActive != true && previewHandle == null
     /** Waits, out of sight, until [nativeQuiet]. Only busy and pending can be
-     * awaited; the rest is looked at four times a second. False once the
-     * editor is being disposed. */
+     * awaited; the rest is looked at four times a second, for at most eight
+     * seconds: by then a cached app would have been frozen, and one kept
+     * running (a bound service) writes the checkpoint itself once left alone.
+     * False once the editor is being disposed or the looks run out. */
     private suspend fun settleIdle(): Boolean {
-        while (true) {
+        repeat(32) {
             if (!importReadiness.awaitReady() || disposing) return false
             if (nativeQuiet()) return true
             delay(250)
         }
+        return false
     }
 
     private suspend fun refreshProjects() {
@@ -1708,8 +1711,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         changesJob = scope.launch {
             try {
                 current.changes.collect { change ->
+                    // The core replays its latest change to each new subscriber;
+                    // an Opened replay of the revision already shown is nothing
+                    // new and must not overtake what open started.
+                    val replay = change.kind == ChangeKind.Opened &&
+                        change.project.hostSeq == info?.hostSeq && change.project.stateHash == info?.stateHash
                     if (change.kind in setOf(ChangeKind.Committed, ChangeKind.Opened) && token == epoch && current === project && change.project.projectId == info?.projectId &&
-                        refreshAdmission.observe(change.sequence)) {
+                        !replay && refreshAdmission.observe(change.sequence)) {
                         captureArrivals.changed(current, token)
                         giantOwner.observe(change.project)
                         invalidateAssisted()
@@ -2019,7 +2027,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         catch (error: CoreFailure) {
             next().let { if(it!=PlainPass.Done)return it }
             if(!adoptable())return PlainPass.Done
-            needsColorConsent = error.kind == CoreFailureKind.Raster && !approvedAssumption(doc) && format?.untagged==true
+            // Judged on what this decode used: a consent recorded while the
+            // page's source information was being read again could not be
+            // applied, and is offered again rather than lost (assumeSrgb
+            // needs this to run again).
+            needsColorConsent = error.kind == CoreFailureKind.Raster && !assumed &&
+                (format?.untagged==true || plain?.consent != null)
             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
                 "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
             else if (error.kind == CoreFailureKind.ImageCodecUnavailable)

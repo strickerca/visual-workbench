@@ -70,7 +70,10 @@ public interface WorkbenchSettling {
     /** Runs after the work already queued in the project and takes as long
      * as its history is large. Returns whether a checkpoint was written:
      * false when none was due. Fails with [CoreFailureKind.Backpressure],
-     * writing nothing, while a stroke is being drawn or saved; with
+     * writing nothing, while any stroke has not been disposed: one being
+     * drawn or saved, and one committed but not yet
+     * [WorkbenchStroke.dispose]d, which also holds off the project's own
+     * checkpoint, so dispose each stroke once it is done; with
      * [CoreFailureKind.Closed] once the project is closed; with
      * [CoreFailureKind.Storage] when writing it failed, and then closing or
      * the next open writes it instead. */
