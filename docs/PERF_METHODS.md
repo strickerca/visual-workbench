@@ -224,6 +224,26 @@ rise in "saved to canvas refreshed" under step 3 is expected. The timings end
 when a frame is handed to the display, so the camera measurement still decides
 PERF-001 (25 ms p95) and PERF-003 (80 ms p95).
 
+## Background checkpoint — S23 check
+
+The phone writes the project's recovery checkpoint once the app has been out
+of sight for 2 s and the editor is idle; Android freezes a cached app about
+10 s after it leaves the screen. On a page with about 2,000 strokes, or the
+largest real project:
+
+1. Draw a few strokes, press Home, wait 15 s, come back.
+2. Projects → Diagnostics → Preview diagnostic report. The line
+   `project: checkpoint on background took … ms` should be well under 8,000 ms.
+   No such line means the checkpoint was not due or did not finish before the
+   freeze.
+3. Close the app from Recents, reopen the project, and read
+   `project: open took … ms` in the same report. Compare it with an open
+   after drawing as much and closing from Recents without waiting 15 s first.
+
+A project with more than 256 MiB of live data also compacts once on the phone,
+when the project list or the project is next opened; note how long that list
+takes to appear the first time.
+
 ## Current environment and gaps
 
 PC and phone facts are in HARDWARE_TRUTH.md, which distinguishes the S23 target
