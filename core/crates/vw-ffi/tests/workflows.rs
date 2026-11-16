@@ -716,17 +716,21 @@ async fn transaction_workspace_refusal_keeps_draft_editable_before_sealing() {
     seed.commit(cancel()).await.unwrap();
     seed.dispose();
     project.close().await.unwrap();
-    let stored = vw_store::ProjectStore::open(&path).unwrap();
-    let resident = stored.workspace_estimate_bytes(BUDGET).unwrap();
-    // Exactly the production canonical mutation charge, with only one MiB
-    // remaining for the NEW transaction representations. No hardcoded project
-    // serialized size or race with another fixture's live handles.
-    let budget = resident * 16 + 4 * 1024 * 1024 + 48 * 1024 * 1024 + 1024 * 1024;
-    assert!(budget < BUDGET);
-    drop(stored);
     let project = open_project(path.to_string_lossy().into(), cancel())
         .await
         .unwrap();
+    // Exactly the production charge of hashing this page beside the
+    // instruction work, read from its refusal, with one MiB more: the NEW
+    // transaction representations do not fit in that. No hardcoded project
+    // serialized size or race with another fixture's live handles.
+    let Err(WorkflowError::Memory { estimated, .. }) = project
+        .instruction_document(id(2), 48 * 1024 * 1024 + 1, cancel())
+        .await
+    else {
+        panic!("a one-byte page budget must be refused with its charge");
+    };
+    let budget = estimated + 1024 * 1024;
+    assert!(budget < BUDGET);
     let binding = project
         .instruction_document(id(2), BUDGET, cancel())
         .await

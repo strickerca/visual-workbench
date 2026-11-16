@@ -31,6 +31,23 @@ pub struct PendingTransaction {
     pub blocked_reason: Option<String>,
 }
 
+/// A replica's undo previews as `Replica::undo_previews` lends them: those
+/// of its accepted edits, then those it holds for its queued edits. Their
+/// serialized shape is the shape of the `serde_json::Value`s they hold.
+pub struct UndoPreviews<'a> {
+    replica: &'a Replica,
+}
+impl serde::Serialize for UndoPreviews<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let replica = self.replica;
+        let queued = replica.pending.iter().filter_map(|pending| {
+            let id = Id::from_proto(pending.transaction.txn_id.as_ref()).ok()?;
+            replica.inverse_previews.get_key_value(&id)
+        });
+        serializer.collect_map(replica.authoritative_inverses.iter().chain(queued))
+    }
+}
+
 /// An optimistic local view over the latest verified host snapshot.
 #[derive(Debug, Clone)]
 pub struct Replica {
@@ -106,6 +123,13 @@ impl Replica {
     }
     pub fn pending(&self) -> &[PendingTransaction] {
         &self.pending
+    }
+    /// The undo previews a replay of the queue rebuilds, lent for sizing it:
+    /// it starts from a copy of those of this device's accepted edits and
+    /// adds one for every queued edit, beside the set held now until the new
+    /// one is installed. Read only.
+    pub fn undo_previews(&self) -> UndoPreviews<'_> {
+        UndoPreviews { replica: self }
     }
     /// Restore a transaction from the durable local outbox after the verified
     /// host base advanced. Preserve its original bytes/base for exact retry and

@@ -13,7 +13,7 @@ pub(super) fn write(
     if options.max_encoded_bytes == 0 || options.max_encoded_bytes > MAX_ENCODED {
         return Err(SelectionError::Invalid);
     }
-    let canonical = canonical_workspace(state, options.memory_budget_bytes, false)?;
+    let canonical = borrowed_workspace(options.memory_budget_bytes)?;
     let pixel_budget = options
         .memory_budget_bytes
         .checked_sub(canonical)

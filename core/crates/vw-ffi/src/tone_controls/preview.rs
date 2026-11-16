@@ -284,7 +284,7 @@ pub(super) fn preview(
         };
         metadata.validate()?;
         let (mut transaction, _) = plan::transaction(state, &document, &metadata, command)?;
-        admit_transaction(state, &transaction, budget, admitted.extra)?;
+        admit_isolated_host(state, &transaction, budget, admitted.extra)?;
         cancel.check()?;
         let mut host = vw_ops::HostSequencer::new(project.clone(), device.clone())
             .map_err(plan::operation_error)?;

@@ -416,7 +416,7 @@ fn draft(
     };
     metadata.validate()?;
     let (mut transaction, _) = plan::transaction(state, document, &metadata, command)?;
-    admit_transaction(state, &transaction, budget, working.extra)?;
+    admit_isolated_host(state, &transaction, budget, working.extra)?;
     cancel.check()?;
     let mut host = vw_ops::HostSequencer::new(state.project()?.clone(), device.clone())
         .map_err(plan::operation_error)?;
