@@ -7,6 +7,9 @@ public data class RemoteEchoTiming(
     public val missing:ULong,public val pending:Int,public val p50Nanos:Long?,
     public val p95Nanos:Long?,public val lastFrameId:ULong,public val lastTicket:ULong,
 )
+/** Receives one covered sample's delay in nanoseconds, for local diagnostics.
+ * An interface with a plain number, so that no value object is made per sample. */
+public fun interface RemoteEchoDelaySink { public fun delay(nanos:Long) }
 /** Caller owns one short local fence; no provider or native work occurs here. */
 public class RemoteEchoLedger {
     private var binding:RemoteTargetBinding?=null
@@ -21,12 +24,14 @@ public class RemoteEchoLedger {
         if(pending.size>=256){pending.remove(pending.keys.first());missing++}
         pending[admission.sequence]=admission.sampledLocalNanos;return true
     }
-    public fun acknowledge(receipt:RemoteRenderedAcknowledgment,callbackNanos:Long):Boolean {
+    /** [measured] receives each covered sample's delay in nanoseconds, for local
+     * diagnostics only; it never changes what is acknowledged. */
+    public fun acknowledge(receipt:RemoteRenderedAcknowledgment,callbackNanos:Long,measured:RemoteEchoDelaySink?=null):Boolean {
         if(receipt.binding!=binding||receipt.frameId<=frame||receipt.ticket==ticket||callbackNanos<clock)return false
         if(pending.any{(seq,sampled)->seq<=receipt.lastInputSequenceApplied&&sampled>callbackNanos})return false
         expire(callbackNanos)
         val covered=pending.filterKeys{it<=receipt.lastInputSequenceApplied}
-        for((seq,sampled)in covered){if(measured.size>=256)measured.removeAt(0);measured+=callbackNanos-sampled;pending.remove(seq);observed++}
+        for((seq,sampled)in covered){if(this.measured.size>=256)this.measured.removeAt(0);this.measured+=callbackNanos-sampled;measured?.delay(callbackNanos-sampled);pending.remove(seq);observed++}
         frame=receipt.frameId;ticket=receipt.ticket;return true
     }
     private fun expire(now:Long){if(now<clock)return;clock=now;val expired=pending.filterValues{now>=it&&now-it>=500_000_000L}.keys;for(seq in expired){pending.remove(seq);missing++}}

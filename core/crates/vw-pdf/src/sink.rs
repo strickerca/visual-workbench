@@ -64,6 +64,11 @@ impl<'a> SaveSink<'a> {
     }
 }
 
+/// # Safety
+/// `header` must be null or the address of the `header` field of a live
+/// `SaveSink` that no other reference or thread accesses during this call
+/// (PDFium passes back the pointer from `SaveSink::pointer`). `data` must be
+/// null or valid for reads of `size` bytes until this call returns.
 unsafe extern "C" fn write_block(
     header: *mut FPDF_FILEWRITE,
     data: *const c_void,

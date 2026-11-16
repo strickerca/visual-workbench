@@ -1,15 +1,17 @@
 //! Host-authoritative, atomic transactions over the shared document model.
 //! Persistence is supplied by vw-store; network delivery is supplied by vw-net.
 
+mod draft;
 mod gesture;
 mod host;
 mod patch;
 mod plan;
 mod replica;
 mod undo;
+pub use draft::{Touched, Work};
 pub use gesture::GestureStore;
-pub use host::{Acceptance, HostSequencer, HostSnapshot};
-pub use replica::{PendingTransaction, Replica};
+pub use host::{Acceptance, HostSequencer, HostSnapshot, InversePreview};
+pub use replica::{CROSS_CHECKED, PendingTransaction, Replica, UndoPreviews};
 pub use undo::UndoManager;
 
 /// Rejections are typed and do not include captured text or private payloads.

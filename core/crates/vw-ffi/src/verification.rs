@@ -4,8 +4,6 @@
 //! both source projects for the complete call. Catalog bytes, inbox PNGs and
 //! matching source state cannot establish that causal capture association by
 //! themselves. Imported lineage and agent result assertions never establish it.
-//! See verification/INTEGRATION.md for the three minimal reserved owner hooks,
-//! registration and deferred execution prerequisites.
 mod checked;
 mod dto;
 mod geometry;

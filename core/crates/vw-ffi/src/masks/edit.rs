@@ -64,7 +64,7 @@ pub(super) fn apply(
     options: SelectionEdit,
     cancel: &Cancellation,
 ) -> SelectionResult<SelectionReceipt> {
-    let canonical = canonical_workspace(state, options.memory_budget_bytes, true)?;
+    let canonical = borrowed_workspace(options.memory_budget_bytes)?;
     if let SelectionOperation::ImportCoverage {
         width,
         height,
@@ -324,21 +324,34 @@ pub(super) fn apply(
         gesture_id: None,
         ops,
     };
+    // Deciding the transaction (the dry run below, then the commit) holds the
+    // mask history and objects it touches; the pixel work is still alive.
+    let committing = selection_error(crate::workflow::commit_workspace(
+        state,
+        &txn,
+        options.memory_budget_bytes,
+    ))?;
+    memory(
+        mask_estimate(
+            size,
+            input_bytes
+                .checked_add(committing)
+                .ok_or(SelectionError::Limit)?,
+        )?,
+        options.memory_budget_bytes,
+    )?;
     // Use the same authority as ProjectState::commit for a dry run before blob
     // admission, including optimistic pending objects on a connected client.
-    if let Some(replica) = &state.replica {
-        let mut candidate = replica.clone();
+    if let Some(replica) = &mut state.replica {
         // This is new work, not a recovered retry. Never return a prepared-mask
         // receipt for a transaction queued in the replica's blocked list.
-        if txn.base_revision.as_ref() != Some(candidate.revision()) {
+        if txn.base_revision.as_ref() != Some(replica.revision()) {
             return Err(SelectionError::Conflict);
         }
-        candidate
-            .queue(txn.clone())
-            .map_err(|_| SelectionError::Invalid)?;
+        replica.check(&txn).map_err(|_| SelectionError::Invalid)?;
     } else {
         state
-            .store()?
+            .store_mut()?
             .validate_transaction(&txn, &device, options.created_at_ms)
             .map_err(|_| SelectionError::Invalid)?;
     }

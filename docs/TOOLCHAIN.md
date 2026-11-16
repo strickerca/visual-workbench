@@ -72,8 +72,7 @@ package/version was added to Cargo.lock. First-party path dependencies are
 explicitly pinned to `=0.1.0`. The probe uses Rust 1.99.0, edition 2024, with the
 existing two-worker Cargo limit. `build-pen-inject` runs both license gates before
 compiling and binds the resulting two executable hashes to their source and
-manifests for warm HIL reuse. See `docs/evidence/T0.05.md` for measured results
-and remaining editor/integrity acceptance.
+manifests for warm HIL reuse. Editor and integrity acceptance remain open.
 
 ## Libraries
 
@@ -186,9 +185,9 @@ The Windows and Android release builds use these exact direct versions:
 | Crate | Pin | Declared license |
 |---|---|---|
 | quinn | 0.11.12 | MIT OR Apache-2.0 |
-| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT |
+| rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT |
 | rcgen | 0.14.10 | MIT OR Apache-2.0 |
-| tokio | 1.53.1 | MIT |
+| tokio | 1.53.3 | MIT |
 | serde | 1.0.229 | MIT OR Apache-2.0 |
 | serde_json | 1.0.151 | MIT OR Apache-2.0 |
 | thiserror | 2.0.21 | MIT OR Apache-2.0 |
@@ -306,12 +305,12 @@ non-yanked versions. Cargo.lock retains exact transitive versions and checksums.
 
 | Crate | Exact pin | Declared license | Selected features |
 | --- | --- | --- | --- |
-| rusqlite | 0.40.2 | MIT | bundled; defaults disabled |
-| libsqlite3-sys | 0.38.2 (resolved) | MIT | bundled SQLite 3.53.2 |
-| zip | 8.6.0 | MIT | defaults disabled; stored ZIP/ZIP64 entries |
-| fs2 | 0.4.3 | MIT OR Apache-2.0 | filesystem capacity and advisory locks |
+| rusqlite | 0.41.1 | MIT | bundled; defaults disabled |
+| libsqlite3-sys | 0.39.1 (resolved) | MIT | bundled SQLite 3.54.1 |
+| zip | 9.5.1 | MIT | defaults disabled; stored ZIP/ZIP64 entries |
 | tempfile | 3.27.0 (reused) | MIT OR Apache-2.0 | atomic temporary-file publication |
-| rustix | 1.1.5 (reused) | Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT | fs, Android/Linux no-replace directory rename |
+| rustix | 1.1.6 (reused) | Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT | fs: advisory locks (`flock`) and volume space (`statvfs`) on Unix, Android/Linux no-replace directory rename |
+| windows-sys | 0.61.2 (reused) | MIT OR Apache-2.0 | advisory locks (`LockFileEx`) and volume space (`GetDiskFreeSpaceW`) on Windows |
 
 BLAKE3 1.8.7, serde 1.0.229, serde_json 1.0.151 with float_roundtrip,
 thiserror 2.0.21 and development-only Windows 0.62.2 reuse existing exact pins.
@@ -320,9 +319,10 @@ to generate a 30-frame, 64x64, one-second H.264 MP4 fixture; no encoder executab
 is bundled. The same fixture bytes run through storage tests on Windows and S23.
 
 Sources: [rusqlite releases](https://github.com/rusqlite/rusqlite/releases),
-[rusqlite 0.40.2](https://crates.io/crates/rusqlite/0.40.2),
-[zip 8.6.0](https://crates.io/crates/zip/8.6.0),
-[fs2 0.4.3](https://crates.io/crates/fs2/0.4.3).
+[rusqlite 0.41.1](https://crates.io/crates/rusqlite/0.41.1),
+[zip 9.5.1](https://crates.io/crates/zip/9.5.1).
+The unmaintained fs2 0.4.3 was dropped on 2026-11-16 for the same OS calls through
+rustix and windows-sys.
 SQLite's generated amalgamation reports **3.53.2** in sqlite3.h and is
 [public domain](https://www.sqlite.org/copyright.html). The MIT Rust wrapper
 license does not replace that upstream dedication. The existing license policy
@@ -352,7 +352,7 @@ at `994e034c9a6e0747386360275058feb7dcac7762` and the official
 [Bazel 7.7.1 Windows x64 executable](https://github.com/bazelbuild/bazel/releases/tag/7.7.1),
 SHA-256 `6d9fb21e806cf4f4e61bfa2bc865df4900ffdc1e9ea90ca1016ba70367ef0de4`.
 These are isolated diagnostic inputs, not product dependencies. The four bounded
-attempts are recorded in `docs/evidence/T0.10-results.json`; none produced the
+attempts did not produce the
 Windows core target. The provisional shared Rust engine remains the implemented
 candidate, with final D6 pending.
 
@@ -363,7 +363,7 @@ The spike adds [sha2 **0.11.0**](https://crates.io/crates/sha2/0.11.0) and
 MIT OR Apache-2.0 terms checked against official registry metadata. Cargo.lock
 adds eight external packages and does not replace existing versions. It reuses
 image **0.25.10** (PNG/JPEG), moxcms **0.8.1**, windows **0.62.2** (WinHTTP and
-Credential Manager), fs2 **0.4.3**, tempfile **3.27.0**, serde **1.0.229**,
+Credential Manager), rustix **1.1.6** and windows-sys **0.61.2** (ledger lock), tempfile **3.27.0**, serde **1.0.229**,
 serde_json **1.0.151** and thiserror **2.0.21**.
 
 The Rust license/source/ban gate passes. Android dependencies are unchanged:
@@ -408,8 +408,8 @@ The locked graph adds stable [spake2 0.4.0](https://docs.rs/spake2/0.4.0/spake2/
 The 0.5.0-pre SPAKE2 preview is not selected. Upstream documents audit/timing
 limitations for 0.4.0; testing is not a cryptographic audit.
 
-Existing quinn 0.11.12, rustls 0.23.45, ring 0.17.14, rcgen 0.14.10,
-tokio 1.53.1 and bytes 1.12.1 exact pins are reused. QUIC and TCP TLS use ring,
+Existing quinn 0.11.12, rustls 0.23.46, ring 0.17.14, rcgen 0.14.10,
+tokio 1.53.3 and bytes 1.12.1 exact pins are reused. QUIC and TCP TLS use ring,
 TLS 1.3 and no resumption/zero-RTT. The lock update adds 24 external packages
 without upgrading/removing prior versions; Rust license/source/ban checks pass.
 The unchanged Kotlin app graph still passes its 220-module/12-configuration

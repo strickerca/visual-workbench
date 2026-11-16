@@ -9,8 +9,7 @@ shortcut and latency results remain pending. The earlier
 | Krita | File version 5.3.4.0; portable Krita 5.3.4 | Owned blank startup window; numeric controls queried without tool changes | Not tested | Not tested | Not tested | Not tested | Not tested | Not measured |
 | Paint | File and installed-package version 11.2605.81.0 | Owned blank window; canvas reports Brush tool; no input sent | Not tested | Not tested; support unconfirmed | Not tested | Not tested | Not tested | Not measured |
 
-The [source-bound observation receipt](../evidence/M4-KP-editor-observations-r18.json)
-records the exact executable BLAKE3/length, probe and runner SHA256, complete
+The source-bound observation run recorded the exact executable BLAKE3/length, probe and runner SHA256, complete
 selected-root queries and actual owned-process/IO retirement. No screenshots were
 created. Both editors closed after their query-only checks; no owner document or
 editor preference was reset.
@@ -35,8 +34,7 @@ owner drawing session or target-device performance.
 
 Later automated checkpoint: the rows above retain the original query-only
 baseline. Subsequent owned-window drawing/history attempts did not pass complete
-pixel restoration; their failures remain in
-[the milestone evidence](../evidence/M4-KP.md). Krita's selected-Brush operation
+pixel restoration. Krita's selected-Brush operation
 moved keyboard focus from the canvas to the toolbox. Native Paint diagnostics
 proved that the Brush point hits a passive Image immediately inside the exact
 Brush button, explaining the existing exact-element guard refusal. Reviewed

@@ -76,16 +76,7 @@ fn read(path: &Path, limit: usize) -> AiEditResult<Vec<u8>> {
     Ok(out)
 }
 fn no_follow(options: &mut OpenOptions) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x0020_0000);
-    }
-    #[cfg(any(target_os = "android", target_os = "linux"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x0002_0000);
-    }
+    vw_store::no_follow(options);
 }
 pub(super) fn sync_directory(path: &Path) -> AiEditResult<()> {
     #[cfg(unix)]
@@ -109,7 +100,7 @@ fn lock(parent: &Path) -> AiEditResult<DirectoryLock> {
     if file.metadata().map_err(|_| AiEditError::Storage)?.len() != 0 {
         return Err(AiEditError::Storage);
     }
-    fs2::FileExt::try_lock_exclusive(&file).map_err(|_| AiEditError::Busy)?;
+    vw_store::os_fs::try_lock_exclusive(&file).map_err(|_| AiEditError::Busy)?;
     Ok(DirectoryLock { _file: file })
 }
 pub(super) fn open(

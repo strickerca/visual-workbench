@@ -130,9 +130,9 @@ fn apply(
     closed: &AtomicBool,
     cancel: &Cancellation,
 ) -> WorkflowResult<VectorEraseReceipt> {
-    // Admission precedes info/hash and all speculative clones. Fresh outline
-    // transaction staging receives its own additional admission below.
-    let canonical = workflow::canonical_workspace(state, request.memory_budget_bytes, true)?;
+    // Erasing reads the project in place and commits in place; deciding the
+    // outline transaction, and the strokes it replaces, is admitted below.
+    let canonical = workflow::borrowed_workspace(request.memory_budget_bytes)?;
     let mut construction = add(
         limits.workspace_bytes().map_err(ink_error)?,
         request.centers.len() as u64 * 64,
@@ -357,26 +357,28 @@ fn apply(
         gesture_id: None,
         ops,
     };
-    let remaining = request
+    // Construction buffers count as alive while the transaction is decided.
+    // The commit charge includes the borrowed canonical one.
+    let left = request
         .memory_budget_bytes
-        .checked_sub(initial_peak)
+        .checked_sub(construction)
         .ok_or(WorkflowError::Limit)?;
-    let single =
-        vw_ops::HostSequencer::transaction_workspace_estimate_bytes(&transaction, remaining / 16)
-            .map_err(|_| WorkflowError::Invalid)?;
-    let estimated_peak = add(initial_peak, multiply(single, 16)?)?;
+    let committing = match workflow::commit_workspace(state, &transaction, left) {
+        Err(WorkflowError::Memory { estimated, .. }) => estimated,
+        other => other?,
+    };
+    let estimated_peak = add(construction, committing)?;
     memory(estimated_peak, request.memory_budget_bytes)?;
-    if let Some(replica) = &state.replica {
+    if let Some(replica) = &mut state.replica {
         if transaction.base_revision.as_ref() != Some(replica.revision()) {
             return Err(WorkflowError::Stale);
         }
-        let mut candidate = replica.clone();
-        candidate
-            .queue(transaction.clone())
+        replica
+            .check(&transaction)
             .map_err(|_| WorkflowError::Invalid)?;
     } else {
         state
-            .store()?
+            .store_mut()?
             .validate_transaction(&transaction, &device, request.metadata.created_at_ms)
             .map_err(|_| WorkflowError::Invalid)?;
     }

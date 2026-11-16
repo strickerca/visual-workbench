@@ -57,9 +57,9 @@ internal fun ExportDialog(controller: EditorController, state: EditorState, save
                 if (settings.encoding.png) {
                     Divider()
                     Text("Windows clipboard companion", style = MaterialTheme.typography.subtitle2)
-                    Text("Copy publishes the exact PNG plus an 8-bit DIBV5 image. PNG file drag preserves the chosen PNG depth.", style = MaterialTheme.typography.caption)
-                    Option("Allow depth reduction for the DIBV5 companion", settings.allowDibDepthReduction, !state.busy) { controller.exportSettings(settings.copy(allowDibDepthReduction = it)) }
-                    Option("Treat an untagged DIBV5 companion as sRGB", settings.assumeDibSrgb, !state.busy) { controller.exportSettings(settings.copy(assumeDibSrgb = it)) }
+                    Text("Copy puts the exact PNG on the clipboard, plus an 8-bit plain bitmap (DIBV5) for older Windows apps. Dragging the PNG file keeps the chosen PNG depth.", style = MaterialTheme.typography.caption)
+                    Option("Allow the plain bitmap copy to be reduced to 8 bits", settings.allowDibDepthReduction, !state.busy) { controller.exportSettings(settings.copy(allowDibDepthReduction = it)) }
+                    Option("Treat the plain bitmap copy as sRGB when the image has no color profile", settings.assumeDibSrgb, !state.busy) { controller.exportSettings(settings.copy(assumeDibSrgb = it)) }
                 }
                 checked?.let { check ->
                     Text("Preflight: ${check.width} × ${check.height} · ${check.outputBitDepth} bit · estimated ${check.estimatedPeakBytes / (1024uL * 1024uL)} MiB${if (check.buffered) " · buffered codec" else " · strip encoder"}")
@@ -74,7 +74,7 @@ internal fun ExportDialog(controller: EditorController, state: EditorState, save
                 }
                 if (settings.encoding.png) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton({ request?.let(controller::copyExport) }, enabled = enabled) { Text("Copy PNG + DIBV5") }
+                        OutlinedButton({ request?.let(controller::copyExport) }, enabled = enabled) { Text("Copy PNG + bitmap") }
                         OutlinedButton({ request?.let(controller::prepareDragExport) }, enabled = enabled) { Text("Prepare file drag") }
                     }
                     Text("Preparing a drag returns to the canvas. Use the Drag prepared PNG button on the transfer shelf.", style = MaterialTheme.typography.caption)

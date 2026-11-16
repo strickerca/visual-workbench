@@ -1,10 +1,6 @@
 @file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 package com.visualworkbench.desktop
 
-// Adapted from the owned ComposePanel/raster/draw leaves preserved at
-// 473395197f6437586a8b0c05fa8cd35aa6800441, recovery/source-candidates/desktop.
-// Shared contracts follow GIANT_RENDERER_PARALLEL_HANDOFF_20261018.md at 8d95427.
-
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue

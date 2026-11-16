@@ -474,25 +474,31 @@ def finalize(receipt: dict, texts: dict) -> tuple[bytes, bytes, dict]:
 
 
 # ------------------------------------------------------------- verification
+def _receipt_shape(receipt: dict) -> None:
+    """Refuse wrong JSON types once, before anything dereferences them.
+
+    Every later step may then assume these types, so an exception raised after
+    this point is a defect in the verifier or a wrong caller argument and is
+    left to propagate with its traceback instead of being reported as a
+    malformed receipt.
+    """
+    def strings(value) -> bool:
+        return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+    code = "notices_receipt_structure"
+    require(isinstance(receipt["generator"], str) and strings(receipt["coverage"]) and strings(receipt["skipped"])
+            and isinstance(receipt["inputs"], dict), code)
+    for row in receipt["components"]:
+        require(all(isinstance(row[name], str) for name in ("ecosystem", "name", "version", "declared", "selected"))
+                and strings(row["scope"]) and strings(row["warnings"]) and isinstance(row["sources"], dict)
+                and isinstance(row["texts"], list), code)
+        require(all(isinstance(t, dict) and isinstance(t.get("sha256"), str) and isinstance(t.get("origin"), str)
+                    for t in row["texts"]), code)
+
+
 def verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
                   declarations: dict | None = None, declared_skips=frozenset(),
                   desktop_files: dict | None = None, opaque_coverage=None) -> dict:
-    """Re-check a generated bundle; see _verify_bundle. A structurally malformed
-    receipt (wrong JSON types) is a static refusal, never a traceback. Explicit
-    keywords keep a misspelled caller argument a TypeError, not a refusal."""
-    try:
-        return _verify_bundle(receipt_raw, text_raw, artifact_kinds=artifact_kinds, declarations=declarations,
-                              declared_skips=declared_skips, desktop_files=desktop_files,
-                              opaque_coverage=opaque_coverage)
-    except Refused:
-        raise
-    except (TypeError, KeyError, AttributeError, IndexError, ValueError) as error:
-        raise Refused("notices_receipt_structure") from error
-
-
-def _verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozenset(),
-                   declarations: dict | None = None, declared_skips=frozenset(),
-                   desktop_files: dict | None = None, opaque_coverage=None) -> dict:
     """Re-check a generated bundle without regenerating it (used by assembly).
 
     Checked: the text is exactly render(receipt, texts); every component has at
@@ -504,6 +510,10 @@ def _verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozen
     release binding also declares has identical bytes; and, when desktop image
     files are supplied, the Java runtime legal files and node.exe match them.
     This does not prove that the artifacts were built from these graphs.
+
+    A structurally malformed receipt (wrong JSON types) is a static refusal:
+    its shape is validated by _receipt_shape before use. Nothing else is
+    converted, so a caller mistake or a verifier defect still raises normally.
     """
     receipt = strict_json(receipt_raw, "notices_receipt_structure")
     keys = {"schema", "generator", "status", "inputs", "coverage", "skipped", "components", "counts", "excluded",
@@ -531,12 +541,14 @@ def _verify_bundle(receipt_raw: bytes, text_raw: bytes, *, artifact_kinds=frozen
         require(text_raw[cursor:cursor + len(trailer)] == trailer, "notices_text_structure")
         cursor += len(trailer)
     require(cursor == len(text_raw), "notices_text_structure")
-    require(render(receipt, texts) == text_raw, "notices_text_render")
     require(isinstance(receipt["components"], list) and receipt["components"], "notices_components")
-    used, seen = set(), set()
     for row in receipt["components"]:
         require(isinstance(row, dict) and {"ecosystem", "name", "version", "declared", "selected", "scope",
                                            "texts", "warnings", "sources"} == set(row), "notices_component")
+    _receipt_shape(receipt)
+    require(render(receipt, texts) == text_raw, "notices_text_render")
+    used, seen = set(), set()
+    for row in receipt["components"]:
         key = (row["ecosystem"], row["name"], row["version"])
         require(key not in seen and all(ascii_text(v, 512) for v in key), "notices_component")
         seen.add(key)

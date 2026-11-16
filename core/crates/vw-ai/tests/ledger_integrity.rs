@@ -231,6 +231,9 @@ fn over_limit_sidecar_lengths_are_refused_without_opening_or_deleting_them() -> 
 mod sparse_fixture {
     use std::{ffi::c_void, fs::File, io, os::windows::io::AsRawHandle};
 
+    // SAFETY: this declaration matches the documented kernel32 DeviceIoControl
+    // ABI: HANDLE, DWORD, LPVOID, DWORD, LPVOID, DWORD, LPDWORD, LPOVERLAPPED
+    // and a BOOL result, using the `system` calling convention.
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn DeviceIoControl(

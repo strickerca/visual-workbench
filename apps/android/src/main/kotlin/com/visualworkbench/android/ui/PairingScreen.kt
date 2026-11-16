@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -27,6 +28,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.visualworkbench.android.editor.EditorController
 import com.visualworkbench.android.editor.WorkbenchScreen
 import com.visualworkbench.android.session.QrScanner
+import com.visualworkbench.android.session.automaticConnectionLine
 import com.visualworkbench.android.session.validEndpoint
 import com.visualworkbench.shared.PairedDevice
 import com.visualworkbench.shared.SessionCarrier
@@ -218,6 +220,16 @@ internal fun PairingScreen(editor: EditorController) {
             }
             OutlinedButton(onClick = { stopPairing(); addingComputer = true; initialChoiceMade = true }, enabled = changeMethod, modifier = Modifier.heightIn(min = 48.dp)) { Text("Add computer") }
             Divider()
+            Text("Automatic connection", style = MaterialTheme.typography.h6)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Switched off while its connection is still only waiting or looking: that stops too.
+                Switch(state.automatic, { on -> if (!on && state.automaticWaiting(editor.connection)) editor.disconnect(); state.chooseAutomatic(on) },
+                    enabled = available, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp))
+                Text("Find and connect to my computer by itself", Modifier.padding(start = 12.dp))
+            }
+            Text(automaticConnectionLine(state.automatic, state.automaticQuiet, configured.isNotEmpty(), activePeers.isNotEmpty(), editor.connection))
+            if (state.automatic) Text("Nothing further down is needed while this works. The same pairing check protects every connection.", style = MaterialTheme.typography.caption)
+            Divider()
             Text(sessionRouteLabel(state.carrier), style = MaterialTheme.typography.h6)
             Text(if (state.carrier == SessionCarrier.QuicTether) "Enable USB tethering on this phone. PC: Pair devices → choose this paired phone → open or import a Workbench project if needed → choose the PC tether network adapter → Use selected connection for USB project → Connect phone to this project."
                 else "On the PC, start its Workbench project connection using ${sessionRouteName(state.carrier)} in Other connection options. Remote Paint requires USB tethering.")
@@ -240,6 +252,7 @@ internal fun PairingScreen(editor: EditorController) {
             if (configured.isNotEmpty()) Text("Configured connection order: ${configured.joinToString(" → ") { sessionRouteName(it) }}.", style = MaterialTheme.typography.caption)
             when {
                 selectedActivePeer == null -> Text("Choose a paired computer above.", style = MaterialTheme.typography.caption)
+                configured.isEmpty() && state.automatic -> Text("No address is needed: the computer is found over Wi-Fi or USB tethering.", style = MaterialTheme.typography.caption)
                 configured.isEmpty() -> Text("Use the pairing connection above, or open Connection details to enter the PC project session address.", style = MaterialTheme.typography.caption)
                 connectionEndpoints == null -> Text("Open Connection details and check each configured route's address and port. Leave unavailable routes empty.", style = MaterialTheme.typography.caption)
                 editor.pending != 0 -> Text("Finish the current edits before connecting.", style = MaterialTheme.typography.caption)
@@ -331,7 +344,7 @@ private fun sessionAddressLabel(carrier: SessionCarrier): String = when (carrier
     SessionCarrier.TcpAdb -> "ADB session address"
 }
 
-private fun pairingActivity(context: Context): Activity? {
+internal fun pairingActivity(context: Context): Activity? {
     var current = context
     repeat(16) {
         if (current is Activity) return current as Activity

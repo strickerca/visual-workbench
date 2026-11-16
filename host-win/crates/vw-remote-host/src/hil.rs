@@ -255,6 +255,11 @@ fn current_input_provenance() -> serde_json::Value {
         extra_info,
     )
 }
+/// # Safety
+/// Window procedure for the class registered in `surface` only. It must be
+/// called by Windows message dispatch on the UI thread that created the
+/// window, whose create parameter is the boxed `SurfaceState` that outlives
+/// the window; `lp` is then the payload Windows defines for `message`.
 unsafe extern "system" fn surface_proc(
     hwnd: HWND,
     message: u32,
@@ -950,6 +955,8 @@ impl OwnedSurface {
                 self.verify()?;
                 // No blocking call follows the final held-button/foreground
                 // observation. Production focus/arm still make their guards.
+                // SAFETY: GetForegroundWindow takes no arguments and only reads the
+                // current foreground HWND, compared as an integer and never dereferenced.
                 if mouse_released()
                     && unsafe { GetForegroundWindow() }.0 as usize as u64 == self.target.window
                 {
@@ -1046,6 +1053,8 @@ impl OwnedSurface {
             };
             // Revalidate retained image/PID creation/class and current foreground after diagnostics.
             authority.verify()?;
+            // SAFETY: argument-free read-only query; the returned HWND is only
+            // compared as an integer and never dereferenced.
             if unsafe { GetForegroundWindow() }.0 as usize as u64 != authority.target.window {
                 continue;
             }
@@ -1066,6 +1075,8 @@ impl OwnedSurface {
             // No potentially blocking provider call follows this final owned-foreground query.
             // The unchanged production operation still makes its own exact target/foreground checks.
             authority.verify()?;
+            // SAFETY: argument-free read-only query; the returned HWND is only
+            // compared as an integer and never dereferenced.
             if unsafe { GetForegroundWindow() }.0 as usize as u64 != authority.target.window {
                 continue;
             }
@@ -1073,6 +1084,8 @@ impl OwnedSurface {
                 return Err(Error::Timeout);
             }
             let focused = platform::focus_for_owner_grant(&target, std::process::id());
+            // SAFETY: argument-free read-only query; the returned HWND is only
+            // reported as an integer and never dereferenced.
             let after = unsafe { GetForegroundWindow() };
             println!(
                 "{}",

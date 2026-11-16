@@ -244,6 +244,7 @@ fn pin(path: &Path, directory: bool) -> Result<File> {
     Ok(file)
 }
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // Fixture setup failures fail the test.
 mod tests {
     use super::*;
     fn fixture(extra: &str) -> Vec<u8> {

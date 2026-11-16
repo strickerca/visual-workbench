@@ -122,14 +122,11 @@ impl ProjectSession {
                     let (transaction, next) =
                         plan::transaction(state, &document, &metadata, command)?;
                     admit_transaction(state, &transaction, memory_budget_bytes, TONE_WORK)?;
-                    if let Some(replica) = &state.replica {
-                        let mut candidate = replica.clone();
-                        candidate
-                            .queue(transaction.clone())
-                            .map_err(plan::operation_error)?;
+                    if let Some(replica) = &mut state.replica {
+                        replica.check(&transaction).map_err(plan::operation_error)?;
                     } else {
                         state
-                            .store()?
+                            .store_mut()?
                             .validate_transaction(
                                 &transaction,
                                 &vw_model::DeviceId::try_from(metadata.device_id.clone())?,

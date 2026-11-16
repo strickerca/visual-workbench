@@ -2,7 +2,6 @@
 //! an owner/SYSTEM-only DACL; ciphertext is atomically replaced under an OS file
 //! lock, after file fsync and with MOVEFILE_WRITE_THROUGH. There is no plaintext
 //! disk fallback and no CRYPTPROTECT_LOCAL_MACHINE flag.
-use fs2::FileExt;
 use std::{
     ffi::{OsStr, OsString},
     fmt,
@@ -332,11 +331,12 @@ impl DpapiTrustStore {
         }
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
-            match FileExt::try_lock_exclusive(&file) {
+            match vw_store::os_fs::try_lock_exclusive(&file) {
                 Ok(()) => return Ok(file),
                 Err(error)
                     if (error.kind() == std::io::ErrorKind::WouldBlock
-                        || error.raw_os_error() == fs2::lock_contended_error().raw_os_error())
+                        || error.raw_os_error()
+                            == vw_store::os_fs::lock_contended_error().raw_os_error())
                         && Instant::now() < deadline =>
                 {
                     thread::sleep(Duration::from_millis(10))

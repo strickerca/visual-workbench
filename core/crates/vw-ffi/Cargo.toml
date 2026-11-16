@@ -19,18 +19,17 @@ integration-carrier-fault = ["vw-remote-host/integration-carrier-fault"]
 fixtures = ["tokio/rt", "tokio/macros"]
 
 [dependencies]
-uniffi = { version = "=0.32.2", default-features = false }
-tokio = { version = "=1.53.1", features = ["sync", "rt", "net", "time", "macros"] }
-thiserror = "=2.0.21"
-serde_json = "=1.0.151"
-serde = { version = "=1.0.229", features = ["derive"] }
-fs2 = "=0.4.3"
+uniffi.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "net", "time", "macros"] }
+thiserror.workspace = true
+serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
 vw-ai = { version = "=0.1.0", path = "../vw-ai" }
 vw-ai-provider = { version = "=0.1.0", path = "../vw-ai-provider" }
 vw-ai-platform = { version = "=0.1.0", path = "../vw-ai-platform" }
-tempfile = "=3.27.0"
-zeroize = "=1.9.0"
-blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
+tempfile.workspace = true
+zeroize.workspace = true
+blake3 = { workspace = true, features = ["std", "pure"] }
 vw-net = { version = "=0.1.0", path = "../vw-net" }
 vw-remote = { version = "=0.1.0", path = "../vw-remote" }
 vw-model = { version = "=0.1.0", path = "../vw-model" }
@@ -44,7 +43,6 @@ vw-formats = { version = "=0.1.0", path = "../vw-formats" }
 vw-assets = { version = "=0.1.0", path = "../vw-assets" }
 vw-stream = { version = "=0.1.0", path = "../vw-stream" }
 vw-capture = { version = "=0.1.0", path = "../vw-capture" }
-vw-avif-os = { version = "=0.1.0", path = "../vw-avif-os" }
 vw-package = { version = "=0.1.0", path = "../vw-package" }
 vw-codec-os = { version = "=0.1.0", path = "../vw-codec-os" }
 vw-instructions = { version = "=0.1.0", path = "../vw-instructions" }
@@ -53,12 +51,12 @@ vw-mask = { version = "=0.1.0", path = "../vw-mask" }
 vw-document-protocol = { version = "=0.1.0", path = "../vw-document-protocol" }
 vw-document-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-document-win" }
 vw-pdf = { version = "=0.1.0", path = "../vw-pdf" }
-tiny-skia = { version = "=0.12.0", default-features = false, features = ["std"] }
-sha2 = "=0.11.0"
-png = "=0.18.1"
+tiny-skia = { workspace = true, features = ["std"] }
+sha2.workspace = true
+png.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-rustix = { version = "=1.1.5", features = ["fs", "process"] }
+rustix = { workspace = true, features = ["fs", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 vw-assets-win = { version = "=0.1.0", path = "../../../host-win/crates/vw-assets-win" }
@@ -68,13 +66,21 @@ vw-net = { version = "=0.1.0", path = "../vw-net", features = ["mdns"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 vw-svg = { version = "=0.1.0", path = "../vw-svg" }
-pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
-jni = { version = "=0.22.4", default-features = false }
+pdfium-render = { workspace = true, features = ["pdfium_7881"] }
+jni.workspace = true
 
 [dev-dependencies]
 vw-svg = { version = "=0.1.0", path = "../vw-svg" }
-pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
-tokio = { version = "=1.53.1", features = ["rt", "macros", "time"] }
+pdfium-render = { workspace = true, features = ["pdfium_7881"] }
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
+
+[[bench]]
+name = "commit"
+harness = false
+
+[[bench]]
+name = "edits"
+harness = false
 
 [[bin]]
 name = "vw-bindgen"

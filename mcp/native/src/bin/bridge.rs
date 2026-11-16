@@ -55,7 +55,7 @@ fn run() -> vw_mcp_native::Result<()> {
     });
     let mut output = io::stdout();
     let mut bytes = Vec::new();
-    let mut buffer = [0u8; 8192];
+    let mut buffer = vec![0u8; 65536];
     let mut outgoing: Option<(Vec<u8>, usize, Instant)> = None;
     let output_deadline =
         vw_mcp_native::write_deadline::WriteDeadline::new(Duration::from_secs(15), || {
@@ -66,6 +66,9 @@ fn run() -> vw_mcp_native::Result<()> {
             }
         })?;
     loop {
+        // Sleep only when neither direction moved, so a large package reply is
+        // not limited to one small read per tick.
+        let mut progressed = false;
         if outgoing.is_none() {
             match receive.try_recv() {
                 Ok(value) => outgoing = Some((value, 0, Instant::now())),
@@ -80,6 +83,7 @@ fn run() -> vw_mcp_native::Result<()> {
             match pipe.write(&value[*at..]) {
                 Ok(0) => {}
                 Ok(n) => {
+                    progressed = true;
                     *at += n;
                     if *at == value.len() {
                         outgoing = None;
@@ -93,6 +97,7 @@ fn run() -> vw_mcp_native::Result<()> {
         match pipe.read(&mut buffer) {
             Ok(0) => break,
             Ok(n) => {
+                progressed = true;
                 for b in &buffer[..n] {
                     if *b == b'\n' {
                         framing::parse(&bytes)?;
@@ -109,7 +114,9 @@ fn run() -> vw_mcp_native::Result<()> {
             Err(e) if e.raw_os_error() == Some(232) || e.kind() == io::ErrorKind::WouldBlock => {}
             Err(_) => break,
         }
-        thread::sleep(Duration::from_millis(2));
+        if !progressed {
+            thread::sleep(Duration::from_millis(2));
+        }
     }
     Ok(())
 }

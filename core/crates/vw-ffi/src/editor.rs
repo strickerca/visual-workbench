@@ -78,6 +78,12 @@ impl History {
         }
         Ok(())
     }
+    /// Take back a `pending` registration whose transaction was not stored.
+    fn forget_pending(&mut self, id: &Id, next_lamport: u64) {
+        let _ = self.undo.discard_pending(id);
+        self.directions.remove(id);
+        self.next_lamport = next_lamport;
+    }
     pub(crate) fn pending(&mut self, txn: &pb::Transaction) -> Result<()> {
         if txn.device_id != self.device.as_str() {
             return Err(CoreError::Invalid);
@@ -132,45 +138,14 @@ impl ProjectState {
         if &self.store()?.local_device()? != device {
             return Err(CoreError::Invalid);
         }
-        if let Some(replica) = &self.replica {
-            if let Some((old, _)) = self
-                .store()?
-                .accepted_transactions()
-                .find(|(old, _)| old.txn_id == txn.txn_id)
-            {
-                if old != txn {
-                    return Err(CoreError::Invalid);
-                }
-                return self.info();
-            }
-            if let Some(old) = replica
-                .pending()
-                .iter()
-                .find(|p| p.transaction.txn_id == txn.txn_id)
-            {
-                if &old.transaction != txn {
-                    return Err(CoreError::Invalid);
-                }
-                return self.info();
-            }
-            let mut staged = replica.clone();
-            if txn.base_revision.as_ref() == Some(staged.revision()) {
-                staged.queue(txn.clone())?;
-            } else {
-                staged.queue_recovered(txn.clone())?;
-            }
-            let mut history = self.history.clone();
-            history.pending(txn)?;
-            self.store
-                .as_mut()
-                .ok_or(CoreError::Closed)?
-                .enqueue_pending(txn)?;
-            self.replica = Some(staged);
-            self.history = history;
-            let info = self.info()?;
-            self.events.publish(ChangeKind::Committed, info.clone());
-            self.changed.notify_one();
-            return Ok(info);
+        // Saving a new stroke takes about a millisecond whatever the project
+        // holds, and any other edit a few milliseconds more on a very large
+        // one. Record the saves that take 50 ms or more (an edit to thousands
+        // of objects at once, or a disk slow to sync), so a stutter can be
+        // explained afterwards.
+        let _timer = crate::diagnostics::slow_timer("project", "slow save", 50_000);
+        if self.replica.is_some() {
+            return self.queue(txn);
         }
         let receipt = self
             .store
@@ -178,6 +153,69 @@ impl ProjectState {
             .ok_or(CoreError::Closed)?
             .commit(txn, device, time)?;
         self.history.accept(txn, &receipt)?;
+        let info = self.info()?;
+        self.events.publish(ChangeKind::Committed, info.clone());
+        self.changed.notify_one();
+        Ok(info)
+    }
+}
+impl ProjectState {
+    /// A mirror cannot accept its own edit: it shows the edit at once, keeps
+    /// it in the durable outbox and waits for the host. Showing, remembering
+    /// for undo and storing either all happen or none does.
+    fn queue(&mut self, txn: &pb::Transaction) -> Result<ProjectInfo> {
+        let id = Id::from_proto(txn.txn_id.as_ref())?;
+        if let Some((old, _)) = self.store()?.accepted_transaction(&id) {
+            if old != txn {
+                return Err(CoreError::Invalid);
+            }
+            return self.info();
+        }
+        let replica = self.replica.as_mut().ok_or(CoreError::Closed)?;
+        if let Some(old) = replica
+            .pending()
+            .iter()
+            .find(|p| p.transaction.txn_id == txn.txn_id)
+        {
+            if &old.transaction != txn {
+                return Err(CoreError::Invalid);
+            }
+            return self.info();
+        }
+        // An undo of accepted work needs what undoing it changes now, which
+        // the replica asks of the host's state in the store when it is used.
+        if let Some(target) = replica.inverse_needed(txn) {
+            let device = DeviceId::try_from(txn.device_id.clone())?;
+            if let Ok(preview) = self
+                .store
+                .as_mut()
+                .ok_or(CoreError::Closed)?
+                .inverse_preview(&target, &device)
+            {
+                replica.provide_inverse(target, preview);
+            }
+        }
+        // The edit goes into the visible project in place. Only a refusal by
+        // the undo history or the outbox takes it back out, which replays the
+        // remaining queue; nothing is copied when the edit is kept.
+        if txn.base_revision.as_ref() == Some(replica.revision()) {
+            replica.queue(txn.clone())?;
+        } else {
+            replica.queue_recovered(txn.clone())?;
+        }
+        let lamport = self.history.next_lamport;
+        let stored = self.history.pending(txn).and_then(|()| {
+            self.store
+                .as_mut()
+                .ok_or(CoreError::Closed)?
+                .enqueue_pending(txn)?;
+            Ok(())
+        });
+        if let Err(error) = stored {
+            let _ = replica.discard_pending(&id);
+            self.history.forget_pending(&id, lamport);
+            return Err(error);
+        }
         let info = self.info()?;
         self.events.publish(ChangeKind::Committed, info.clone());
         self.changed.notify_one();
@@ -377,13 +415,12 @@ impl ProjectSession {
                             transform,
                         } => {
                             let layer = Id::try_from(layer_id)?;
+                            let layer_wire = layer.to_proto();
                             let left = order_by_layer.get(&layer).cloned().or_else(|| {
                                 project
                                     .objects
                                     .values()
-                                    .filter(|o| {
-                                        o.state.layer_id.as_ref() == Some(&layer.to_proto())
-                                    })
+                                    .filter(|o| o.state.layer_id.as_ref() == Some(&layer_wire))
                                     .map(|o| o.state.order_key.as_str())
                                     .max()
                                     .and_then(|v| OrderKey::try_from(v.to_owned()).ok())

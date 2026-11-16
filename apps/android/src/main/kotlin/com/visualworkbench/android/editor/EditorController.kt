@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.visualworkbench.android.diagnostics.DiagnosticsController
+import com.visualworkbench.android.diagnostics.PenTiming
 import com.visualworkbench.android.input.*
 import com.visualworkbench.android.precision.*
 import com.visualworkbench.android.airactions.*
@@ -272,6 +273,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val documentId: String, val page: UInt?, val binding: WorkflowBinding)
     private var composedBackground: ComposedBackgroundOwner? = null
     private val composedReload = ComposedReloadObligation()
+    private val plainLoads = PlainBackgroundLoads()
     private fun composedCurrent(doc: DocumentSnapshot): Boolean {
         val revision = doc.render.revision
         val owner = composedBackground ?: return false
@@ -279,8 +281,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             owner.page == doc.page && owner.binding == WorkflowBinding(revision.projectId, doc.documentId,
             revision.hostSeq, revision.stateHash) && background != null
     }
-    private suspend fun preparedDrawing(items: List<RenderItem>): List<DrawObject> =
-        prepareEditorObjects(core, items.filterNot { it.shape is Shape.Adjustment })
+    private suspend fun preparedDrawing(items: List<RenderItem>, reuse: List<DrawObject> = emptyList()): List<DrawObject> =
+        prepareEditorObjects(core, items.filterNot { it.shape is Shape.Adjustment }, reuse)
     private var giantRenderReady=false
     private var updatingGiant=false
     private val canvasRetirement:suspend()->Unit = {giantRenderReady=false;canvasOwners.retireAll()}
@@ -382,7 +384,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private val preferencesQueue = Channel<EditorPreferences>(Channel.CONFLATED)
     private val mutations = Mutex()
     private val refreshMutex = Mutex()
-    private val refreshAdmission = RefreshAdmission()
+    // A save whose own re-read was dropped stays pending until the queued refresh adopts.
+    private val refreshAdmission = RefreshAdmission { pending += it }
     private val documentRefresh = DocumentRefreshAdmission()
     private var changesJob: Job? = null
     private var refreshJob: Job? = null
@@ -419,6 +422,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sliderSequence = 0u
     private var sliderRevision: ProjectInfo? = null
     val diagnostics = DiagnosticsController(application, scope)
+    private val coreFailureReasons = nativeCoreFailureReasons()
     private var screenState by mutableStateOf(WorkbenchScreen.Projects)
     var screen: WorkbenchScreen
         get() = screenState
@@ -429,6 +433,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     // Native-operation admission must not wait for a Compose host or
     // global snapshot apply notifications. UI state remains observable.
     private val importReadiness = EditorReadiness()
+    private val backgroundSettle = BackgroundSettle(scope, ::settleIdle)
     private var busyState by mutableStateOf(true)
     var busy: Boolean
         get() = busyState
@@ -558,6 +563,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sceneRevision = 0L
     private var background: Bitmap? = null
     private var objects = emptyList<DrawObject>()
+    /** Diagnostics only: the newest pen sample that has ink, and the pen-down of its stroke. */
+    private var inkSampleMs = 0L
+    private var inkStartMs = 0L
+    private var savedIdsOf: List<DrawObject>? = null
+    private var savedIdsKept: Set<String> = emptySet()
     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
         set(value) { if (field != value) interruptAirInput(clearView = !applyingAirView); field = value }
     private var cameraFitted = false
@@ -1353,6 +1363,35 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         sliderGesture = null; sliderLink = null; sliderRevision = null; selectedStyleDraft = null; showBrush = false
         pairing.leave(); diagnostics.background(); hoverPoint = null; publish()
     }
+    /** The activity is out of sight (onStop). The project stays open; after a
+     * grace period it writes the checkpoint closing would write. A stream
+     * draft editor only borrows its private draft. */
+    fun onHidden() { if (!streamDraftOnly) backgroundSettle.hidden(project) { project.takeIf { !disposing } } }
+    /** The activity is visible again (onStart). */
+    fun onShown() { backgroundSettle.shown() }
+    /** No native call of the editor's own is in flight: no stroke, save, edit,
+     * open or close (busy, pending), and no AI, workflow, instruction,
+     * semantic, image-frame, selection, eraser, rotation, document, transfer
+     * or capture work, whose next call would otherwise wait for the
+     * checkpoint. Open panels with nothing running do not count. */
+    private fun nativeQuiet(): Boolean = !disposing && !busy && pending == 0 && operationCount == 0 &&
+        gesture == null && strokes.isEmpty() && !captureStreamBlocksParent && captureOpenWork == null &&
+        assistedActions == null && ai.state.value.idle && !ai.state.value.loadingPixels &&
+        !workflows.controls.state.value.busy && !workflows.tones.state.value.busy && !workflows.review.state.value.busy &&
+        !instructionEditor.state.value.busy && !semanticEditor.state.value.busy && !imageFrames.state.value.busy &&
+        !selections.state.value.busy && !erasers.state.value.busy && !rotation.state.value.busy &&
+        !documents.state.value.busy && transferJob == null && incomingJob == null && incomingProducer == null &&
+        previewJob?.isActive != true && previewHandle == null
+    /** Waits, out of sight, until [nativeQuiet]. Only busy and pending can be
+     * awaited; the rest is looked at four times a second. False once the
+     * editor is being disposed. */
+    private suspend fun settleIdle(): Boolean {
+        while (true) {
+            if (!importReadiness.awaitReady() || disposing) return false
+            if (nativeQuiet()) return true
+            delay(250)
+        }
+    }
 
     private suspend fun refreshProjects() {
         projects = repository.list().map { ProjectCard(it.path, it.info?.title ?: "Unavailable project",
@@ -1641,7 +1680,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         try { closing.step(EditorCloseStage.ProjectStorage) { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() } }
                         finally {
                             document = null; info = null
-                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); selected = null; transientShape = null
+                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); savedIdsOf = null; savedIdsKept = emptySet(); selected = null; transientShape = null
                             transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
                         }
                     }
@@ -1657,13 +1696,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         captureArrivals.bind(current, token, checkNotNull(info).hostSeq)
         val queue = Channel<Unit>(Channel.CONFLATED)
         refreshQueue = queue
+        val serving = refreshAdmission.serve()
         refreshJob = scope.launch {
-            for (ignored in queue) {
-                if (token != epoch || current !== project || disposing) break
-                try { refresh(current, current.info(), token) }
-                catch (cancel: CancellationException) { throw cancel }
-                catch (error: Exception) { report(error) }
-            }
+            try {
+                for (ignored in queue) {
+                    if (token != epoch || current !== project || disposing) break
+                    refreshAdmission.queuedTurn(::report) { refreshDocument(current, current.info(), token, queued = true) }
+                }
+            } finally { refreshAdmission.stopServing(serving) }
         }
         changesJob = scope.launch {
             try {
@@ -1687,6 +1727,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) { if (token == epoch && !disposing) report(error) }
+            // No further change will queue a refresh for this project.
+            finally { refreshAdmission.stopServing(serving) }
         }
     }
 
@@ -1863,8 +1905,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val binding = WorkflowBinding(revision.projectId, snapshot.documentId, revision.hostSeq, revision.stateHash)
         val token = epoch
         val ticket = refreshAdmission.capture()
-        fun current(): Boolean = !disposing && project === owner && epoch == token && refreshAdmission.accepts(ticket) &&
-            document?.let { it.documentId == binding.documentId && originalFormatRevisionMatches(it.render.revision, binding) } == true
+        // Kept while its revision is shown, even past an ordered change
+        // (keepsFormatReceipt); dropping it left the open path to decode
+        // without it. Readers that depend on the revision (approvedAssumption,
+        // the background and giant loads) match its binding; the others read
+        // fields fixed for the document (rawPreview, sourceAssetId).
+        fun current(): Boolean = !disposing && project === owner && epoch == token &&
+            keepsFormatReceipt(refreshAdmission, ticket, document, binding)
         if (!current()) return
         originalFormatNotice = null; originalFormat = null
         try {
@@ -1878,11 +1925,20 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (current()) originalFormatNotice = "Original-image page information could not be checked. Reopen the project to retry."
         }
     }
-    private suspend fun loadBackground() {
-        val current = project ?: return
-        val doc = document ?: return
+    /** A plain background request for [doc]; null while the editor shows
+     * anything else (see [PlainBackgroundLoads.request]). */
+    private fun plainBackgroundRequest(doc: DocumentSnapshot? = document, attachment: Long = epoch,
+        admission: Long = refreshAdmission.capture().epoch): PlainBackgroundRequest? =
+        PlainBackgroundLoads.request(doc, !disposing && project != null, documents.state.value.descriptor != null,
+            streamDraftOnly, attachment, admission, colorAssumedSourceAsset.takeIf { colorAssumed })
+    // AfterRefresh follows a revision adopted during the decode, which only a
+    // refresh holding refreshMutex can do; so this load never holds it then.
+    private suspend fun loadBackground() = plainLoads.load({ loadBackgroundOnce() }) { refreshMutex.withLock {} }
+    private suspend fun loadBackgroundOnce(): PlainPass {
+        val current = project ?: return PlainPass.Done
+        val doc = document ?: return PlainPass.Done
         if(streamDraftOnly){
-            background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return
+            background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return PlainPass.Done
         }
         val token = epoch
         val ticket = refreshAdmission.capture()
@@ -1891,8 +1947,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         fun stillCurrent(): Boolean = !disposing && project === current && token == epoch && refreshAdmission.accepts(ticket) &&
             document?.let { it.documentId == doc.documentId && it.page == doc.page &&
                 WorkflowBinding(it.render.revision.projectId,it.documentId,it.render.revision.hostSeq,it.render.revision.stateHash) == binding } == true
-        if(documents.state.value.descriptor!=null){detachGiant();background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return}
-        if(giantDisplayRequired(doc)){loadGiantBackground(current,doc);return}
+        if(documents.state.value.descriptor!=null){detachGiant();background=null;composedBackground=null;blockingMessage=null;needsColorConsent=false;publish();return PlainPass.Done}
+        if(giantDisplayRequired(doc)){loadGiantBackground(current,doc);return PlainPass.Done}
         if(giantMode||giantOwner.retaining)detachGiant()
         val composed = doc.hasToneAdjustments
         val format = originalFormat?.takeIf { it.binding == binding }
@@ -1903,16 +1959,22 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 needsColorConsent=false
                 blockingMessage=if(format?.rawPreview==true) "Saved tone composition is unavailable for an embedded RAW preview. The sensor original remains unchanged."
                     else "The saved tone composition needs verified source information. Reopen the project to retry."
-                publish();return
+                publish();return PlainPass.Done
             }
             if(format.untagged && !approvedAssumption(doc)){
                 needsColorConsent=true
                 blockingMessage="Tone display requires explicit sRGB consent for this untagged original. The original remains unchanged."
-                publish();return
+                publish();return PlainPass.Done
             }
         }
+        val assumed = approvedAssumption(doc)
+        // A plain page: adopted while its read revision is shown, decoded again
+        // when a newer one or a consent arrived. Composed keeps its fence.
+        val plain = if(composed) null else plainBackgroundRequest(doc,token,ticket.epoch)
+        fun adoptable(): Boolean = if(plain==null) stillCurrent() else project === current && plainLoads.adopts(plain,plainBackgroundRequest())
+        fun next(): PlainPass = if(plain!=null && project === current) plainLoads.next(plain,plainBackgroundRequest()) else PlainPass.Done
+        if(plain!=null && !plainLoads.begin(plain.page))return PlainPass.Done // The decode in flight checks this page again when it ends.
         try {
-            val assumed = approvedAssumption(doc)
             val image = if(composed){
                 val value=imageFrameWorkflows(current).editingBackground(binding,assumed)
                 if(value.binding!=binding || value.width!=doc.width || value.height!=doc.height ||
@@ -1923,7 +1985,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 BackgroundImage(value.width,value.height,value.rgba,value.sourceAssetId,value.sourceBitDepth,value.iccProfile)
             }else current.background(doc.documentId, assumeUntaggedSrgb = assumed)
             currentCoroutineContext().ensureActive()
-            if(!stillCurrent())return
+            if(!adoptable())return next()
             val bitmap = withContext(Dispatchers.Default) {
                 require(image.width in 1u..50_000u && image.height in 1u..50_000u)
                 val width = image.width.toInt(); val height = image.height.toInt()
@@ -1946,7 +2008,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             var adopted=false
             try {
                 currentCoroutineContext().ensureActive()
-                if(!stillCurrent())return
+                if(!adoptable())return next()
                 background = bitmap
                 composedBackground = if(composed) ComposedBackgroundOwner(current,token,doc.documentId,doc.page,binding) else null
                 blockingMessage = null; needsColorConsent = false
@@ -1955,7 +2017,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             } finally { if(!adopted) bitmap.recycle() }
         } catch (cancel: CancellationException) { throw cancel }
         catch (error: CoreFailure) {
-            if(!stillCurrent())return
+            next().let { if(it!=PlainPass.Done)return it }
+            if(!adoptable())return PlainPass.Done
             needsColorConsent = error.kind == CoreFailureKind.Raster && !approvedAssumption(doc) && format?.untagged==true
             blockingMessage = if (error.kind == CoreFailureKind.Backpressure)
                 "This image exceeds the current full-resolution display memory budget. Its original is saved unchanged. Bounded tiled display is still required before all images up to 50 megapixels can be edited."
@@ -1966,11 +2029,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             else "The image could not be displayed safely. Its original remains saved; no smaller replacement was created."
         } catch(error: Exception){
             currentCoroutineContext().ensureActive()
-            if(!stillCurrent())return
+            next().let { if(it!=PlainPass.Done)return it }
+            if(!adoptable())return PlainPass.Done
             blockingMessage=if(composed) "The saved tone composition could not be displayed. Retry or reopen before editing; saved data is intact."
                 else "The image could not be displayed safely. Its original remains saved."
-        }
+        } finally { if(plain!=null) plainLoads.end(plain.page) }
         publish()
+        return PlainPass.Done
     }
     fun assumeSrgb() {
         if (busy || !needsColorConsent) return
@@ -2020,12 +2085,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         aiResults.request()
         val resultFrame=aiFrame()
-        val savedIds = objects.mapTo(HashSet()) { it.item.objectId }
+        // Developer switch: the saved objects change only on a refresh, so their
+        // id set is kept between samples and, with no peer preview replacing any
+        // of them, the list itself is published instead of an equal copy.
+        val keepDry = preferences.penPath[PenPathToggle.CanvasInkOnly]
+        val savedIds = if (keepDry && savedIdsOf === objects) savedIdsKept
+            else objects.mapTo(HashSet<String>()) { it.item.objectId }.also { if (keepDry) { savedIdsOf = objects; savedIdsKept = it } }
         val admittedPeers=peerObjects.filter{aiAdmitResultPreview(doc,it.item)}
         val peerById = admittedPeers.associateBy { it.item.objectId }
         // Existing objects keep their canonical stacking position. Local
         // transforms and erasures below still override the remote replacement.
-        val visibleObjects = objects.map { peerById[it.item.objectId] ?: it }
+        val visibleObjects = if (keepDry && admittedPeers.isEmpty()) objects else objects.map { peerById[it.item.objectId] ?: it }
         val localProvisional = (strokes.mapNotNull { it.drawing } + pendingPreviews.values).filter { it.item.objectId !in savedIds } + listOfNotNull(transientShape)
         val localIds = localProvisional.mapTo(HashSet()) { it.item.objectId }
         val provisional = localProvisional + admittedPeers.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
@@ -2045,7 +2115,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val next = CanvasScene(++sceneRevision, doc, displayBackground, camera, core.cameraMatrix(camera), visibleObjects,
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
-            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle())
+            aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle(),
+            wetSampleMs=inkSampleMs,wetStartMs=inkStartMs,keepDryPicture=keepDry)
         scene = next
         if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
@@ -2085,11 +2156,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    private fun editorInputAllowed(ownCaptureStream: Boolean = false): Boolean =
+    private fun editorInputAllowed(ownCaptureStream: Boolean = false, ink: Boolean = false): Boolean =
         (ownCaptureStream || !captureStreamBlocksParent) && !streamEditsSealed&&!disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
-        !instructionEditor.state.value.busy&&!semanticEditor.state.value.busy&&!documents.state.value.busy&&
+        (ink||(!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy))&&!documents.state.value.busy&&
         !ai.state.value.open&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)
-    internal fun precisionInputAllowed():Boolean = editorInputAllowed() && airModals.isEmpty() && aiResultReady() &&
+    internal fun precisionInputAllowed():Boolean = precisionInputAllowed(false)
+    private fun precisionInputAllowed(ink:Boolean):Boolean = editorInputAllowed(ink = ink) && airModals.isEmpty() && aiResultReady() &&
         document?.let{(!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
             (background!=null||streamBackgroundReady()||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
@@ -2101,12 +2173,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
         clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        if (busy || instructionEditor.state.value.busy || semanticEditor.state.value.busy || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
+        // Developer switch: after every save the instruction and marker lists are
+        // read again, and a pen-down in those few milliseconds was dropped without
+        // a message. A plain ink stroke needs neither list, so it is let through.
+        val ink = inkPassesListRefresh(preferences.penPath[PenPathToggle.CanvasInkBeforeSave], tool, assistedCollecting,
+            documents.state.value.textTool, documents.state.value.regionTool) { erasers.tools.route(rawSample.tool == PointerTool.Eraser) }
+        if (busy || (!ink && (instructionEditor.state.value.busy || semanticEditor.state.value.busy)) || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
             if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
             return
         }
         val current = project ?: return
-        if(!precisionInputAllowed())return
+        if(!precisionInputAllowed(ink))return
         val route=erasers.tools.route(rawSample.tool==PointerTool.Eraser)
         if(route==EraserInputRoute.Blocked)return
         val raw=Point(rawSample.x,rawSample.y)
@@ -2353,51 +2430,59 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     }
     fun predict(sample: PenSample?) { gesture?.stroke?.prediction = sample?.let{precision.routePen(listOf(it)).single()} }
 
-    private fun batch(run: StrokeRun, samples: List<PenSample>, predicted: Boolean = false): SampleBatch {
+    private fun batch(run: StrokeRun, samples: List<PenSample>, predicted: Boolean = false,
+                      sequence: ULong = run.sequence, after: Long = run.lastTime): SampleBatch {
         require(samples.isNotEmpty() && samples.size <= if (predicted) 32 else 512)
-        require(samples.first().timeMs >= run.lastTime && samples.zipWithNext().all { (a, b) -> a.timeMs <= b.timeMs })
+        require(samples.first().timeMs >= after && samples.zipWithNext().all { (a, b) -> a.timeMs <= b.timeMs })
         val points = core.mapPoints(run.camera, true, samples.map { Point(it.x, it.y) })
-        return SampleBatch(run.sequence, points.map { it.x }.toDoubleArray(), points.map { it.y }.toDoubleArray(),
+        return SampleBatch(sequence, points.map { it.x }.toDoubleArray(), points.map { it.y }.toDoubleArray(),
             samples.map { require(it.timeMs >= run.start.timeMs && it.timeMs - run.start.timeMs <= UInt.MAX_VALUE.toLong()); (it.timeMs - run.start.timeMs).toUInt() }.toUIntArray(),
             samples.map { it.pressure }.toFloatArray(),
             if (run.capabilities.tilt) samples.map { it.tilt ?: 0f }.toFloatArray() else floatArrayOf(),
             if (run.capabilities.orientation) samples.map { it.orientation ?: 0f }.toFloatArray() else floatArrayOf())
     }
 
+    // region Stroke: ink, then save
     private fun startStroke(current: WorkbenchProject, run: StrokeRun) {
+        // Developer switch, read at pen-down. Off: the whole stroke, from its
+        // first sample to its refresh, runs under the mutation lock, so it
+        // starts only after the stroke before it is saved and refreshed.
+        val inkFirst = preferences.penPath[PenPathToggle.CanvasInkBeforeSave]
         scope.launch {
             try {
-                mutations.withLock {
-                    if (run.canceled.get() || run.epoch != epoch) return@withLock
-                    val native = current.beginStroke(run.options); run.native = native
-                    if (run.canceled.get()) { cancelNative(native); return@withLock }
-                    for (samples in run.queue) {
-                        if (run.canceled.get() || run.epoch != epoch) break
-                        require(run.samples + samples.size <= 100_000) { "Stroke sample limit reached. The unfinished stroke was canceled." }
-                        val realBatch = batch(run, samples)
-                        val update = appendWithBackpressure(native, realBatch)
-                        try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
-                        catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
-                        require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
-                        val additions = withContext(Dispatchers.Default) { EditorDrawing.contourPath(update.contours, run.origin) }
-                        run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
-                        run.samples += samples.size; run.lastTime = samples.last().timeMs; run.sequence++
-                        val path = Path(run.real)
-                        val predicted = run.prediction
-                        if (!run.finished && predicted != null && predicted.timeMs > run.lastTime && predicted.timeMs - run.lastTime <= 100) {
-                            try { path.addPath(EditorDrawing.contourPath(native.predict(batch(run, listOf(predicted), true)).contours, run.origin)) }
-                            catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error }
+                // On: the core begins the stroke without waiting for the project.
+                // A stroke it cannot begin that way (a highlighter, which may have
+                // to create its layer from what the project holds) is null here and
+                // takes the original path below, whole.
+                val early = if (run.canceled.get() || run.epoch != epoch) null else earlyInkStroke(inkFirst, current, run.options)
+                if (early == null) mutations.withLock {
+                    val native = inkStroke(current, run, null) ?: return@withLock
+                    val saved = saveStroke(run, native) ?: return@withLock
+                    refresh(current, saved.first, run.epoch)
+                    diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
+                } else {
+                    run.native = early
+                    // The stroke takes its place in the mutation queue now, at
+                    // pen-down, as it always did, so strokes, edits, undo and
+                    // closing are still saved in the order they were asked for.
+                    // Only its ink no longer waits there.
+                    val saved = inkThenSaveInOrder(mutations, ink = {
+                        val native = inkStroke(current, run, early)
+                        if (native != null && run.finished && !run.canceled.get() && run.epoch == epoch) {
+                            // The predicted tail goes at pen-up, not after a wait for the lock.
+                            run.drawing = wetObject(run, Path(run.real)); publish()
+                            native
+                        } else {
+                            // A cancelled stroke has nothing to save and waits for nobody.
+                            if (native != null) cancelNative(native)
+                            null
                         }
-                        if (!run.canceled.get() && run.epoch == epoch) { run.drawing = wetObject(run, path); publish() }
+                    }, save = { saveStroke(run, it) })
+                    // The next stroke may save now; it does not wait for this refresh.
+                    if (saved != null) {
+                        refresh(current, saved.first, run.epoch)
+                        diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
                     }
-                    if (run.finished && !run.canceled.get() && run.epoch == epoch) {
-                        // Predictions are replaced by canonical real contours before commit.
-                        run.drawing = wetObject(run, Path(run.real)); publish()
-                        val result = native.commit()
-                        run.committed = true
-                        finishRemotePreview(run.link, run.options.gestureId, false)
-                        refresh(current, result, run.epoch)
-                    } else cancelNative(native)
                 }
             } catch (cancel: CancellationException) { cancelNative(run.native); throw cancel }
             catch (error: Exception) { cancelNative(run.native); if (!run.canceled.get()) report(error) }
@@ -2412,6 +2497,81 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             }
         }
     }
+
+    /** Begins the native stroke, unless [early] already began it, and feeds it
+     * every queued batch until pen-up or cancellation. Null: the stroke ended
+     * before it began. With [early] each batch makes one trip off the main
+     * thread instead of three. */
+    private suspend fun inkStroke(current: WorkbenchProject, run: StrokeRun, early: WorkbenchStroke?): WorkbenchStroke? {
+        if (run.canceled.get() || run.epoch != epoch) { if (early != null) cancelNative(early); return null }
+        val native = early ?: current.beginStroke(run.options)
+        run.native = native
+        diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
+        if (run.canceled.get()) { cancelNative(native); return null }
+        for (samples in run.queue) {
+            if (run.canceled.get() || run.epoch != epoch) break
+            require(run.samples + samples.size <= 100_000) { "Stroke sample limit reached. The unfinished stroke was canceled." }
+            if (early != null) { inkBatchInOneTrip(native, run, samples); continue }
+            val realBatch = batch(run, samples)
+            val update = appendWithBackpressure(native, realBatch)
+            try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
+            catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
+            require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
+            val additions = withContext(Dispatchers.Default) { EditorDrawing.contourPath(update.contours, run.origin) }
+            run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
+            run.samples += samples.size; run.lastTime = samples.last().timeMs; run.sequence++
+            val path = Path(run.real)
+            val predicted = run.prediction
+            if (!run.finished && predicted != null && predicted.timeMs > run.lastTime && predicted.timeMs - run.lastTime <= 100) {
+                try { path.addPath(EditorDrawing.contourPath(native.predict(batch(run, listOf(predicted), true)).contours, run.origin)) }
+                catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error }
+            }
+            if (!run.canceled.get() && run.epoch == epoch) { inkSampleMs = run.lastTime; inkStartMs = run.start.timeMs; run.drawing = wetObject(run, path); publish() }
+        }
+        return native
+    }
+
+    /** The same work as one pass of the loop above, with the append, the path
+     * of its contours and the predicted tail done in a single trip off the main
+     * thread instead of three. The stroke's counters stay on the main thread. */
+    private suspend fun inkBatchInOneTrip(native: WorkbenchStroke, run: StrokeRun, samples: List<PenSample>) {
+        val realBatch = batch(run, samples)
+        val last = samples.last().timeMs
+        val predicted = run.prediction?.takeIf { !run.finished && it.timeMs > last && it.timeMs - last <= 100 }
+        // The tail follows this batch: its request carries the next sequence.
+        val tailBatch = predicted?.let { batch(run, listOf(it), true, sequence = run.sequence + 1uL, after = last) }
+        val origin = run.origin
+        val (update, additions, tail) = withContext(Dispatchers.Default) {
+            val update = appendWithBackpressure(native, realBatch)
+            val additions = EditorDrawing.contourPath(update.contours, origin)
+            val tail = if (tailBatch == null) null else try { EditorDrawing.contourPath(native.predict(tailBatch).contours, origin) }
+                catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error; null }
+            Triple(update, additions, tail)
+        }
+        try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
+        catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
+        require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
+        run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
+        run.samples += samples.size; run.lastTime = last; run.sequence++
+        val path = Path(run.real)
+        if (tail != null && !run.finished) path.addPath(tail)
+        if (!run.canceled.get() && run.epoch == epoch) { inkSampleMs = run.lastTime; inkStartMs = run.start.timeMs; run.drawing = wetObject(run, path); publish() }
+    }
+
+    /** Saves a finished stroke and returns its revision with the time it was
+     * saved; a stroke that was cancelled instead is cancelled natively. */
+    private suspend fun saveStroke(run: StrokeRun, native: WorkbenchStroke): Pair<ProjectInfo, Long>? {
+        if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); return null }
+        // Predictions are replaced by canonical real contours before commit.
+        run.drawing = wetObject(run, Path(run.real)); publish()
+        val result = native.commit()
+        run.committed = true
+        val saved = SystemClock.uptimeMillis()
+        diagnostics.pen.recordMillis(PenTiming.CanvasSave, saved - run.lastTime)
+        finishRemotePreview(run.link, run.options.gestureId, false)
+        return result to saved
+    }
+    // endregion
 
     private suspend fun appendWithBackpressure(native: WorkbenchStroke, batch: SampleBatch): InkUpdate {
         repeat(4) { attempt ->
@@ -2480,15 +2640,28 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     private suspend fun refresh(current: WorkbenchProject, revision: ProjectInfo, token: Long) {
+        refreshDocument(current, revision, token, queued = false)
+    }
+    /** One read of the document and, when nothing newer was observed during
+     * it, its adoption. A save's own read ([queued] false) that its change
+     * event overtook is dropped as before; the refresh that event queued
+     * adopts, and the save stays pending until then. */
+    private suspend fun refreshDocument(current: WorkbenchProject, revision: ProjectInfo, token: Long, queued: Boolean): RefreshAdmission.Verdict =
         refreshMutex.withLock {
-        if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return
-        val ticket = refreshAdmission.capture()
-        val doc = document ?: return
-        val fetched = documentRefresh.load(doc,{document}){current.document(doc.documentId)} ?: return
-        val next = fetched.snapshot
-        val drawing = preparedDrawing(next.render.items)
-        if (token != epoch || project !== current || disposing || !refreshAdmission.accepts(ticket) ||
-            !documentRefresh.accepts(fetched.ticket,document,next)) return
+        if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return@withLock RefreshAdmission.Verdict.Dropped
+        refreshAdmission.refresh(queued, read = {
+            val doc = document ?: return@refresh null
+            // Developer switch: ask only for what changed and keep the paths
+            // already built for untouched strokes. Off: the full read, as before.
+            val quick = preferences.penPath[PenPathToggle.CanvasQuickRefresh]
+            val fetched = documentRefresh.load(doc,{document}){readDocumentSnapshot(current,doc,quick)} ?: return@refresh null
+            val prepared = preparedDrawing(fetched.snapshot.render.items, if (quick) objects else emptyList())
+            if (token != epoch || project !== current || disposing ||
+                !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
+            else fetched.snapshot to prepared
+        }, adopt = { loaded -> adoptDocument(current, loaded.first, loaded.second) })
+        }
+    private suspend fun adoptDocument(current: WorkbenchProject, next: DocumentSnapshot, drawing: List<DrawObject>) {
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
@@ -2514,7 +2687,6 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         if (objects.none { it.item.objectId == selected }) selected = null
         publish()
-        }
     }
     fun saveText(text: String, font: String, size: Double) {
         if (streamEditsSealed || captureStreamBlocksParent || busy || pending != 0) return
@@ -2823,18 +2995,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             is GiantImageFailure -> when (error.kind) {
                 GiantImageFailureKind.Limit, GiantImageFailureKind.Memory, GiantImageFailureKind.Backpressure ->
                     "This large JPEG exceeds the available tile, memory or scratch-storage allowance. Its source was not reduced."
-                GiantImageFailureKind.Unsupported -> "This device's tiled producer supports JPEG originals only. Choose regular import for a supported smaller image."
+                GiantImageFailureKind.Unsupported -> "On this device very large images can only be opened from JPEG files. Use regular import for a smaller image in another format."
                 GiantImageFailureKind.Storage -> "The large JPEG could not be saved safely. Check free space and try again."
                 GiantImageFailureKind.Cancelled -> "Large-JPEG import was canceled."
                 else -> "The large JPEG could not be verified or opened. Existing projects are unchanged."
             }
-            is CoreFailure -> when (error.kind) {
-                CoreFailureKind.Backpressure -> "The core is at its resource limit. The unfinished action was canceled; saved work is intact."
-                CoreFailureKind.Storage -> "The edit could not be saved. Check available storage and try again."
-                CoreFailureKind.ImageCodecUnavailable -> "An installed AVIF decoder is unavailable. The original is unchanged."
-                CoreFailureKind.Cancelled -> "The unfinished action was canceled."
-                else -> "The core could not complete this action (${error.kind}). Saved work is intact."
-            }
+            // What happened and what to do, in plain words, made more specific by
+            // the core's own reason for this failure when it recorded one.
+            is CoreFailure -> coreFailureReasons.text(error)
             is IllegalArgumentException, is IllegalStateException, is UnsupportedOperationException -> error.message ?: "This action could not be completed."
             else -> "This action could not be completed. Saved work is intact."
         }

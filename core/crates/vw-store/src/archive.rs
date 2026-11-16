@@ -239,7 +239,7 @@ pub fn import_vwbz(
     ProjectStore::open(&destination)
 }
 
-fn sqlite_path(path: &Path) -> Result<&str, StoreError> {
+pub(crate) fn sqlite_path(path: &Path) -> Result<&str, StoreError> {
     path.to_str()
         .ok_or(StoreError::Invalid("SQLite filename encoding"))
 }

@@ -1,10 +1,11 @@
 use crate::{
-    HostSnapshot, OpsError,
+    HostSnapshot, InversePreview, OpsError, Touched,
+    draft::{self, Originals, for_each_collection},
     patch::{self, Change},
     plan,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use vw_model::{DeviceId, Id, Project};
+use vw_model::{DeviceId, Id, Project, StateHash, StateHasher};
 use vw_proto::{Message, v1};
 
 // SYNC-002 requires recovery of 5,000 offline transactions. Keep the queue
@@ -30,6 +31,28 @@ pub struct PendingTransaction {
     pub blocked_reason: Option<String>,
 }
 
+/// Whether this build checks every incremental state hash against a hash of
+/// the whole project (the `cross-check` feature, which the workspace's test
+/// build turns on): every decided edit then also hashes the whole project.
+pub const CROSS_CHECKED: bool = cfg!(feature = "cross-check");
+
+/// A replica's undo previews as `Replica::undo_previews` lends them: those
+/// of its accepted edits, then those it holds for its queued edits. Their
+/// serialized shape is the shape of the `serde_json::Value`s they hold.
+pub struct UndoPreviews<'a> {
+    replica: &'a Replica,
+}
+impl serde::Serialize for UndoPreviews<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let replica = self.replica;
+        let queued = replica.pending.iter().filter_map(|pending| {
+            let id = Id::from_proto(pending.transaction.txn_id.as_ref()).ok()?;
+            replica.inverse_previews.get_key_value(&id)
+        });
+        serializer.collect_map(replica.authoritative_inverses.iter().chain(queued))
+    }
+}
+
 /// An optimistic local view over the latest verified host snapshot.
 #[derive(Debug, Clone)]
 pub struct Replica {
@@ -39,7 +62,16 @@ pub struct Replica {
     visible: Project,
     pending: Vec<PendingTransaction>,
     inverse_previews: BTreeMap<Id, Vec<Change>>,
+    /// What undoing an accepted transaction of this device would change, as
+    /// of the current authoritative revision. A snapshot brings all of them;
+    /// `advance` keeps only those its pending work needs, and the rest are
+    /// asked of the host when an undo needs them (`inverse_needed`).
     authoritative_inverses: BTreeMap<Id, Vec<Change>>,
+    /// Every accepted transaction of this device.
+    owned: BTreeSet<Id>,
+    /// Follows `visible`, so its hash is known without hashing it again.
+    hasher: StateHasher,
+    visible_hash: StateHash,
 }
 
 impl Replica {
@@ -67,8 +99,9 @@ impl Replica {
 
     /// Start from a hash-verified snapshot; pending transactions are device-owned.
     pub fn new(device: DeviceId, snapshot: HostSnapshot) -> Result<Self, OpsError> {
-        validate_snapshot(&snapshot)?;
+        let (hasher, visible_hash) = validate_snapshot(&snapshot)?;
         let inverse_previews = owned_previews(&snapshot, &device);
+        let owned = owned_ids(&snapshot, &device)?;
         Ok(Self {
             device,
             visible: snapshot.project.clone(),
@@ -77,16 +110,31 @@ impl Replica {
             pending: Vec::new(),
             authoritative_inverses: inverse_previews.clone(),
             inverse_previews,
+            owned,
+            hasher,
+            visible_hash,
         })
     }
     pub const fn project(&self) -> &Project {
         &self.visible
+    }
+    /// The state hash of the visible project, pending edits included. It is
+    /// kept up to date as edits are queued and snapshots received.
+    pub const fn state_hash(&self) -> &StateHash {
+        &self.visible_hash
     }
     pub const fn revision(&self) -> &v1::Revision {
         &self.revision
     }
     pub fn pending(&self) -> &[PendingTransaction] {
         &self.pending
+    }
+    /// The undo previews a replay of the queue rebuilds, lent for sizing it:
+    /// it starts from a copy of those of this device's accepted edits and
+    /// adds one for every queued edit, beside the set held now until the new
+    /// one is installed. Read only.
+    pub fn undo_previews(&self) -> UndoPreviews<'_> {
+        UndoPreviews { replica: self }
     }
     /// Restore a transaction from the durable local outbox after the verified
     /// host base advanced. Preserve its original bytes/base for exact retry and
@@ -154,7 +202,7 @@ impl Replica {
                 }
                 continue;
             }
-            if self.authoritative_inverses.contains_key(&id) {
+            if self.owned.contains(&id) {
                 return Err(OpsError::IdCollision);
             }
             if identities.len() >= MAX_PENDING_TRANSACTIONS
@@ -185,14 +233,14 @@ impl Replica {
                 next = admitted.next();
             }
         }
-        let (visible, inverses) = replay(
+        let replayed = replay(
             &self.authoritative,
             &mut pending,
             self.authoritative_inverses.clone(),
+            StateHasher::default(),
         )?;
         self.pending = pending;
-        self.visible = visible;
-        self.inverse_previews = inverses;
+        self.install(replayed);
         Ok(())
     }
     /// Explicitly abandon rejected/cancelled local work and its inverse chain.
@@ -235,16 +283,60 @@ impl Replica {
             })
             .cloned()
             .collect::<Vec<_>>();
-        let (visible, inverse_previews) = replay(
+        let replayed = replay(
             &self.authoritative,
             &mut remaining,
             self.authoritative_inverses.clone(),
+            StateHasher::default(),
         )?;
         self.pending = remaining;
-        self.visible = visible;
-        self.inverse_previews = inverse_previews;
+        self.install(replayed);
         Ok(removed.into_iter().collect())
     }
+    /// Whether `queue` would take this transaction, without keeping it: the
+    /// same refusals, tried on the visible project itself and taken back out,
+    /// so nothing is copied and the replica is exactly as before.
+    pub fn check(&mut self, transaction: &v1::Transaction) -> Result<(), OpsError> {
+        if transaction.device_id != self.device.as_str() {
+            return Err(OpsError::DeviceMismatch);
+        }
+        if transaction.base_revision.as_ref() != Some(&self.revision) {
+            return Err(OpsError::RevisionMismatch);
+        }
+        if Id::from_proto(transaction.project_id.as_ref())? != self.authoritative.id {
+            return Err(OpsError::Invalid("project identity"));
+        }
+        admit_payload_bytes(0, transaction)?;
+        Id::from_proto(transaction.txn_id.as_ref())?;
+        if let Some(existing) = self
+            .pending
+            .iter()
+            .find(|p| p.transaction.txn_id == transaction.txn_id)
+        {
+            return if existing.transaction.encode_to_vec() == transaction.encode_to_vec() {
+                Ok(())
+            } else {
+                Err(OpsError::IdCollision)
+            };
+        }
+        if self.pending.len() >= MAX_PENDING_TRANSACTIONS
+            || transaction.ops.is_empty()
+            || transaction.ops.len() > 4096
+        {
+            return Err(OpsError::Invalid("pending queue bounds"));
+        }
+        self.pending
+            .iter()
+            .try_fold(transaction.encoded_len(), |bytes, pending| {
+                admit_payload_bytes(bytes, &pending.transaction)
+            })?;
+        validate_transaction(transaction)?;
+        let replaced = optimistic(&mut self.visible, transaction, &self.inverse_previews)?;
+        let inverse = inverse_of(&replaced, &self.visible);
+        replaced.restore(&mut self.visible);
+        inverse.map(|_| ())
+    }
+
     /// Apply one local transaction optimistically. Its base is the last host
     /// revision, not a fabricated revision for earlier unacknowledged local edits.
     pub fn queue(&mut self, transaction: v1::Transaction) -> Result<(), OpsError> {
@@ -282,14 +374,28 @@ impl Replica {
                 admit_payload_bytes(bytes, &pending.transaction)
             })?;
         validate_transaction(&transaction)?;
-        let project = optimistic(&self.visible, &transaction, &self.inverse_previews)?;
-        let inverse = patch::between(&self.visible, &project)?
-            .into_iter()
-            .rev()
-            .map(|change| change.inverse())
-            .collect();
+        let replaced = optimistic(&mut self.visible, &transaction, &self.inverse_previews)?;
+        self.hasher.replaced(&replaced);
+        let concluded = inverse_of(&replaced, &self.visible).and_then(|inverse| {
+            let (hash, _) = self.hasher.hash(&self.visible)?;
+            Ok((inverse, hash))
+        });
+        let (inverse, hash) = match concluded {
+            Ok(concluded) => concluded,
+            Err(error) => {
+                self.hasher.replaced(&replaced);
+                replaced.restore(&mut self.visible);
+                return Err(error);
+            }
+        };
+        #[cfg(feature = "cross-check")]
+        assert_eq!(
+            Some(&hash),
+            self.visible.state_hash().ok().as_ref(),
+            "incremental visible hash differs from the whole-project hash"
+        );
         self.inverse_previews.insert(id, inverse);
-        self.visible = project;
+        self.visible_hash = hash;
         self.pending.push(PendingTransaction {
             transaction,
             blocked_reason: None,
@@ -300,7 +406,7 @@ impl Replica {
     /// remove only byte-matched accepted work, then replay the remaining queue.
     /// Failures remain blocked in that queue with a notice for the caller.
     pub fn receive(&mut self, snapshot: HostSnapshot) -> Result<(), OpsError> {
-        validate_snapshot(&snapshot)?;
+        let (hasher, _) = validate_snapshot(&snapshot)?;
         if snapshot.project.id != self.authoritative.id
             || snapshot.revision.host_seq < self.revision.host_seq
         {
@@ -320,46 +426,284 @@ impl Replica {
             }
         }
         let authoritative_inverses = owned_previews(&snapshot, &self.device);
-        let (visible, inverse_previews) = replay(
+        let owned = owned_ids(&snapshot, &self.device)?;
+        // The hasher that verified the snapshot continues through the replay.
+        let replayed = replay(
             &snapshot.project,
             &mut remaining,
             authoritative_inverses.clone(),
+            hasher,
         )?;
         self.authoritative = snapshot.project;
         self.revision = snapshot.revision;
-        self.visible = visible;
         self.pending = remaining;
-        self.inverse_previews = inverse_previews;
+        self.install(replayed);
         self.authoritative_inverses = authoritative_inverses;
+        self.owned = owned;
         Ok(())
+    }
+
+    /// The accepted transaction whose undo preview `transaction` needs and
+    /// this replica does not hold: the target of a standalone undo that is
+    /// neither pending here nor known. Ask the host for it
+    /// (`HostSequencer::inverse_preview`) and `provide_inverse` it before
+    /// queueing `transaction`; without it the undo is refused as it always
+    /// was for a transaction of another device.
+    pub fn inverse_needed(&self, transaction: &v1::Transaction) -> Option<Id> {
+        let target = undo_target(transaction)?;
+        (!self.inverse_previews.contains_key(&target) && self.owned.contains(&target))
+            .then_some(target)
+    }
+
+    /// Hold the preview the host gave for undoing its accepted transaction
+    /// `target`, valid until the authoritative revision changes.
+    pub fn provide_inverse(&mut self, target: Id, preview: InversePreview) {
+        if self.owned.contains(&target) && !self.inverse_previews.contains_key(&target) {
+            self.inverse_previews
+                .insert(target.clone(), preview.0.clone());
+            self.authoritative_inverses.insert(target, preview.0);
+        }
+    }
+
+    /// The accepted transactions whose undo previews `advance` needs once
+    /// `accepted` are accepted: the targets of pending undos that stay
+    /// pending, other than pending work itself.
+    pub fn previews_needed(&self, accepted: &[&v1::Transaction]) -> Vec<Id> {
+        let id = |txn: &v1::Transaction| Id::from_proto(txn.txn_id.as_ref()).ok();
+        let acknowledged = accepted
+            .iter()
+            .filter_map(|txn| id(txn))
+            .collect::<BTreeSet<_>>();
+        let remaining = self
+            .pending
+            .iter()
+            .filter(|pending| id(&pending.transaction).is_none_or(|id| !acknowledged.contains(&id)))
+            .collect::<Vec<_>>();
+        let pending_ids = remaining
+            .iter()
+            .filter_map(|pending| id(&pending.transaction))
+            .collect::<BTreeSet<_>>();
+        let mut needed = BTreeSet::new();
+        for pending in remaining {
+            if let Some(target) = undo_target(&pending.transaction)
+                && !pending_ids.contains(&target)
+            {
+                needed.insert(target);
+            }
+        }
+        needed.into_iter().collect()
+    }
+
+    /// Move to the host's next revision without a snapshot of the whole
+    /// project. `project` and `revision` are the host's now, `accepted` the
+    /// transactions it accepted since this replica's revision, in host
+    /// order, and `touched` everything they touched. `previews` holds, from
+    /// the host at its new revision, what `previews_needed` named.
+    ///
+    /// The result is what `receive` makes of a snapshot of the same host:
+    /// acknowledged work leaves the queue, the authoritative project is the
+    /// host's, and the remaining work is replayed over it, refused work
+    /// staying blocked. Only the entities the accepted transactions touched
+    /// and those the pending work changed are copied, so the work follows
+    /// what changed. When no work is left waiting, what is shown is the
+    /// host's project, and its hash has to be the host's state hash.
+    ///
+    /// On an error the replica keeps its old revision. It is then behind
+    /// its host: it refuses new work, whose base is the host's revision,
+    /// until it is built again from the host (`new`) with the durable
+    /// outbox; what it shows may be partly moved on meanwhile.
+    pub fn advance(
+        &mut self,
+        project: &Project,
+        revision: v1::Revision,
+        accepted: &[&v1::Transaction],
+        touched: &Touched,
+        previews: BTreeMap<Id, InversePreview>,
+    ) -> Result<(), OpsError> {
+        if project.id != self.authoritative.id
+            || revision.host_seq < self.revision.host_seq
+            || revision.state_hash.len() != 32
+        {
+            return Err(OpsError::RevisionMismatch);
+        }
+        let mut acknowledged = BTreeMap::new();
+        for transaction in accepted {
+            acknowledged.insert(Id::from_proto(transaction.txn_id.as_ref())?, *transaction);
+        }
+        // What the visible project shows differently from the authoritative
+        // one: only what pending work changed.
+        let mut reset = touched.clone();
+        let mut remaining = Vec::with_capacity(self.pending.len());
+        for pending in &self.pending {
+            let id = Id::from_proto(pending.transaction.txn_id.as_ref())?;
+            if let Some(changes) = self.inverse_previews.get(&id) {
+                patch::touched_by(changes, &mut reset);
+            }
+            match acknowledged.get(&id) {
+                Some(accepted) => {
+                    if accepted.encode_to_vec() != pending.transaction.encode_to_vec() {
+                        return Err(OpsError::IdCollision);
+                    }
+                }
+                None => remaining.push(pending.clone()),
+            }
+        }
+        // Nothing has changed so far. From here the projects move on; the
+        // revision moves last.
+        copy_entities(project, &mut self.authoritative, touched, None);
+        let mut replaced = Originals::default();
+        copy_entities(project, &mut self.visible, &reset, Some(&mut replaced));
+        self.hasher.replaced(&replaced);
+        let mut inverses = previews
+            .into_iter()
+            .map(|(id, preview)| (id, preview.0))
+            .collect::<BTreeMap<_, _>>();
+        let authoritative_inverses = inverses.clone();
+        for pending in &mut remaining {
+            match optimistic(&mut self.visible, &pending.transaction, &inverses) {
+                Ok(replaced) => {
+                    self.hasher.replaced(&replaced);
+                    let inverse = inverse_of(&replaced, &self.visible)?;
+                    inverses.insert(
+                        Id::from_proto(pending.transaction.txn_id.as_ref())?,
+                        inverse,
+                    );
+                    pending.blocked_reason = None;
+                }
+                Err(error) => pending.blocked_reason = Some(error.to_string()),
+            }
+        }
+        let (hash, _) = self.hasher.hash(&self.visible)?;
+        // With nothing waiting, what is shown is the authoritative copy,
+        // which has to be the host's project: a copy that is not, for one
+        // taken in from a wrong list of touched entities, is refused here.
+        if remaining.is_empty() && hash.bytes().as_slice() != revision.state_hash {
+            return Err(OpsError::RevisionMismatch);
+        }
+        #[cfg(feature = "cross-check")]
+        {
+            assert!(
+                &self.authoritative == project,
+                "advanced authoritative project differs from the host's"
+            );
+            assert_eq!(
+                Some(&hash),
+                self.visible.state_hash().ok().as_ref(),
+                "incremental visible hash differs from the whole-project hash"
+            );
+        }
+        for (id, transaction) in acknowledged {
+            if transaction.device_id == self.device.as_str() {
+                self.owned.insert(id);
+            }
+        }
+        self.pending = remaining;
+        self.revision = revision;
+        self.inverse_previews = inverses;
+        self.authoritative_inverses = authoritative_inverses;
+        self.visible_hash = hash;
+        Ok(())
+    }
+
+    fn install(&mut self, replayed: Replayed) {
+        self.visible = replayed.visible;
+        self.inverse_previews = replayed.inverses;
+        self.hasher = replayed.hasher;
+        self.visible_hash = replayed.hash;
     }
 }
 
+/// The visible project rebuilt from a base and the pending queue.
+struct Replayed {
+    visible: Project,
+    inverses: BTreeMap<Id, Vec<Change>>,
+    hasher: StateHasher,
+    hash: StateHash,
+}
+
+/// Apply the pending queue to a copy of `base`. `hasher` either follows
+/// `base` already or is new; it comes back following the result.
 fn replay(
     base: &Project,
     pending: &mut [PendingTransaction],
     mut inverses: BTreeMap<Id, Vec<Change>>,
-) -> Result<(Project, BTreeMap<Id, Vec<Change>>), OpsError> {
+    mut hasher: StateHasher,
+) -> Result<Replayed, OpsError> {
     let mut visible = base.clone();
     for pending in pending {
-        match optimistic(&visible, &pending.transaction, &inverses) {
-            Ok(next) => {
-                let inverse = patch::between(&visible, &next)?
-                    .into_iter()
-                    .rev()
-                    .map(|change| change.inverse())
-                    .collect();
+        match optimistic(&mut visible, &pending.transaction, &inverses) {
+            Ok(replaced) => {
+                hasher.replaced(&replaced);
+                let inverse = inverse_of(&replaced, &visible)?;
                 inverses.insert(
                     Id::from_proto(pending.transaction.txn_id.as_ref())?,
                     inverse,
                 );
-                visible = next;
                 pending.blocked_reason = None;
             }
             Err(error) => pending.blocked_reason = Some(error.to_string()),
         }
     }
-    Ok((visible, inverses))
+    let (hash, _) = hasher.hash(&visible)?;
+    #[cfg(feature = "cross-check")]
+    assert_eq!(
+        Some(&hash),
+        visible.state_hash().ok().as_ref(),
+        "incremental visible hash differs from the whole-project hash"
+    );
+    Ok(Replayed {
+        visible,
+        inverses,
+        hasher,
+        hash,
+    })
+}
+
+/// The accepted transactions in a snapshot that `device` made.
+fn owned_ids(snapshot: &HostSnapshot, device: &DeviceId) -> Result<BTreeSet<Id>, OpsError> {
+    snapshot
+        .accepted
+        .iter()
+        .filter(|(_, (txn, _))| txn.device_id == device.as_str())
+        .map(|(id, _)| Ok(id.clone()))
+        .collect()
+}
+
+/// The target of a standalone undo.
+fn undo_target(transaction: &v1::Transaction) -> Option<Id> {
+    match transaction.ops.as_slice() {
+        [
+            v1::Op {
+                kind: Some(v1::op::Kind::UndoTransaction(undo)),
+                ..
+            },
+        ] => Id::from_proto(undo.target_txn_id.as_ref()).ok(),
+        _ => None,
+    }
+}
+
+/// Make `into` hold what `from` holds for every entity `entities` names,
+/// remembering in `replaced` what it held before.
+fn copy_entities(
+    from: &Project,
+    into: &mut Project,
+    entities: &Touched,
+    mut replaced: Option<&mut Originals>,
+) {
+    macro_rules! copy {
+        ($field:ident, $key:ty, $value:ty) => {
+            for id in &entities.$field {
+                let previous = match from.$field.get(id) {
+                    Some(value) => into.$field.insert(id.clone(), value.clone()),
+                    None => into.$field.remove(id),
+                };
+                if let Some(replaced) = replaced.as_deref_mut() {
+                    replaced.$field.entry(id.clone()).or_insert(previous);
+                }
+            }
+        };
+    }
+    for_each_collection!(copy);
 }
 
 fn owned_previews(snapshot: &HostSnapshot, device: &DeviceId) -> BTreeMap<Id, Vec<Change>> {
@@ -376,11 +720,13 @@ fn owned_previews(snapshot: &HostSnapshot, device: &DeviceId) -> BTreeMap<Id, Ve
         .collect()
 }
 
+/// Apply one pending transaction to the visible project in place and return
+/// what it replaced. A refused transaction leaves the project untouched.
 fn optimistic(
-    project: &Project,
+    project: &mut Project,
     transaction: &v1::Transaction,
     inverses: &BTreeMap<Id, Vec<Change>>,
-) -> Result<Project, OpsError> {
+) -> Result<Originals, OpsError> {
     if let [
         v1::Op {
             kind: Some(v1::op::Kind::UndoTransaction(undo)),
@@ -390,14 +736,28 @@ fn optimistic(
     {
         let id = Id::from_proto(undo.target_txn_id.as_ref())?;
         let changes = inverses.get(&id).ok_or(OpsError::UndoOwnership)?;
-        patch::apply(project, changes)
+        draft::edit(project, |draft| patch::apply(draft, changes))
     } else {
-        plan::plan(project, transaction)
+        draft::edit(project, |draft| plan::apply(draft, transaction))
     }
 }
 
-fn validate_snapshot(snapshot: &HostSnapshot) -> Result<(), OpsError> {
-    if snapshot.project.state_hash()?.bytes().as_slice() != snapshot.revision.state_hash {
+/// The changes that take `project` back to what an edit replaced.
+fn inverse_of(replaced: &Originals, project: &Project) -> Result<Vec<Change>, OpsError> {
+    Ok(patch::between(replaced, project)?
+        .into_iter()
+        .rev()
+        .map(|change| change.inverse())
+        .collect())
+}
+
+/// Check a snapshot against its revision. The hasher that computed its hash
+/// is returned following the snapshot's project, with that hash.
+fn validate_snapshot(snapshot: &HostSnapshot) -> Result<(StateHasher, StateHash), OpsError> {
+    snapshot.project.validate()?;
+    let mut hasher = StateHasher::default();
+    let (hash, _) = hasher.hash(&snapshot.project)?;
+    if hash.bytes().as_slice() != snapshot.revision.state_hash {
         return Err(OpsError::RevisionMismatch);
     }
     let mut sequences = BTreeSet::new();
@@ -413,7 +773,7 @@ fn validate_snapshot(snapshot: &HostSnapshot) -> Result<(), OpsError> {
             return Err(OpsError::RevisionMismatch);
         }
     }
-    Ok(())
+    Ok((hasher, hash))
 }
 
 fn is_inverse(transaction: &v1::Transaction) -> bool {

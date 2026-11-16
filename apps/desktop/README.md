@@ -4,8 +4,7 @@ Central checkpoint (2026-10-03): the complete desktop and shared JVM suites pass
 again in `build.ps1 test-all`, including the native cache-anchor regressions.
 The packaged Windows startup runner passed its 24 parser/binding, ten bounded
 child-capture and Windows lease fixtures. The actual packaged application drew
-a frame at density 1.75/window DPI 168 and completed ordinary shutdown; see
-`docs/evidence/T1.09.md` for exact receipts and timing limits. Synthetic tests do not
+a frame at density 1.75/window DPI 168 and completed ordinary shutdown. Synthetic tests do not
 establish owner visual, input, clipboard/drag or paired-device acceptance.
 
 The window uses the generated shared core and host bindings. PMv2 is established

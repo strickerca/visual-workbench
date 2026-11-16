@@ -1,0 +1,24 @@
+# Once a week, checks every pinned Rust library against the public list of
+# known vulnerabilities. Pushes already run this check; the weekly run catches
+# a vulnerability published while nobody is pushing. A failure emails the owner.
+name: weekly-scan
+
+on:
+  schedule:
+    - cron: "17 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  advisories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: tools/ci/install-tools.sh deny
+      - run: cargo deny check advisories

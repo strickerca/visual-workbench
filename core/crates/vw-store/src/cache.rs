@@ -198,9 +198,10 @@ pub struct RealFreeSpace;
 
 impl FreeSpaceQuery for RealFreeSpace {
     fn query(&self, path: &Path) -> Result<DiskSpace, StoreError> {
+        let (total_bytes, available_bytes) = crate::os_fs::volume_space(path)?;
         Ok(DiskSpace {
-            total_bytes: fs2::total_space(path)?,
-            available_bytes: fs2::available_space(path)?,
+            total_bytes,
+            available_bytes,
         })
     }
 }
@@ -264,9 +265,9 @@ impl<Q: FreeSpaceQuery> DiskCache<Q> {
         ensure_directory(&directory)?;
         let lock_path = directory.join("manager.lock");
         let lock = open_lock(&lock_path)?;
-        fs2::FileExt::try_lock_exclusive(&lock).map_err(|error| {
+        crate::os_fs::try_lock_exclusive(&lock).map_err(|error| {
             if error.kind() == std::io::ErrorKind::WouldBlock
-                || error.raw_os_error() == fs2::lock_contended_error().raw_os_error()
+                || error.raw_os_error() == crate::os_fs::lock_contended_error().raw_os_error()
             {
                 StoreError::Busy
             } else {
@@ -771,16 +772,7 @@ fn open_lock(path: &Path) -> Result<File, StoreError> {
     }
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x0020_0000);
-    }
-    #[cfg(any(target_os = "android", target_os = "linux"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x0002_0000);
-    }
+    crate::blobs::no_follow(&mut options);
     let file = options.open(path)?;
     check_regular_metadata(&file.metadata()?)?;
     Ok(file)

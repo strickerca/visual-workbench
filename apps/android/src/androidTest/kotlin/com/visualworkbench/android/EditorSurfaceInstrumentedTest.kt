@@ -17,7 +17,9 @@ import com.visualworkbench.android.editor.*
 import com.visualworkbench.shared.Point
 import com.visualworkbench.shared.Shape
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestName
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
@@ -25,6 +27,12 @@ import kotlin.math.abs
 /** Actual app SurfaceView MotionEvents + native persistence; synthetic input only. */
 @RunWith(AndroidJUnit4::class)
 class EditorSurfaceInstrumentedTest {
+    @get:Rule val testName = TestName()
+    /** Uptime at which the running test began, and whether it runs the canvas with
+     * its lifecycle log on (diagnostics) or off (the shipping path). */
+    private var lifeSinceMs = 0L
+    private var lifecycleLog = false
+
     private fun ready(activity: MainActivity): Boolean = !activity.editor.busy && activity.editor.pending == 0 &&
         !activity.editor.instructionEditor.state.value.busy && !activity.editor.semanticEditor.state.value.busy
 
@@ -44,7 +52,11 @@ class EditorSurfaceInstrumentedTest {
         scenario.onActivity { activity ->
             val editor = activity.editor
             val closeDetail = editor.retirementTimeoutSuffix
-            detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} $closeDetail"
+            // Which part of a canvas wait failed: the scene, its background or the surface.
+            detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} " +
+                "scene=${editor.scene != null} background=${editor.scene?.background != null} " +
+                "surface_valid=${canvas(activity.window.decorView)?.holder?.surface?.isValid == true} " +
+                "instructions_busy=${editor.instructionEditor.state.value.busy} semantics_busy=${editor.semanticEditor.state.value.busy} $closeDetail"
         }
         fail("Timed out in $phase: $detail")
     }
@@ -135,6 +147,8 @@ class EditorSurfaceInstrumentedTest {
      * a persistent one. Screenshots stay in memory and are recycled immediately. */
     private fun assertPresented(scenario: ActivityScenario<MainActivity>, phase: String, deadlineMs: Long = 2_000, observeMs: Long = 800) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        // Writing out what the canvas recorded so far happens before the deadline's clock starts.
+        CanvasLife.line("check_begin phase=$phase")
         val start = SystemClock.uptimeMillis()
         var samples = 0; var blackSamples = 0; var bandSamples = 0; var firstBlackMs = -1L; var lastBlackMs = -1L
         var firstPresentedMs = -1L; var lastPresented = false; var detail = "canvas-unavailable"
@@ -165,14 +179,53 @@ class EditorSurfaceInstrumentedTest {
             val now = SystemClock.uptimeMillis() - start
             if ((lastPresented && now >= observeMs) || now >= deadlineMs) break
         }
+        // Diagnosis only, after the verdict is fixed: does the page appear by itself
+        // later (a slow machine) or never (a missed redraw)? The test fails either way.
+        var latePresentedMs = -1L
+        if (!lastPresented) {
+            val lateStart = SystemClock.uptimeMillis()
+            while (SystemClock.uptimeMillis() - lateStart < 12_000) {
+                var probe: CanvasProbe? = null
+                scenario.onActivity { probe = canvasProbe(it) }
+                val current = probe
+                val raw = if (current == null) null else automation.takeScreenshot()
+                if (current != null && raw != null) {
+                    val shot = if (raw.config == Bitmap.Config.HARDWARE) raw.copy(Bitmap.Config.ARGB_8888, false).also { raw.recycle() } else raw
+                    val shown = try { presentSample(shot, current).presented } finally { shot.recycle() }
+                    if (shown) { latePresentedMs = SystemClock.uptimeMillis() - start; break }
+                }
+                SystemClock.sleep(100)
+            }
+        }
         val summary = "phase=$phase samples=$samples black_samples=$blackSamples black_band_samples=$bandSamples " +
-            "first_black_ms=$firstBlackMs last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented $detail"
+            "first_black_ms=$firstBlackMs last_black_ms=$lastBlackMs first_presented_ms=$firstPresentedMs presented=$lastPresented " +
+            "late_presented_ms=$latePresentedMs $detail"
         Log.i("VW_CANVAS_PRESENT", summary)
-        if (!lastPresented || blackSamples > 0 || bandSamples > 0) fail("Canvas presentation failed: $summary")
+        CanvasLife.line("check_end phase=$phase presented=$lastPresented first_presented_ms=$firstPresentedMs late_presented_ms=$latePresentedMs")
+        if (!lastPresented || blackSamples > 0 || bandSamples > 0) {
+            // The canvas's own account of the same seconds (fixed words and numbers):
+            // what it was asked to draw, what it drew and when each frame was handed
+            // over, so that a late picture can be told from a lost one. Reading it
+            // must never replace the presentation failure itself.
+            val state = try {
+                var read = "canvas-unavailable"
+                scenario.onActivity { read = canvas(it.window.decorView)?.lifeState() ?: read }
+                read
+            } catch (error: Throwable) { "canvas-state-unreadable cause=${error.javaClass.simpleName}" }
+            CanvasLife.line("canvas_state $state")
+            CanvasLife.line("present_failed phase=$phase samples=$samples black_samples=$blackSamples black_band_samples=$bandSamples " +
+                "check_began_t=$start")
+            val events = if (!lifecycleLog) "canvas lifecycle log off in this test (its twin with the log on records it)"
+                else "canvas events of this test, oldest first (t is uptime in ms; this check began at t=$start):\n" +
+                    CanvasLife.recent().filter { (it.substringAfter("t=", "").substringBefore(' ').toLongOrNull() ?: 0L) >= lifeSinceMs }
+                        .takeLast(160).joinToString("\n")
+            fail("Canvas presentation failed: $summary canvas: $state\n$events")
+        }
     }
 
     private fun resizeCanvas(scenario: ActivityScenario<MainActivity>, phase: String, shrink: Boolean, action: (MainActivity) -> Unit) {
         var before = 0
+        CanvasLife.line("step name=$phase")
         scenario.onActivity { before = requireNotNull(canvas(it.window.decorView)).height; action(it) }
         await(scenario, phase) { activity ->
             val view = canvas(activity.window.decorView)
@@ -183,27 +236,47 @@ class EditorSurfaceInstrumentedTest {
         // The real input gate also waits for the instruction/semantic refreshes
         // that share the native project worker after an edit.
         await(scenario, "input-ready-$tool", ::ready)
-        scenario.onActivity { activity ->
-            val editor = activity.editor; editor.chooseTool(tool)
-            val surface = requireNotNull(canvas(activity.window.decorView))
-            val snapshot = requireNotNull(editor.scene)
-            val screen = points.map { EditorDrawing.map(snapshot.matrix, it) }
-            val start = SystemClock.uptimeMillis()
-            screen.forEachIndexed { index, p ->
-                val action = when (index) { 0 -> MotionEvent.ACTION_DOWN; screen.lastIndex -> if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP; else -> MotionEvent.ACTION_MOVE }
-                val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = if (finger) MotionEvent.TOOL_TYPE_FINGER else MotionEvent.TOOL_TYPE_STYLUS })
-                val coordinates = arrayOf(MotionEvent.PointerCoords().apply { x = p.x.toFloat(); y = p.y.toFloat(); pressure = .2f + .7f * index / maxOf(1, screen.lastIndex); size = .01f })
-                val event = MotionEvent.obtain(start, start + index * 8, action, 1, properties, coordinates, 0, 0, 1f, 1f, -1, 0,
-                    if (finger) InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_STYLUS, 0)
-                try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
+        // That gate refuses a contact without a message while it is closed, and
+        // the follow-up refresh of the previous edit can close it again between
+        // two main-thread turns. Readiness is therefore re-checked in the very
+        // turn that dispatches the contact, not only in an earlier one.
+        val deadline = SystemClock.uptimeMillis() + 45_000
+        var dispatched = false
+        while (!dispatched) {
+            scenario.onActivity { activity -> if (ready(activity)) { dispatch(activity, tool, points, cancel, finger); dispatched = true } }
+            if (!dispatched) {
+                if (SystemClock.uptimeMillis() >= deadline) fail("Timed out in input-gate-$tool")
+                SystemClock.sleep(5)
             }
         }
         await(scenario, "gesture-$tool", ::ready)
     }
-    private fun withCanvas(body: (ActivityScenario<MainActivity>, String) -> Unit) {
+    /** Main thread: the whole contact, down to up, in one turn. */
+    private fun dispatch(activity: MainActivity, tool: EditorTool, points: List<Point>, cancel: Boolean, finger: Boolean) {
+        val editor = activity.editor; editor.chooseTool(tool)
+        val surface = requireNotNull(canvas(activity.window.decorView))
+        val snapshot = requireNotNull(editor.scene)
+        val screen = points.map { EditorDrawing.map(snapshot.matrix, it) }
+        val start = SystemClock.uptimeMillis()
+        screen.forEachIndexed { index, p ->
+            val action = when (index) { 0 -> MotionEvent.ACTION_DOWN; screen.lastIndex -> if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP; else -> MotionEvent.ACTION_MOVE }
+            val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = if (finger) MotionEvent.TOOL_TYPE_FINGER else MotionEvent.TOOL_TYPE_STYLUS })
+            val coordinates = arrayOf(MotionEvent.PointerCoords().apply { x = p.x.toFloat(); y = p.y.toFloat(); pressure = .2f + .7f * index / maxOf(1, screen.lastIndex); size = .01f })
+            val event = MotionEvent.obtain(start, start + index * 8, action, 1, properties, coordinates, 0, 0, 1f, 1f, -1, 0,
+                if (finger) InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_STYLUS, 0)
+            try { assertTrue(surface.dispatchTouchEvent(event)) } finally { event.recycle() }
+        }
+    }
+    /** [lifecycleLog]: the canvases made for this test record their lifecycle
+     * (VW_CANVAS_LIFE) and a presentation failure quotes it. Recording only observes
+     * (a clock read and a few numbers per event; the log's own thread writes the
+     * lines), and the presentation tests still also run with it off, as shipped. */
+    private fun withCanvas(lifecycleLog: Boolean = false, body: (ActivityScenario<MainActivity>, String) -> Unit) {
         var ownedProject: String? = null
         var storageClosed = false
         var primaryFailure: Throwable? = null
+        lifeSinceMs = SystemClock.uptimeMillis(); this.lifecycleLog = lifecycleLog; CanvasLife.forced = lifecycleLog
+        CanvasLife.line("test_begin name=${testName.methodName} lifecycle_log=${if (lifecycleLog) "on" else "off"}")
         try {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             try {
@@ -233,6 +306,7 @@ class EditorSurfaceInstrumentedTest {
             if (primaryFailure == null) primaryFailure = error
             throw error
         } finally {
+            CanvasLife.line("test_end name=${testName.methodName} failed=${primaryFailure != null}"); CanvasLife.forced = false
             try { ownedProject?.let { id ->
                 val root = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "projects").canonicalFile
                 val target = File(root, id).canonicalFile
@@ -273,7 +347,12 @@ class EditorSurfaceInstrumentedTest {
         }
     }
 
-    @Test fun textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore() = withCanvas { scenario, _ ->
+    @Test fun textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore() = textSelectionAndRecreation(lifecycleLog = false)
+
+    /** The same steps, deadlines and checks, with the canvas lifecycle log on. */
+    @Test fun textSelectionMoveResizeEraserUndoAndActivityRecreationWithLifecycleLog() = textSelectionAndRecreation(lifecycleLog = true)
+
+    private fun textSelectionAndRecreation(lifecycleLog: Boolean) = withCanvas(lifecycleLog) { scenario, _ ->
         gesture(scenario, EditorTool.Rectangle, listOf(Point(420.0, 260.0), Point(600.0, 420.0)))
         val created = arrayOf("")
         scenario.onActivity { created[0] = requireNotNull(it.editor.document).render.items.single().objectId }
@@ -299,6 +378,7 @@ class EditorSurfaceInstrumentedTest {
         await(scenario, "undo-delete") { it.editor.pending == 0 }
         var hash = ""
         scenario.onActivity { assertEquals(2, it.editor.document?.render?.items?.size); hash = requireNotNull(it.editor.info).stateHash }
+        CanvasLife.line("step name=recreate")
         scenario.recreate()
         // Native state and a valid Surface do not prove presentation: require actual composited pixels.
         assertPresented(scenario, "renderer-after-recreation", deadlineMs = 3_000)
@@ -307,12 +387,18 @@ class EditorSurfaceInstrumentedTest {
         scenario.onActivity { assertEquals(3, it.editor.document?.render?.items?.size) }
     }
 
-    @Test fun eraserResizeAndRecreationPresentCanvasPixels() = withCanvas { scenario, _ ->
+    @Test fun eraserResizeAndRecreationPresentCanvasPixels() = eraserResizeAndRecreation(lifecycleLog = false)
+
+    /** The same steps, deadlines and checks, with the canvas lifecycle log on. */
+    @Test fun eraserResizeAndRecreationPresentCanvasPixelsWithLifecycleLog() = eraserResizeAndRecreation(lifecycleLog = true)
+
+    private fun eraserResizeAndRecreation(lifecycleLog: Boolean) = withCanvas(lifecycleLog) { scenario, _ ->
         gesture(scenario, EditorTool.Pen, listOf(Point(260.0, 100.0), Point(330.0, 115.0), Point(420.0, 145.0)))
         assertPresented(scenario, "baseline")
         // Eraser controls take layout space below the weighted canvas: an actual SurfaceView resize.
         resizeCanvas(scenario, "eraser-controls-resize", shrink = true) { it.editor.chooseTool(EditorTool.Eraser) }
         assertPresented(scenario, "after-eraser-resize")
+        CanvasLife.line("step name=recreate")
         scenario.recreate()
         assertPresented(scenario, "after-recreation", deadlineMs = 3_000)
         resizeCanvas(scenario, "pen-controls-resize", shrink = false) { it.editor.chooseTool(EditorTool.Pen) }

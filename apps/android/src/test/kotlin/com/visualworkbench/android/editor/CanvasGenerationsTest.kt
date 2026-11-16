@@ -1,5 +1,6 @@
 package com.visualworkbench.android.editor
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.junit.Assert.*
 import org.junit.Test
@@ -17,6 +18,54 @@ class CanvasGenerationsTest {
         assertFalse(generations.canCreate(hasCurrent = false))
         kept.complete(Unit); generations.settled(kept)
         assertFalse(generations.releasing)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    @Test fun noGenerationIsCreatedWhileTheSurfaceReportsItsNewSize() {
+        val generations = CanvasGenerations()
+        assertFalse(generations.viewportChanging)
+        val result = generations.whileViewportChanges {
+            assertTrue(generations.viewportChanging)
+            assertFalse(generations.canCreate(hasCurrent = false))
+            // The owner may fit the page inside its size update: a report within a report.
+            generations.whileViewportChanges { assertFalse(generations.canCreate(hasCurrent = false)) }
+            assertFalse(generations.canCreate(hasCurrent = false))
+            "reported"
+        }
+        assertEquals("reported", result)
+        assertFalse(generations.viewportChanging)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    @Test fun aSizeReportThatFailsStillReopensCreation() {
+        val generations = CanvasGenerations()
+        val failure = IllegalStateException("the owner refused the size")
+        try { generations.whileViewportChanges<Unit> { throw failure }; fail("the failure must reach the caller") }
+        catch (error: IllegalStateException) { assertSame(failure, error) }
+        assertFalse(generations.viewportChanging)
+        assertTrue(generations.canCreate(hasCurrent = false))
+    }
+
+    /** The surface's sequence on a size change, with the owner's actual order: it
+     * cancels the tool in hand, which publishes a scene still laid out for the old
+     * size, then takes the new size and publishes the scene for it. */
+    @Test fun aSuccessorStartsFromTheSceneForTheNewSizeNotFromOnePublishedOnTheWay() {
+        val generations = CanvasGenerations()
+        var latest = "old size"; var firstSceneOfSuccessor: String? = null
+        fun ensure() { if (firstSceneOfSuccessor == null && generations.canCreate(hasCurrent = false)) firstSceneOfSuccessor = latest }
+        fun publish(scene: String) { latest = scene; ensure() }
+        generations.whileViewportChanges { publish("old size, tool cancelled"); publish("new size") }
+        assertNull("nothing is created from inside the report", firstSceneOfSuccessor)
+        ensure()
+        assertEquals("new size", firstSceneOfSuccessor)
+    }
+
+    @Test fun aReleaseStillSettlingKeepsCreationClosedAfterTheSizeReport() {
+        val generations = CanvasGenerations()
+        val retired = generations.beginRelease()
+        generations.whileViewportChanges { assertFalse(generations.canCreate(hasCurrent = false)) }
+        assertFalse(generations.canCreate(hasCurrent = false))
+        retired.complete(Unit); generations.settled(retired)
         assertTrue(generations.canCreate(hasCurrent = false))
     }
 
@@ -194,6 +243,148 @@ class CanvasReplacementTest {
     }
 }
 
+/** The order in which a surface takes a size, run on the real bookkeeping with a
+ * stand-in for everything else. [Surface] follows CanvasSurface step for step
+ * wherever a generation can be created (attach, surfaceCreated, surfaceChanged,
+ * surfaceDestroyed, publish, ensureRenderer, resize). [Owner] follows the
+ * controller wherever it publishes: cancelling the tool publishes, and taking a
+ * viewport cancels the tool first, then takes the size, then publishes. The
+ * owner outlives an activity, so after a recreation it still holds the camera
+ * for the previous canvas. A scene is named by the viewport it was laid out for. */
+class CanvasSizeChangeOrderTest {
+    private class Owner(private var camera: String) {
+        var sink: ((String) -> Unit)? = null
+        fun publish() { sink?.invoke(camera) }
+        fun cancelTool() = publish()
+        fun viewport(size: String) { cancelTool(); camera = size; publish() }
+    }
+
+    private class Surface(private val owner: Owner, private val inputCancelHeld: Boolean = true) {
+        val generations = CanvasGenerations()
+        val replacement = CanvasReplacement<Int>()
+        val actions = mutableListOf<CanvasReplacement.ResizeAction>()
+        /** The scene each generation started from, in order of creation. */
+        val firstScenes = mutableListOf<String>()
+        var ownerAllowsCreation = true
+        private var attached = false
+        private var size: String? = null
+        private var latest: String? = null
+        private var current: Int? = null
+        private val settling = mutableListOf<CompletableDeferred<Unit>>()
+
+        fun attach() { attached = true; owner.sink = ::publish; owner.publish(); ensureRenderer() }
+        fun surfaceCreated() { ensureRenderer() }
+        fun surfaceChanged(newSize: String) {
+            val changed = size != newSize
+            size = newSize
+            if (changed) {
+                if (inputCancelHeld) generations.whileViewportChanges { cancelInput() } else cancelInput()
+                resize(newSize)
+            }
+            ensureRenderer()
+        }
+        fun surfaceDestroyed() { size = null; cancelInput(); retireRenderer() }
+        fun ownerAllowsCreationNow() { ownerAllowsCreation = true; ensureRenderer() }
+        fun releasesSettle() {
+            for (release in settling.toList()) { release.complete(Unit); generations.settled(release); ensureRenderer() }
+            settling.clear()
+        }
+
+        private fun cancelInput() { owner.cancelTool() }
+        private fun publish(scene: String) { latest = scene; if (current == null) ensureRenderer() }
+        private fun ensureRenderer() {
+            if (!attached || !ownerAllowsCreation || size == null || latest == null || !generations.canCreate(current != null)) return
+            firstScenes += checkNotNull(latest); current = firstScenes.size
+        }
+        private fun retireRenderer() {
+            replacement.clearDeferred()
+            if (replacement.take() != null) settling += generations.beginRelease()
+            if (current != null) { settling += generations.beginRelease(); current = null }
+        }
+        private fun reportViewport(newSize: String) { generations.whileViewportChanges { owner.viewport(newSize) } }
+        private fun resize(newSize: String) {
+            val action = replacement.resizeAction(current != null, giant = false, releasing = generations.releasing)
+            actions += action
+            when (action) {
+                CanvasReplacement.ResizeAction.RetireAll -> { retireRenderer(); reportViewport(newSize) }
+                CanvasReplacement.ResizeAction.Defer -> reportViewport(newSize)
+                CanvasReplacement.ResizeAction.Replace -> {
+                    replacement.keep(checkNotNull(current), awaitRedraw = true); current = null
+                    reportViewport(newSize)
+                    ensureRenderer()
+                    if (current == null) current = replacement.restore()
+                }
+            }
+        }
+    }
+
+    @Test fun theFirstSurfaceOfARecreatedActivityStartsOneGenerationFromTheSceneForItsOwnSize() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated()
+        assertTrue("nothing starts before the surface has a size", surface.firstScenes.isEmpty())
+        surface.surfaceChanged("1500x1080")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.RetireAll), surface.actions)
+        assertEquals(listOf("1500x1080"), surface.firstScenes)
+        assertNull("nothing is kept: there was nothing to replace", surface.replacement.kept)
+    }
+
+    /** The order before the cancel was held: the size was assigned, the cancel
+     * published the owner's old-size scene, and that started a first generation
+     * which the size change then kept while it built a second. */
+    @Test fun cancellingTheInputOutsideTheHoldStartedAGenerationForTheOldSizeAndThenASecond() {
+        val surface = Surface(Owner(camera = "1080x1500"), inputCancelHeld = false)
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1500x1080")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.Replace), surface.actions)
+        assertEquals(listOf("1080x1500", "1500x1080"), surface.firstScenes)
+        assertEquals(1, surface.replacement.kept)
+    }
+
+    @Test fun aSurfaceThatComesBackStartsOneGenerationAgain() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceDestroyed(); surface.releasesSettle()
+        surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.RetireAll, CanvasReplacement.ResizeAction.RetireAll), surface.actions)
+        assertEquals(listOf("1080x1500", "1080x1500"), surface.firstScenes)
+        assertNull(surface.replacement.kept)
+    }
+
+    @Test fun aSurfaceThatComesBackBeforeItsReleaseSettledStartsOneGenerationOnceItHas() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceDestroyed()
+        surface.surfaceCreated(); surface.surfaceChanged("1080x1100")
+        assertEquals(listOf("1080x1500"), surface.firstScenes)
+        surface.releasesSettle()
+        assertEquals(listOf("1080x1500", "1080x1100"), surface.firstScenes)
+    }
+
+    @Test fun aSurfaceWhoseOwnerStillWaitsForThePreviousCanvasStartsOneGenerationWhenAllowed() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.ownerAllowsCreation = false
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1500x1080")
+        assertTrue(surface.firstScenes.isEmpty())
+        surface.ownerAllowsCreationNow()
+        assertEquals(listOf("1500x1080"), surface.firstScenes)
+    }
+
+    @Test fun aLaterSizeChangeStillKeepsTheGenerationAndStartsOneSuccessorForTheNewSize() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceChanged("1080x1100")
+        assertEquals(listOf(CanvasReplacement.ResizeAction.RetireAll, CanvasReplacement.ResizeAction.Replace), surface.actions)
+        assertEquals(listOf("1080x1500", "1080x1100"), surface.firstScenes)
+        assertEquals(1, surface.replacement.kept)
+    }
+
+    @Test fun aSurfaceChangeThatKeepsTheSizeTouchesNothing() {
+        val surface = Surface(Owner(camera = "1080x1500"))
+        surface.attach(); surface.surfaceCreated(); surface.surfaceChanged("1080x1500")
+        surface.surfaceChanged("1080x1500")
+        assertEquals(1, surface.actions.size); assertEquals(1, surface.firstScenes.size)
+    }
+}
+
 class CanvasRedrawHandshakeTest {
     private class Scheduler {
         val scheduled = mutableListOf<Pair<Runnable, Long>>()
@@ -235,5 +426,18 @@ class CanvasRedrawHandshakeTest {
         handshake.request({ finished++ }, presented = false)
         scheduler.scheduled.single().first.run()
         assertEquals(1, finished); assertEquals(0, handshake.waiting)
+    }
+
+    @Test fun onlyTheFallbackReportsItselfWithTheNumberOfRedrawsItReleased() {
+        val scheduler = Scheduler(); val reported = mutableListOf<Int>(); var finished = 0
+        val handshake = CanvasRedrawHandshake(scheduler::schedule, scheduler::unschedule, 750) { reported += it }
+        handshake.request({ finished++ }, presented = false); handshake.request({ finished++ }, presented = false)
+        scheduler.scheduled.single().first.run()
+        assertEquals(listOf(2), reported); assertEquals(2, finished)
+        // A first committed frame, a destroyed surface or a detached window finish without it.
+        handshake.request({ finished++ }, presented = false)
+        handshake.finish()
+        handshake.request({ finished++ }, presented = true)
+        assertEquals(listOf(2), reported); assertEquals(4, finished)
     }
 }

@@ -499,16 +499,30 @@ fn startup_saturation_retires_the_input_without_starting_its_body() {
         let mut running: Vec<std::pin::Pin<Box<dyn Future<Output = crate::Result<()>>>>> =
             Vec::new();
         let mut releases = Vec::new();
-        for _ in 0..4 {
+        // The start limit is one counter for the whole test process, and other
+        // tests open projects while this one runs. A slot that another test
+        // holds for a moment is waited for, so that this test ends up holding
+        // all four itself.
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while running.len() < 4 {
             let (started, ready) = tokio::sync::oneshot::channel();
             let (release, wait) = mpsc::channel();
-            let mut job = Box::pin(crate::worker::startup(move || {
-                let _ = started.send(());
-                wait.recv_timeout(Duration::from_secs(8))
-                    .map_err(|_| crate::CoreError::Worker)?;
-                Ok(())
-            }));
-            pending(job.as_mut()).await;
+            let mut job: std::pin::Pin<Box<dyn Future<Output = crate::Result<()>>>> =
+                Box::pin(crate::worker::startup(move || {
+                    let _ = started.send(());
+                    wait.recv_timeout(Duration::from_secs(8))
+                        .map_err(|_| crate::CoreError::Worker)?;
+                    Ok(())
+                }));
+            match poll_fn(|cx| Poll::Ready(job.as_mut().poll(cx))).await {
+                Poll::Pending => {}
+                Poll::Ready(Err(crate::CoreError::Backpressure)) => {
+                    assert!(Instant::now() < deadline, "start slots stayed taken");
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                    continue;
+                }
+                Poll::Ready(other) => panic!("start job ended at once: {other:?}"),
+            }
             bounded(ready).await.unwrap();
             running.push(job);
             releases.push(release);

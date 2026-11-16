@@ -41,6 +41,16 @@ public data class RemoteRenderedAcknowledgment(public val binding:RemoteTargetBi
 /** Consumer invalidation is immediate. retire reports success only after its
  * actual decoder/surface/palette workers have joined; false retains the owner. */
 public interface RemoteConsumerOwner { public fun invalidate();public suspend fun retire():Boolean }
+/** Optional capability of a remote-edit link: the pen calls without JSON, and
+ * several samples in one call. What reaches the computer is the same as with
+ * [WorkbenchRemoteEdit.pen]: one input event per sample, the same bytes. */
+public interface RemotePenBatches {
+    /** As [WorkbenchRemoteEdit.reservePen], for up to 32 samples of one pen event. */
+    public fun reservePenBatch(binding:RemoteTargetBinding,samples:UInt):Boolean
+    /** As one [WorkbenchRemoteEdit.pen] per sample, in order. A refused sample
+     * fails the call; samples before it were sent, as after separate calls. */
+    public suspend fun penBatch(binding:RemoteTargetBinding,samples:List<RemotePenSample>):List<RemoteInputAdmission>
+}
 public interface WorkbenchRemoteEdit:RemoteCommandDispatcher {
     /** Binding replacement/revocation invalidates every registered consumer
      * synchronously before the replacement target/state becomes visible.

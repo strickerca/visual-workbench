@@ -5,6 +5,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
+import com.visualworkbench.ui.*
 
 /** Modal window owns field focus; the editor's shortcut/follow admission also
  * checks the same synchronous controller flag before accepting remote focus. */

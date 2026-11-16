@@ -28,6 +28,54 @@ public interface WorkbenchProject {
     public suspend fun export(options: ExportOptions): ExportResult
     public suspend fun close()
 }
+/** Optional project capability: read a document again without rebuilding or
+ * transferring the strokes the caller already holds. After every saved stroke
+ * the plain [WorkbenchProject.document] call recomputes the outline of every
+ * stroke in the document; this one costs what changed. */
+public interface WorkbenchDocumentChanges {
+    /** The document exactly as [WorkbenchProject.document] returns it at this
+     * moment. A stroke that is unchanged since [previous] is the very same
+     * [RenderItem] instance as in [previous] (or a copy sharing its contours
+     * when only its layer's opacity, blend or lock changed), so a caller can
+     * keep whatever it derived from it. [previous] must be the snapshot this
+     * project returned last for the document, or null for a first read.
+     * Null result: this document has no such path (paged documents); use
+     * [WorkbenchProject.document]. */
+    public suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot?
+}
+/** Optional project capability: start a stroke without waiting for the
+ * project, so ink can be drawn while the project is saving or writing a
+ * recovery checkpoint. */
+public interface WorkbenchDeferredStrokes {
+    /** Like [WorkbenchProject.beginStroke], but the project's answer is not
+     * waited for: the layer, device and object checks and the base revision
+     * are asked for now, in the project's own order, and the stroke takes ink
+     * meanwhile. A stroke the project refuses takes no further ink once the
+     * refusal has arrived and is refused by [WorkbenchStroke.commit] with the
+     * failure [WorkbenchProject.beginStroke] would have reported; nothing of it
+     * is saved. Returns null for a stroke that needs the project before its
+     * first ink (highlighter) and when the project cannot take the request
+     * right now; use [WorkbenchProject.beginStroke] then. The caller owns the
+     * result and must [WorkbenchStroke.dispose] it. */
+    public fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke?
+}
+/** Optional project capability: write now the recovery checkpoint that
+ * [WorkbenchProject.close] would write, and keep the project open. For an
+ * app put in the background, whose process the system freezes within
+ * seconds and may end: the checkpoint the project writes by itself waits
+ * until it has been left alone for ten seconds, and one that is merely due
+ * waits for closing, so the next open would replay more of the log. Nothing
+ * is lost without it; the log holds every edit. */
+public interface WorkbenchSettling {
+    /** Runs after the work already queued in the project and takes as long
+     * as its history is large. Returns whether a checkpoint was written:
+     * false when none was due. Fails with [CoreFailureKind.Backpressure],
+     * writing nothing, while a stroke is being drawn or saved; with
+     * [CoreFailureKind.Closed] once the project is closed; with
+     * [CoreFailureKind.Storage] when writing it failed, and then closing or
+     * the next open writes it instead. */
+    public suspend fun settle(): Boolean
+}
 public interface WorkbenchStroke {
     /** Retain and retry this exact sequence only when CoreFailure.Backpressure is reported. */
     public suspend fun append(batch: SampleBatch): InkUpdate
@@ -48,8 +96,6 @@ public data class Camera(public val center: Point, public val scale: Double, pub
 public data class StrokeOptions(public val gestureId: String, public val transactionId: String, public val objectId: String, public val documentId: String, public val layerId: String, public val deviceId: String, public val lamport: ULong, public val createdAtMs: Long, public val family: String, public val width: Double, public val rgba: UInt, public val stabilization: Float = 0f, public val pressureCurve: List<Double> = emptyList())
 /** Immutable owned batch; callers must not mutate arrays after submitting it. */
 public data class SampleBatch(public val sequence: ULong, public val x: DoubleArray, public val y: DoubleArray, public val timeMs: UIntArray, public val pressure: FloatArray, public val tilt: FloatArray = floatArrayOf(), public val orientation: FloatArray = floatArrayOf())
-/** Compound NONZERO fill in 1/256 D units; draw together once, never alpha-blend each contour. */
-public data class Contours(public val x: LongArray, public val y: LongArray, public val ends: UIntArray)
 public data class InkUpdate(public val sequence: ULong, public val firstPolygon: ULong, public val sampleCount: ULong, public val contours: Contours)
 public data class ObjectStyle(public val rgba: UInt, public val width: Double, public val screenConstantWidth: Boolean = false, public val fill: UInt? = null)
 public sealed interface Outline {

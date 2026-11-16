@@ -18,8 +18,7 @@ errors; no endpoint, certificate, code, QR, key or user path is logged.
 Build through `build.ps1 build-pairing`, then run `build.ps1 hil-test pairing`
 for the explicitly selected OnePlus IN2019. The owned ADB-reverse harness has
 passed QR pairing, one exact OPS acknowledgment, revocation refusal on both
-sides, and cleanup. See `docs/evidence/T1.06b.md` for current source/artifact
-bindings and limitations. Direct tether and interactive code-pairing hardware
+sides, and cleanup. Direct tether and interactive code-pairing hardware
 runs remain pending. For manual commands below, substitute explicitly selected
 interface addresses, never wildcard pairing binds, and use distinct nonzero ports.
 

@@ -6,7 +6,12 @@ dependencyResolutionManagement {
         google(); mavenCentral()
         exclusiveContent {
             forRepository {
-                maven { url = uri("https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/") }
+                // VW_RUSTLS_MAVEN points at a local checkout (file: URL only) of the same branch where the
+                // network cannot reach this URL (cloud sessions). The lock state still pins
+                // the exact version either way.
+                maven { url = uri(providers.environmentVariable("VW_RUSTLS_MAVEN").orNull
+                    ?.also { require(it.startsWith("file:")) { "VW_RUSTLS_MAVEN must be a file: URL" } }
+                    ?: "https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/") }
             }
             filter { includeGroup("org.rustls") }
         }

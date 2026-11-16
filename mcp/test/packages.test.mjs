@@ -104,3 +104,18 @@ test('Claude supervisor-shaped recursively sorted JSON preserves exact Send whil
     assert.equal(sends,1);
   }finally{await rm(f.root,{recursive:true,force:true});}
 });
+
+test('a default list keeps the newest packages; a since cursor pages forward oldest-first',async()=>{
+  const uuid=n=>`019a3aaa-0123-789a-8abc-${n.toString(16).padStart(12,'0')}`,stamp=n=>`2026-10-03T00:00:${String(n).padStart(2,'0')}.000Z`;
+  const root=await mkdtemp(path.join(tmpdir(),'vw-mcp-package-test-'));
+  try{
+    let n=0;const packages=new Packages({verify:async()=>({manifest_sha256:'b'.repeat(64),manifest:{package_id:uuid(n),created_at:stamp(n),compiled_for:{target:'generic'},
+      source:{revision:'fixture'},extensions:{host_seq:1,state_hash:'a'.repeat(64)},markers:[],images:[],files:[]}})});
+    for(n=0;n<25;n++)await packages.publish(root,'b'.repeat(64));
+    const listed=packages.list();assert.equal(listed.length,20);
+    assert.deepEqual(listed.map(p=>p.created_at),Array.from({length:20},(_,i)=>stamp(i+5)));
+    assert.deepEqual(packages.list(2).map(p=>p.id),[uuid(23),uuid(24)]);
+    assert.deepEqual(packages.list(3,stamp(1)).map(p=>p.id),[uuid(2),uuid(3),uuid(4)]);
+    assert.equal(packages.list(64).length,25);
+  }finally{await rm(root,{recursive:true,force:true});}
+});

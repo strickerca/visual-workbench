@@ -1,19 +1,72 @@
 use crate::{StoreError, blobs, migrations};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use std::{
+    collections::BTreeSet,
     fs::{self, File, OpenOptions},
     path::{Path, PathBuf},
-    time::Duration,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
 use vw_model::{AssetId, DeviceId, Id, Project};
-use vw_ops::{Acceptance, HostSequencer};
+use vw_ops::{Acceptance, HostSequencer, OpsError, Touched};
 use vw_proto::{Message, v1};
 
-/// Accepted transaction count between recovery checkpoints.
-pub const SNAPSHOT_TRANSACTIONS: u64 = 500;
-/// Elapsed wall time between recovery checkpoints, evaluated at each commit.
-pub const SNAPSHOT_INTERVAL_MS: i64 = 300_000;
 pub(crate) const MAX_PAYLOAD: usize = 64 * 1024 * 1024;
+/// No checkpoint is written for less replay than this, in the microseconds
+/// of `ReplayCost`: a tenth of a second of opening.
+const CHECKPOINT_MIN_MICROS: u64 = 100_000;
+/// A checkpoint is urgent from this much replay on: five seconds of opening.
+const CHECKPOINT_URGENT_MICROS: u64 = 5_000_000;
+/// Unused pages are handed back to the filesystem once they make up this much
+/// of the database and at least a quarter of it.
+const RECLAIM_MIN_BYTES: i64 = 4 * 1024 * 1024;
+/// Compacting copies the live pages once. Up to this size the copy is held in
+/// memory, because not every platform gives SQLite a temporary directory.
+const RECLAIM_IN_MEMORY_BYTES: i64 = 256 * 1024 * 1024;
+/// Where a compaction's private copy is made, inside the project's `cache`.
+const RECLAIM_DIRECTORY: &str = "compaction-v1";
+const RECLAIM_PREFIX: &str = "compact-";
+
+/// Where an open puts the copy that compacting a database makes, when its
+/// live pages are more than fit in memory. Chosen per platform; injectable
+/// so that the Android path is tested on any machine.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LargeCopy {
+    /// SQLite's own temporary file, and the database is compacted in place.
+    Temporary,
+    /// A file of the project's own (`cache/compaction-v1`) that then replaces
+    /// the database file: Android gives SQLite no temporary directory, and
+    /// the SQLite built for it keeps every temporary file in memory.
+    Private,
+}
+
+/// How an open hands unused pages back. Injectable for tests.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Compaction {
+    /// Live pages up to this many bytes are copied in memory, on every
+    /// platform.
+    pub in_memory_bytes: i64,
+    /// Where a larger copy goes.
+    pub larger: LargeCopy,
+}
+impl Compaction {
+    /// What this platform does.
+    pub const PLATFORM: Self = Self {
+        in_memory_bytes: RECLAIM_IN_MEMORY_BYTES,
+        larger: if cfg!(target_os = "android") {
+            LargeCopy::Private
+        } else {
+            LargeCopy::Temporary
+        },
+    };
+}
+/// How long a write waits for another connection.
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+/// The same while an open tidies the file: a connected reader makes a step
+/// fail, to be tried at a later open, instead of holding the open up.
+const UPKEEP_BUSY_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// Diagnostic commit boundaries. Observers must return promptly and never panic.
 /// The process-crash harness kills its own writer at randomized boundaries.
@@ -25,16 +78,153 @@ pub enum CommitStage {
     Committed,
 }
 
+/// Diagnostic boundaries of the clean-up an open performs on a project that
+/// still carries superseded checkpoints or unused pages. Observers have the
+/// same no-panic/no-blocking contract as commit observers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenStage {
+    /// The project is verified; nothing has been written.
+    Restored,
+    /// Superseded checkpoints are removed inside the uncommitted transaction.
+    Pruned,
+    Committed,
+    /// A compaction is about to start; the attempt is noted in the database.
+    Compacting,
+    /// The compaction is copying rows. Nothing of it is committed.
+    Copying,
+    /// The compacted pages are committed to the write-ahead log. With a
+    /// private copy (`LargeCopy::Private`): the copy is complete, checked and
+    /// on disk, and the database file is as it was.
+    Vacuumed,
+    /// They are in the database file; the log is about to be emptied. With a
+    /// private copy: the copy has replaced the database file, which is not
+    /// open yet.
+    Transferred,
+    /// Unused pages were handed back, or there were too few to bother.
+    Compacted,
+}
+
+/// What an open did besides loading the project, for diagnostics: counts and
+/// durations, and for a step that failed the error it failed with.
+#[derive(Debug, Default)]
+pub struct OpenReport {
+    /// Stored checkpoints that did not load and were passed over.
+    pub skipped_checkpoints: u64,
+    /// The clean-up transaction: superseded checkpoints, cancellation
+    /// records and the log seal.
+    pub tidy: Upkeeping,
+    /// A checkpoint written because this open had a costly log to replay.
+    pub checkpoint: Upkeeping,
+    /// Handing unused pages back to the filesystem.
+    pub compaction: Upkeeping,
+}
+
+/// How one step of an open's upkeep went. None of them can fail the open.
+#[derive(Debug, Default)]
+pub enum Upkeeping {
+    /// There was nothing to do.
+    #[default]
+    NotDue,
+    Done(Duration),
+    /// The project is open and the step changed nothing; a later open tries
+    /// again.
+    Failed(Duration, StoreError),
+    /// Not attempted: an earlier step failed, or this one did not finish
+    /// before and nothing has changed since.
+    Skipped,
+}
+impl Upkeeping {
+    fn of(started: Instant, result: Result<bool, StoreError>) -> Self {
+        match result {
+            Ok(true) => Self::Done(started.elapsed()),
+            Ok(false) => Self::NotDue,
+            Err(error) => Self::Failed(started.elapsed(), error),
+        }
+    }
+}
+
+/// What one sync update from the host changed: every entity its
+/// transactions touched, and how much queued work they acknowledged.
+#[derive(Debug, Clone, Default)]
+pub struct HostBatch {
+    pub touched: Touched,
+    pub removed: usize,
+}
+
+/// The size a sync batch may have, as a device checks it (`vw_net`).
+const HOST_BATCH_BYTES: usize = 8 * 1024 * 1024 - 256;
+
+/// How much the next open would gain from a checkpoint written now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CheckpointNeed {
+    /// Replaying the log costs less than loading a checkpoint would.
+    None,
+    /// A checkpoint would shorten the next open: write it when the project
+    /// closes.
+    Due,
+    /// Replaying would at least double the next open: write it when the
+    /// project has been left alone for a while.
+    Overdue,
+    /// Replaying would take at least five seconds and four times as long as
+    /// the rest of the open: write it at the next moment nothing else is
+    /// waiting, although someone is working. Writing one holds the project
+    /// up for about as long as an open takes, so this is the backstop for
+    /// work that never pauses, not the usual way.
+    Urgent,
+}
+
 /// A single-writer project database. Its advisory lock is released by the OS on
 /// process death; WAL readers are allowed, but all writers must use this API.
+///
+/// The accepted log is the record of the project. A checkpoint holds the
+/// sequencing state at one revision, so that opening can start there and
+/// replay only the log after it. At most two are stored. The first is the one
+/// the project began with: at revision zero it is small, it is never removed,
+/// and gesture cancellations, the one thing the log cannot rebuild, are
+/// recorded in it; each cancellation also has a row of its own, in case that
+/// one row is ever damaged. A later checkpoint is written when replaying the
+/// log has become more expensive than loading one. Saving never writes it:
+/// this store does when a project opens, and the application asks for it
+/// while the project is idle and when it closes (`checkpoint_if`). Before a
+/// new one replaces the one before it, it is read back.
+///
+/// Opening decides again every transaction stored after the checkpoint it
+/// starts from, with the engine of the build that opens. What that requires
+/// of the engine is stated at `evaluate` in `vw-ops`, and what happens when
+/// it does not hold at `restore` here.
 pub struct ProjectStore {
     pub(crate) root: PathBuf,
     pub(crate) connection: Connection,
     host: HostSequencer,
-    _lock: File,
-    last_snapshot_seq: u64,
-    last_snapshot_ms: i64,
+    _lock: ProjectLock,
+    /// Revision of the checkpoint that cancellations are recorded in.
+    ledger_seq: u64,
+    /// What the next open would replay as things stand.
+    cost: ReplayCost,
+    /// The size of the whole log.
+    log: LogSpan,
+    seal: LogSeal,
     replayed_transactions: u64,
+    opened: OpenReport,
+    /// The history has outgrown what a checkpoint may hold. Writing one was
+    /// tried and refused; it is not tried again while the project is open.
+    beyond_checkpoint: bool,
+    /// A lower limit on the size of a checkpoint than the one it has anyway.
+    history_limit: usize,
+    /// This store mirrors a project another device owns; only that device
+    /// accepts transactions into it.
+    mirror: bool,
+}
+
+/// The advisory lock, given up explicitly. A lock belongs to the open file
+/// and not to this handle: a child process forked while the project was open
+/// keeps the file open until it starts its own program, and would keep the
+/// lock alive past the close without the explicit release.
+struct ProjectLock(File);
+impl Drop for ProjectLock {
+    fn drop(&mut self) {
+        let _ = crate::os_fs::unlock(&self.0);
+    }
 }
 
 impl ProjectStore {
@@ -76,39 +266,20 @@ impl ProjectStore {
         tx.execute("INSERT INTO meta(key,value) VALUES ('host_device',?1),('project_id',?2),('local_device',?3)",params![host.host_device().as_str(),host.project().id.as_str(),local_device.as_str()])?;
         let mut accepted = host.accepted_transactions().collect::<Vec<_>>();
         accepted.sort_by_key(|(_, ack)| ack.host_seq);
+        let mut seal = LogSeal::empty();
+        let mut log = LogSpan::default();
         for (txn, ack) in accepted {
-            let id = Id::from_proto(txn.txn_id.as_ref())?;
-            let accepted_at = host
-                .accepted_at(&id)
-                .ok_or(StoreError::Invalid("checkpoint receipt time"))?;
-            let base = txn
-                .base_revision
-                .as_ref()
-                .ok_or(StoreError::Invalid("checkpoint base"))?;
-            for op in &txn.ops {
-                sql_u64(
-                    op.op_id
-                        .as_ref()
-                        .ok_or(StoreError::Invalid("op ID"))?
-                        .lamport,
-                )?;
-                if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
-                    super::projections::persist_asset(&tx, asset)?;
-                }
-            }
-            let hash: [u8; 32] = ack
-                .state_hash
-                .as_slice()
-                .try_into()
-                .map_err(|_| StoreError::Invalid("checkpoint receipt hash"))?;
-            let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
-            tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",params![sql_u64(ack.host_seq)?,id.as_str(),txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bounded_encode(txn)?,hash,txn.created_at_wall_ms,accepted_at,bounded_encode(ack)?])?;
+            let stored;
+            (seal, stored) = insert_accepted(&tx, &host, txn, ack, &seal)?;
+            log.add(stored);
         }
         super::projections::persist(&tx, host.project(), seq, now_ms)?;
         for conflict in host.conflicts() {
             write_conflict(&tx, conflict)?;
         }
         write_snapshot(&tx, &host, now_ms)?;
+        write_cancellations(&tx, &host)?;
+        write_seal(&tx, &seal)?;
         verify_prefix(&tx, &host, seq)?;
         super::projections::verify_assets(&tx, host.project())?;
         super::projections::verify(&tx, host.project(), seq)?;
@@ -121,9 +292,15 @@ impl ProjectStore {
             connection,
             host,
             _lock: lock,
-            last_snapshot_seq: revision.host_seq,
-            last_snapshot_ms: now_ms,
+            ledger_seq: revision.host_seq,
+            cost: ReplayCost::default(),
+            log,
+            seal,
             replayed_transactions: 0,
+            opened: OpenReport::default(),
+            beyond_checkpoint: false,
+            history_limit: usize::MAX,
+            mirror: local_device != authenticated_host,
         })
     }
 
@@ -171,6 +348,8 @@ impl ProjectStore {
         )?;
         super::projections::persist(&tx, host.project(), 0, now_ms)?;
         write_snapshot(&tx, &host, now_ms)?;
+        let seal = LogSeal::empty();
+        write_seal(&tx, &seal)?;
         tx.commit()?;
         blobs::ensure_directory(&root.join("blobs"))?;
         blobs::ensure_directory(&root.join("cache"))?;
@@ -179,15 +358,55 @@ impl ProjectStore {
             connection,
             host,
             _lock: lock,
-            last_snapshot_seq: 0,
-            last_snapshot_ms: now_ms,
+            ledger_seq: 0,
+            cost: ReplayCost::default(),
+            log: LogSpan::default(),
+            seal,
             replayed_transactions: 0,
+            opened: OpenReport::default(),
+            beyond_checkpoint: false,
+            history_limit: usize::MAX,
+            mirror: false,
         })
     }
 
-    /// Restore the newest validated checkpoint and replay only its committed
-    /// tail. Unsupported schemas and damaged state are rejected without repair.
+    /// Verify the newest checkpoint that loads and replay the accepted log
+    /// after it. Unsupported schemas, a damaged log and damaged projections
+    /// are rejected without repair, and so is a log this build's engine does
+    /// not decide the way it was stored (`StoreError::EngineMismatch`); a
+    /// refused project is left exactly as it was. A damaged checkpoint is
+    /// skipped when an earlier one and the log give the same project. A
+    /// project written by an older build carries a checkpoint for every 500
+    /// saves: once the project is verified, all but the two this store keeps
+    /// are removed and their space is handed back. `open_report` says what
+    /// of this happened.
     pub fn open(path: &Path) -> Result<Self, StoreError> {
+        Self::open_observed(path, |_| {})
+    }
+
+    /// Diagnostic boundaries of the clean-up for the process-crash regression.
+    /// One of them is reported from inside SQLite while it compacts, which is
+    /// why the observer has to be owned and sendable.
+    pub fn open_observed<F: FnMut(OpenStage) + Send + 'static>(
+        path: &Path,
+        observer: F,
+    ) -> Result<Self, StoreError> {
+        Self::open_compacting(path, observer, Compaction::PLATFORM)
+    }
+
+    /// `open_observed` with another platform's compaction, for tests.
+    #[doc(hidden)]
+    pub fn open_compacting<F: FnMut(OpenStage) + Send + 'static>(
+        path: &Path,
+        observer: F,
+        compaction: Compaction,
+    ) -> Result<Self, StoreError> {
+        let observer = Arc::new(Mutex::new(observer));
+        let mut observer = move |stage: OpenStage| {
+            if let Ok(mut observer) = observer.lock() {
+                observer(stage);
+            }
+        };
         blobs::check_directory(path)?;
         let root = path.canonicalize()?;
         let lock = lock_project(&root)?;
@@ -195,26 +414,118 @@ impl ProjectStore {
         migrations::upgrade(&mut connection)?;
         let Restored {
             host,
-            seq,
-            time,
             replayed,
+            cost,
+            log,
+            seal,
+            upkeep,
+            skipped,
         } = restore(&connection)?;
-        Ok(Self {
+        observer(OpenStage::Restored);
+        let mut store = Self {
             root,
             connection,
             host,
             _lock: lock,
-            last_snapshot_seq: seq,
-            last_snapshot_ms: time,
+            ledger_seq: upkeep.keep[0] as u64,
+            cost,
+            log,
+            seal,
             replayed_transactions: replayed,
-        })
+            opened: OpenReport {
+                skipped_checkpoints: skipped,
+                ..OpenReport::default()
+            },
+            beyond_checkpoint: false,
+            history_limit: usize::MAX,
+            mirror: false,
+        };
+        store.mirror = store.local_device()? != *store.host.host_device();
+        store.upkeep(&upkeep, &mut observer, compaction)?;
+        observer(OpenStage::Compacted);
+        Ok(store)
+    }
+
+    /// The project is verified and complete in memory. This only tidies the
+    /// file: one transaction, a checkpoint if this open had to replay a lot,
+    /// and one compaction, each all or nothing. If the disk refuses one (it
+    /// is full, a reader holds the file), the project is open as it is and a
+    /// later open tries again: an open has never needed room to write. What
+    /// happened is kept in the report. The one error: a private copy replaced
+    /// the database file and the file could not be opened again. The project
+    /// on disk is whole, and the next open opens it.
+    fn upkeep<F: FnMut(OpenStage) + Clone + Send + 'static>(
+        &mut self,
+        upkeep: &Upkeep,
+        observer: &mut F,
+        compaction: Compaction,
+    ) -> Result<(), StoreError> {
+        if upkeep.unsettled {
+            self.opened.tidy = Upkeeping::Skipped;
+            self.opened.checkpoint = Upkeeping::Skipped;
+            self.opened.compaction = Upkeeping::Skipped;
+            return Ok(());
+        }
+        let _ = self.connection.busy_timeout(UPKEEP_BUSY_TIMEOUT);
+        let started = Instant::now();
+        self.opened.tidy = Upkeeping::of(
+            started,
+            tidy(
+                &mut self.connection,
+                &self.host,
+                &self.seal,
+                upkeep,
+                observer,
+            ),
+        );
+        if matches!(self.opened.tidy, Upkeeping::Failed(..)) {
+            self.opened.checkpoint = Upkeeping::Skipped;
+            self.opened.compaction = Upkeeping::Skipped;
+        } else {
+            let started = Instant::now();
+            let due = self.checkpoint_need() >= CheckpointNeed::Due;
+            self.opened.checkpoint = Upkeeping::of(
+                started,
+                if due {
+                    self.write_checkpoint(None, |_| {}).map(|()| true)
+                } else {
+                    Ok(false)
+                },
+            );
+            let started = Instant::now();
+            self.opened.compaction =
+                match reclaim(&mut self.connection, &self.root, compaction, observer) {
+                    Ok(Reclaimed::Skipped) => Upkeeping::Skipped,
+                    Ok(Reclaimed::NotDue) => Upkeeping::NotDue,
+                    Ok(Reclaimed::Done) => Upkeeping::Done(started.elapsed()),
+                    Err(Unreclaimed::Kept(error)) => Upkeeping::Failed(started.elapsed(), error),
+                    Err(Unreclaimed::Closed(error)) => return Err(error),
+                };
+        }
+        let _ = self.connection.busy_timeout(BUSY_TIMEOUT);
+        Ok(())
+    }
+
+    /// What this open did besides loading the project.
+    pub const fn open_report(&self) -> &OpenReport {
+        &self.opened
     }
 
     pub fn project(&self) -> &Project {
         self.host.project()
     }
+    /// The sequencing state this store holds, to read: what answering a
+    /// device's sync request takes from it. Only the store changes it.
+    pub const fn host(&self) -> &HostSequencer {
+        &self.host
+    }
     pub fn revision(&self) -> Result<v1::Revision, StoreError> {
         Ok(self.host.revision()?)
+    }
+    /// The canonical state hash of the current revision, already known from
+    /// the last commit; nothing is serialized or hashed to answer this.
+    pub fn state_hash(&self) -> Result<&vw_model::StateHash, StoreError> {
+        Ok(self.host.state_hash()?)
     }
     /// Validated complete sequencing state for authenticated transport resume.
     pub fn checkpoint_bytes(&self) -> Result<Vec<u8>, StoreError> {
@@ -267,6 +578,11 @@ impl ProjectStore {
         self.host.host_device()
     }
 
+    /// One accepted transaction and its acknowledgement, by transaction ID.
+    pub fn accepted_transaction(&self, id: &Id) -> Option<(&v1::Transaction, &v1::TxnAck)> {
+        self.host.accepted_transaction(id)
+    }
+
     /// Accepted bindings for restoring application undo cursors without replay
     /// or quadratic generation of every transaction's inverse preview.
     pub fn accepted_transactions(&self) -> impl Iterator<Item = (&v1::Transaction, &v1::TxnAck)> {
@@ -277,7 +593,9 @@ impl ProjectStore {
     /// exact matching pending transactions in the same SQLite commit. The caller
     /// must obtain `authenticated_host` from its pinned transport, not a payload.
     /// Existing accepted history must be an exact prefix; stale, foreign and
-    /// divergent histories cannot replace local durable state.
+    /// divergent histories cannot replace local durable state. What is stored
+    /// is the checkpoint's new log rows; a stored checkpoint changes only to
+    /// take in cancellations the host has recorded since.
     pub fn install_authenticated_checkpoint(
         &mut self,
         bytes: &[u8],
@@ -331,8 +649,6 @@ impl ProjectStore {
         }
         let seq = sql_u64(revision.host_seq)?;
         let old_seq = sql_u64(previous.host_seq)?;
-        // Monotonic checkpoint bookkeeping even if the caller's wall clock moves back.
-        let snapshot_time = now_ms.max(self.last_snapshot_ms);
         observer(CommitStage::Prepared);
         let tx = self
             .connection
@@ -369,45 +685,30 @@ impl ProjectStore {
                 acknowledged.push(txn);
             }
         }
+        let mut seal = self.seal.clone();
+        let (mut cost, mut log) = (self.cost, self.log);
         for (txn, ack) in ordered
             .into_iter()
             .filter(|(_, ack)| ack.host_seq > previous.host_seq)
         {
-            let id = Id::from_proto(txn.txn_id.as_ref())?;
-            let accepted_at = candidate
-                .accepted_at(&id)
-                .ok_or(StoreError::Invalid("checkpoint receipt time"))?;
-            let base = txn
-                .base_revision
-                .as_ref()
-                .ok_or(StoreError::Invalid("checkpoint base"))?;
-            for op in &txn.ops {
-                sql_u64(
-                    op.op_id
-                        .as_ref()
-                        .ok_or(StoreError::Invalid("op ID"))?
-                        .lamport,
-                )?;
-                // Preserve originals introduced then removed before this checkpoint.
-                if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
-                    super::projections::persist_asset(&tx, asset)?;
-                }
-            }
-            let hash: [u8; 32] = ack
-                .state_hash
-                .as_slice()
-                .try_into()
-                .map_err(|_| StoreError::Invalid("checkpoint receipt hash"))?;
-            let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
-            tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-                params![sql_u64(ack.host_seq)?,id.as_str(),txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bounded_encode(txn)?,hash,txn.created_at_wall_ms,accepted_at,bounded_encode(ack)?])?;
+            let stored;
+            (seal, stored) = insert_accepted(&tx, &candidate, txn, ack, &seal)?;
+            // Not replayed here: the next open counts what these rows cost.
+            cost.span.add(stored);
+            log.add(stored);
         }
+        write_seal(&tx, &seal)?;
         observer(CommitStage::LogWritten);
-        super::projections::persist(&tx, candidate.project(), seq, snapshot_time)?;
+        super::projections::persist(&tx, candidate.project(), seq, now_ms)?;
         for conflict in &candidate.conflicts()[self.host.conflicts().len()..] {
             write_conflict(&tx, conflict)?;
         }
-        write_snapshot(&tx, &candidate, snapshot_time)?;
+        if !candidate.cancellations_are_subset_of(&self.host) {
+            let mut ledger = load_checkpoint(&tx, sql_u64(self.ledger_seq)?)?;
+            carry_cancellations(&mut ledger, &candidate)?;
+            write_snapshot(&tx, &ledger, now_ms)?;
+            write_cancellations(&tx, &candidate)?;
+        }
         let mut removed = 0;
         for txn in acknowledged {
             removed += tx.execute(
@@ -423,13 +724,205 @@ impl ProjectStore {
         observer(CommitStage::BeforeCommit);
         tx.commit()?;
         self.host = candidate;
-        self.last_snapshot_seq = revision.host_seq;
-        self.last_snapshot_ms = snapshot_time;
-        self.replayed_transactions = 0;
+        self.seal = seal;
+        (self.cost, self.log) = (cost, log);
         observer(CommitStage::Committed);
         Ok(removed)
     }
-    /// Number of operations replayed after the newest checkpoint on this open.
+    /// Take in one ordinary sync update from the host this project mirrors:
+    /// the transactions it accepted since this store's revision. Each is
+    /// decided again by this build's engine and kept with the host's
+    /// acknowledgement when it gives the same revision and state hash, as an
+    /// open decides a stored log; the notices are the host's. The log rows,
+    /// the rows of the entities they touched, their conflict records and the
+    /// removal of the exactly matching queued work happen in one SQLite
+    /// transaction, so the work follows the update, not the history.
+    ///
+    /// The checks are those a device makes of a batch (`vw_net`
+    /// `SyncReceiver::receive`): it comes from the host, belongs to this
+    /// project, starts at this store's revision, continues it without a gap
+    /// and ends where it says it does. A batch that names a checkpoint is
+    /// not taken here (`install_authenticated_checkpoint`). On any refusal
+    /// the store and the database are as they were.
+    pub fn receive_host_batch(
+        &mut self,
+        batch: &v1::SyncBatch,
+        authenticated_host: &DeviceId,
+        now_ms: i64,
+    ) -> Result<HostBatch, StoreError> {
+        if now_ms < 0 || authenticated_host != self.host.host_device() {
+            return Err(StoreError::Invalid("host batch identity/time"));
+        }
+        let previous = self.host.revision()?;
+        let revision = batch
+            .revision
+            .as_ref()
+            .ok_or(StoreError::Invalid("host batch revision"))?;
+        if batch.project_id.as_ref() != Some(&self.project().id.to_proto())
+            || batch.encoded_len() > HOST_BATCH_BYTES
+            || batch.txns.len() > 256
+            || !batch.checkpoint_asset_id.is_empty()
+            || batch.checkpoint_size != 0
+            || revision.state_hash.len() != 32
+            || revision.host_seq < previous.host_seq
+            || batch.base.as_ref() != Some(&previous)
+        {
+            return Err(StoreError::Invalid("host batch"));
+        }
+        let mut entries = Vec::with_capacity(batch.txns.len());
+        let mut expected = previous.host_seq;
+        for entry in &batch.txns {
+            let txn = entry
+                .txn
+                .as_ref()
+                .ok_or(StoreError::Invalid("host batch transaction"))?;
+            let ack = entry
+                .ack
+                .as_ref()
+                .ok_or(StoreError::Invalid("host batch acknowledgement"))?;
+            expected = expected
+                .checked_add(1)
+                .ok_or(StoreError::Invalid("host batch continuity"))?;
+            if entry.host_seq != expected
+                || entry.host_seq > revision.host_seq
+                || ack.txn_id != txn.txn_id
+                || ack.host_seq != entry.host_seq
+                || ack.state_hash != entry.state_hash
+            {
+                return Err(StoreError::Invalid("host batch continuity"));
+            }
+            entries.push((txn, bounded_encode(txn)?, ack, entry.accepted_at_ms));
+        }
+        if (batch.complete && expected != revision.host_seq)
+            || (!batch.complete && (batch.txns.is_empty() || expected >= revision.host_seq))
+        {
+            return Err(StoreError::Invalid("host batch completion"));
+        }
+        let conflicts_before = self.host.conflicts().len();
+        let Self {
+            host,
+            connection,
+            seal,
+            cost,
+            log,
+            ..
+        } = self;
+        let decided = host.replay_with(
+            entries
+                .iter()
+                .map(|(txn, _, ack, accepted_at)| ((*txn).clone(), *accepted_at, (*ack).clone())),
+            |host, touched| -> Result<(LogSeal, ReplayCost, LogSpan, HostBatch), StoreError> {
+                if batch.complete && &host.revision()? != revision {
+                    return Err(StoreError::Invalid("host batch completion"));
+                }
+                let mut sealed = seal.clone();
+                let (mut replay, mut span) = (*cost, *log);
+                let mut all = Touched::default();
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+                let mut removed = 0;
+                for ((txn, bytes, ack, accepted_at), touched) in entries.iter().zip(touched) {
+                    let seq = sql_u64(ack.host_seq)?;
+                    let base = txn
+                        .base_revision
+                        .as_ref()
+                        .ok_or(StoreError::Invalid("base revision"))?;
+                    for op in &txn.ops {
+                        sql_u64(
+                            op.op_id
+                                .as_ref()
+                                .ok_or(StoreError::Invalid("op ID"))?
+                                .lamport,
+                        )?;
+                        // Keep originals introduced and removed again, as a
+                        // checkpoint's log rows do.
+                        if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
+                            super::projections::persist_asset(&tx, asset)?;
+                        }
+                    }
+                    let hash: [u8; 32] = ack
+                        .state_hash
+                        .as_slice()
+                        .try_into()
+                        .map_err(|_| StoreError::Invalid("host batch hash"))?;
+                    let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
+                    let ack_bytes = bounded_encode(*ack)?;
+                    sealed = sealed.with_row(seq, bytes, &hash, *accepted_at, &ack_bytes);
+                    tx.prepare("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")?
+                        .execute(params![seq,uuid(txn.txn_id.as_ref())?,txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,bytes,hash,txn.created_at_wall_ms,accepted_at,ack_bytes])?;
+                    // The exactly matching queued work is acknowledged.
+                    let id = uuid(txn.txn_id.as_ref())?;
+                    let queued: Option<Vec<u8>> = tx
+                        .query_row("SELECT txn FROM pending_txns WHERE txn_id=?1", [&id], |row| {
+                            row.get(0)
+                        })
+                        .optional()?;
+                    if let Some(queued) = queued {
+                        if &queued != bytes {
+                            return Err(StoreError::Invalid(
+                                "pending checkpoint transaction collision",
+                            ));
+                        }
+                        removed += tx.execute(
+                            "DELETE FROM pending_txns WHERE txn_id=?1 AND txn=?2",
+                            params![id, bytes],
+                        )?;
+                    }
+                    replay.add(touched, bytes.len());
+                    span.add(bytes.len());
+                    all.extend(touched);
+                }
+                write_seal(&tx, &sealed)?;
+                super::projections::persist_touched(
+                    &tx,
+                    host.project(),
+                    &all,
+                    sql_u64(host.revision()?.host_seq)?,
+                    now_ms,
+                )?;
+                for conflict in &host.conflicts()[conflicts_before..] {
+                    write_conflict(&tx, conflict)?;
+                }
+                tx.commit()?;
+                Ok((
+                    sealed,
+                    replay,
+                    span,
+                    HostBatch {
+                        touched: all,
+                        removed,
+                    },
+                ))
+            },
+        )?;
+        let Some((sealed, replay, span, received)) = decided else {
+            return Err(StoreError::EngineMismatch);
+        };
+        *seal = sealed;
+        *cost = replay;
+        *log = span;
+        Ok(received)
+    }
+
+    /// What replaying the log after the newest checkpoint is estimated to
+    /// cost, in the microseconds of the estimate (see `ReplayCost`); for a
+    /// measurement to set beside it.
+    pub const fn replay_estimate_micros(&self) -> u64 {
+        self.cost.micros
+    }
+
+    /// What undoing the accepted transaction `target` would change in the
+    /// project as it is now, for a replica that shows it to `device`; see
+    /// `HostSequencer::inverse_preview`. Nothing is changed or written.
+    pub fn inverse_preview(
+        &mut self,
+        target: &Id,
+        device: &DeviceId,
+    ) -> Result<vw_ops::InversePreview, StoreError> {
+        Ok(self.host.inverse_preview(target, device)?)
+    }
+
+    /// Number of accepted operations replayed from the log on this open.
     pub const fn replayed_transactions(&self) -> u64 {
         self.replayed_transactions
     }
@@ -437,19 +930,54 @@ impl ProjectStore {
         integrity(&self.connection)
     }
 
+    /// The connection's `temp_store` setting (0 is SQLite's default), for
+    /// tests that an open's compaction leaves the connection as it was.
+    #[doc(hidden)]
+    pub fn temp_store(&self) -> Result<i64, StoreError> {
+        Ok(self
+            .connection
+            .query_row("PRAGMA temp_store", [], |row| row.get(0))?)
+    }
+
+    /// How many bytes `checkpoint_bytes` would return. Every save keeps this
+    /// up to date; nothing is serialized to answer it.
+    pub fn checkpoint_len(&self) -> usize {
+        self.host.checkpoint_len()
+    }
+
+    /// Refuse saves that would leave a checkpoint larger than `bytes`. The
+    /// limit a checkpoint has anyway (256 MB) always applies; this can only
+    /// lower it, which is how the limit is tested.
+    pub fn limit_history(&mut self, bytes: usize) {
+        self.history_limit = bytes;
+    }
+
     /// Validate against the current authority without advancing it. Transport
     /// uses this before acquiring new originals; commit revalidates after I/O.
+    /// The transaction is decided in place and taken back out, so the store
+    /// is exactly as before and nothing is copied or written.
     pub fn validate_transaction(
-        &self,
+        &mut self,
         txn: &v1::Transaction,
         authenticated: &DeviceId,
         accepted_at_ms: i64,
     ) -> Result<Acceptance, StoreError> {
         bounded_encode(txn)?;
-        let mut candidate = self.host.clone();
-        let acceptance = candidate.submit(txn.clone(), authenticated, accepted_at_ms)?;
-        if candidate.project().canonical_bytes()?.len() > MAX_PAYLOAD {
+        let limit = self.history_limit;
+        let (acceptance, (canonical_len, history)) =
+            self.host
+                .check_with(txn.clone(), authenticated, accepted_at_ms, |host| {
+                    (
+                        host.canonical_len(),
+                        host.admit_checkpoint_len_within(limit),
+                    )
+                })?;
+        if canonical_len > MAX_PAYLOAD {
             return Err(StoreError::Invalid("snapshot size"));
+        }
+        // A retry of an accepted transaction adds nothing.
+        if !acceptance.duplicate {
+            history?;
         }
         sql_u64(acceptance.ack.host_seq)?;
         sql_u64(
@@ -468,9 +996,11 @@ impl ProjectStore {
         }
         Ok(acceptance)
     }
-    /// Persist one host acceptance, its exact ack, conflict records, projections
-    /// and any due checkpoint in the same SQLite transaction. Rejections and
-    /// SQL failures leave both the database and the in-memory host unchanged.
+    /// Persist one host acceptance, its exact ack, conflict records and
+    /// projections in the same SQLite transaction. The work follows what the
+    /// transaction changes, never the size of the project or its history.
+    /// Rejections and SQL failures leave both the database and the in-memory
+    /// host unchanged.
     pub fn commit(
         &mut self,
         txn: &v1::Transaction,
@@ -486,71 +1016,199 @@ impl ProjectStore {
         accepted_at_ms: i64,
         mut observer: F,
     ) -> Result<Acceptance, StoreError> {
+        // A mirror's edits wait in its outbox for the host to accept them
+        // (`enqueue_pending`). Accepting one here would give it a log the
+        // host never sees.
+        if self.mirror {
+            return Err(StoreError::Invalid("a mirror cannot accept transactions"));
+        }
         let bytes = bounded_encode(txn)?;
-        let mut candidate = self.host.clone();
-        let acceptance = candidate.submit(txn.clone(), authenticated, accepted_at_ms)?;
-        if acceptance.duplicate {
-            return Ok(acceptance);
-        }
-        if candidate.project().canonical_bytes()?.len() > MAX_PAYLOAD {
-            return Err(StoreError::Invalid("snapshot size"));
-        }
-        let seq = sql_u64(acceptance.ack.host_seq)?;
-        let base = txn
-            .base_revision
-            .as_ref()
-            .ok_or(StoreError::Invalid("base revision"))?;
-        let base_seq = sql_u64(base.host_seq)?;
-        for op in &txn.ops {
-            sql_u64(
-                op.op_id
+        let stored = bytes.len();
+        let Self {
+            host,
+            connection,
+            seal,
+            cost,
+            log,
+            history_limit,
+            ..
+        } = self;
+        // The host accepts the transaction in place and takes it back out if
+        // anything below fails, so neither side ever holds a half commit.
+        let (acceptance, persisted) = host.submit_with(
+            txn.clone(),
+            authenticated,
+            accepted_at_ms,
+            |host, acceptance, touched| -> Result<(LogSeal, ReplayCost), StoreError> {
+                if host.canonical_len() > MAX_PAYLOAD {
+                    return Err(StoreError::Invalid("snapshot size"));
+                }
+                // The history a checkpoint holds, and with it what a joining
+                // device is given, has a limit. Saves no longer write a
+                // checkpoint, so the save that would cross it is refused
+                // here, from the size the host keeps up to date.
+                host.admit_checkpoint_len_within(*history_limit)?;
+                let seq = sql_u64(acceptance.ack.host_seq)?;
+                let base = txn
+                    .base_revision
                     .as_ref()
-                    .ok_or(StoreError::Invalid("op ID"))?
-                    .lamport,
-            )?;
+                    .ok_or(StoreError::Invalid("base revision"))?;
+                let base_seq = sql_u64(base.host_seq)?;
+                for op in &txn.ops {
+                    sql_u64(
+                        op.op_id
+                            .as_ref()
+                            .ok_or(StoreError::Invalid("op ID"))?
+                            .lamport,
+                    )?;
+                }
+                let hash = host.state_hash()?.as_str();
+                let ack = acceptance.ack.encode_to_vec();
+                let sealed = seal.with_row(seq, &bytes, hash, accepted_at_ms, &ack);
+                let mut replay = *cost;
+                replay.add(touched, stored);
+                observer(CommitStage::Prepared);
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+                tx.prepare("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)")?
+                    .execute(params![seq,uuid(txn.txn_id.as_ref())?,authenticated.as_str(),base_seq,optional_uuid(txn.gesture_id.as_ref())?,bytes,hash,txn.created_at_wall_ms,accepted_at_ms,ack])?;
+                write_seal(&tx, &sealed)?;
+                observer(CommitStage::LogWritten);
+                super::projections::persist_touched(
+                    &tx,
+                    host.project(),
+                    touched,
+                    seq,
+                    accepted_at_ms,
+                )?;
+                for conflict in &acceptance.conflicts {
+                    write_conflict(&tx, conflict)?;
+                }
+                observer(CommitStage::BeforeCommit);
+                tx.commit()?;
+                Ok((sealed, replay))
+            },
+        )?;
+        // A retry of an accepted transaction persisted nothing.
+        if let Some((sealed, replay)) = persisted {
+            *seal = sealed;
+            *cost = replay;
+            log.add(stored);
+            observer(CommitStage::Committed);
         }
-        let snapshot_due = acceptance.ack.host_seq - self.last_snapshot_seq
-            >= SNAPSHOT_TRANSACTIONS
-            || accepted_at_ms.saturating_sub(self.last_snapshot_ms) >= SNAPSHOT_INTERVAL_MS;
+        Ok(acceptance)
+    }
+
+    /// How much the next open would gain from a checkpoint written now. It
+    /// is `None` for a log of new strokes however long: replaying them is
+    /// cheaper than loading a checkpoint that holds them.
+    pub fn checkpoint_need(&self) -> CheckpointNeed {
+        if self.beyond_checkpoint {
+            return CheckpointNeed::None;
+        }
+        checkpoint_need(&self.cost, &self.log)
+    }
+
+    /// Write a checkpoint at the current revision if one is needed at least
+    /// as much as `need` says. It rewrites the whole sequencing state and
+    /// reads it back, which takes as long as the history is large, so no
+    /// save does it. This store writes a due one when a project opens;
+    /// applications ask for a due one before they close a project, for an
+    /// overdue one when the project is idle, and for an urgent one between
+    /// two pieces of work. Returns whether one was written.
+    pub fn checkpoint_if(&mut self, need: CheckpointNeed, now_ms: i64) -> Result<bool, StoreError> {
+        if now_ms < 0 {
+            return Err(StoreError::Invalid("checkpoint time"));
+        }
+        if need == CheckpointNeed::None || self.checkpoint_need() < need {
+            return Ok(false);
+        }
+        self.write_checkpoint(Some(now_ms), |_| {})?;
+        Ok(true)
+    }
+
+    /// `checkpoint_if` for a checkpoint that is due.
+    pub fn checkpoint_if_due(&mut self, now_ms: i64) -> Result<bool, StoreError> {
+        self.checkpoint_if(CheckpointNeed::Due, now_ms)
+    }
+
+    /// Write a checkpoint at the current revision whether or not one is due.
+    /// Prefer `checkpoint_if_due`: for a log of strokes, opening from a
+    /// checkpoint is slower than replaying them.
+    pub fn checkpoint_now(&mut self, now_ms: i64) -> Result<(), StoreError> {
+        self.checkpoint_now_observed(now_ms, |_| {})
+    }
+
+    /// Diagnostic transaction boundaries for the process-crash regression.
+    /// `LogWritten` here means the checkpoint is written, uncommitted.
+    pub fn checkpoint_now_observed<F: FnMut(CommitStage)>(
+        &mut self,
+        now_ms: i64,
+        observer: F,
+    ) -> Result<(), StoreError> {
+        if now_ms < 0 {
+            return Err(StoreError::Invalid("checkpoint time"));
+        }
+        self.write_checkpoint(Some(now_ms), observer)
+    }
+
+    fn write_checkpoint<F: FnMut(CommitStage)>(
+        &mut self,
+        now_ms: Option<i64>,
+        observer: F,
+    ) -> Result<(), StoreError> {
+        let written = self.try_write_checkpoint(now_ms, observer);
+        // Serializing a history that large takes seconds every time, and the
+        // history only grows: once refused for its size, do not ask again.
+        if matches!(
+            written,
+            Err(StoreError::Operation(OpsError::Invalid("checkpoint size")))
+        ) {
+            self.beyond_checkpoint = true;
+        }
+        written
+    }
+
+    fn try_write_checkpoint<F: FnMut(CommitStage)>(
+        &mut self,
+        now_ms: Option<i64>,
+        mut observer: F,
+    ) -> Result<(), StoreError> {
         observer(CommitStage::Prepared);
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
-        tx.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-            params![seq,uuid(txn.txn_id.as_ref())?,authenticated.as_str(),base_seq,optional_uuid(txn.gesture_id.as_ref())?,bytes,candidate.project().state_hash()?.as_str(),txn.created_at_wall_ms,accepted_at_ms,acceptance.ack.encode_to_vec()])?;
+        let created = match now_ms {
+            Some(now_ms) => now_ms,
+            None => tx.query_row("SELECT MAX(created_at) FROM snapshots", [], |row| {
+                row.get(0)
+            })?,
+        };
+        // The revision-zero checkpoint stays: the whole log replays from it
+        // should the new one ever fail to load, and cancellations go on being
+        // recorded in it. Any other is replaced, and removed first so that
+        // the new one takes over its pages.
+        tx.execute(
+            "DELETE FROM snapshots WHERE host_seq<>0 OR ?1<>0",
+            [sql_u64(self.ledger_seq)?],
+        )?;
+        write_snapshot(&tx, &self.host, created)?;
+        // Where no revision-zero checkpoint is kept (every mirror), the new
+        // row is now the only way into the project. Read it back the way an
+        // open will before the old one is gone for good: if it does not load
+        // and bind to the log, the transaction is abandoned and the stored
+        // checkpoints stay as they were.
+        let seq = sql_u64(self.host.revision()?.host_seq)?;
+        verify_prefix(&tx, &load_checkpoint(&tx, seq)?, seq)?;
         observer(CommitStage::LogWritten);
-        super::projections::persist(&tx, candidate.project(), seq, accepted_at_ms)?;
-        for conflict in &acceptance.conflicts {
-            write_conflict(&tx, conflict)?;
-        }
-        if snapshot_due {
-            write_snapshot(&tx, &candidate, accepted_at_ms)?;
-        }
         observer(CommitStage::BeforeCommit);
         tx.commit()?;
-        self.host = candidate;
-        if snapshot_due {
-            self.last_snapshot_seq = acceptance.ack.host_seq;
-            self.last_snapshot_ms = accepted_at_ms;
+        if self.ledger_seq != 0 {
+            self.ledger_seq = self.host.revision()?.host_seq;
         }
+        self.cost = ReplayCost::default();
         observer(CommitStage::Committed);
-        Ok(acceptance)
-    }
-
-    /// Explicit idle/save checkpoint; applications may call after five idle
-    /// minutes. An accepted transaction always checks the interval itself.
-    pub fn snapshot_now(&mut self, now_ms: i64) -> Result<(), StoreError> {
-        if now_ms < 0 {
-            return Err(StoreError::Invalid("snapshot time"));
-        }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        write_snapshot(&tx, &self.host, now_ms)?;
-        tx.commit()?;
-        self.last_snapshot_seq = self.host.revision()?.host_seq;
-        self.last_snapshot_ms = now_ms;
         Ok(())
     }
     /// Query durable acceptance/cancellation without cloning a checkpoint.
@@ -559,25 +1217,49 @@ impl ProjectStore {
     }
 
     /// Persist cancellation before accepting any later commit with this gesture.
+    /// The log cannot rebuild a cancellation, so it goes into the project's
+    /// first checkpoint, which every open reads.
     pub fn cancel_gesture(
         &mut self,
         device: DeviceId,
         gesture: Id,
         now_ms: i64,
     ) -> Result<(), StoreError> {
+        self.cancel_gesture_observed(device, gesture, now_ms, |_| {})
+    }
+
+    /// Diagnostic transaction boundaries for the process-crash regression.
+    /// `LogWritten` here means the checkpoint is rewritten, uncommitted.
+    pub fn cancel_gesture_observed<F: FnMut(CommitStage)>(
+        &mut self,
+        device: DeviceId,
+        gesture: Id,
+        now_ms: i64,
+        mut observer: F,
+    ) -> Result<(), StoreError> {
         if now_ms < 0 {
-            return Err(StoreError::Invalid("snapshot time"));
+            return Err(StoreError::Invalid("cancellation time"));
         }
-        let mut host = self.host.clone();
-        host.cancel_gesture(device, gesture)?;
+        // A committed gesture is refused and a cancelled one is already
+        // durable; neither touches the host or the database.
+        if self.host.gesture_closed(&device, &gesture) {
+            return Ok(self.host.cancel_gesture(device, gesture)?);
+        }
+        observer(CommitStage::Prepared);
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        write_snapshot(&tx, &host, now_ms)?;
+        migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+        let mut ledger = load_checkpoint(&tx, sql_u64(self.ledger_seq)?)?;
+        ledger.cancel_gesture(device.clone(), gesture.clone())?;
+        write_snapshot(&tx, &ledger, now_ms)?;
+        write_cancellation(&tx, &device, &gesture)?;
+        observer(CommitStage::LogWritten);
+        observer(CommitStage::BeforeCommit);
         tx.commit()?;
-        self.host = host;
-        self.last_snapshot_seq = self.host.revision()?.host_seq;
-        self.last_snapshot_ms = now_ms;
+        // Cannot fail: the gesture was open a moment ago and nothing ran since.
+        self.host.cancel_gesture(device, gesture)?;
+        observer(CommitStage::Committed);
         Ok(())
     }
 
@@ -701,7 +1383,7 @@ impl ProjectStore {
     }
 }
 
-fn lock_project(root: &Path) -> Result<File, StoreError> {
+fn lock_project(root: &Path) -> Result<ProjectLock, StoreError> {
     let path = root.join(".store.lock");
     match fs::symlink_metadata(&path) {
         Ok(m) => blobs::check_regular_metadata(&m)?,
@@ -710,28 +1392,19 @@ fn lock_project(root: &Path) -> Result<File, StoreError> {
     }
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x0020_0000);
-    }
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(0x0002_0000);
-    }
+    blobs::no_follow(&mut options);
     let file = options.open(path)?;
     blobs::check_regular_metadata(&file.metadata()?)?;
-    fs2::FileExt::try_lock_exclusive(&file).map_err(|e| {
+    crate::os_fs::try_lock_exclusive(&file).map_err(|e| {
         if e.kind() == std::io::ErrorKind::WouldBlock
-            || e.raw_os_error() == fs2::lock_contended_error().raw_os_error()
+            || e.raw_os_error() == crate::os_fs::lock_contended_error().raw_os_error()
         {
             StoreError::Busy
         } else {
             StoreError::Io(e)
         }
     })?;
-    Ok(file)
+    Ok(ProjectLock(file))
 }
 fn connect(root: &Path, create: bool) -> Result<Connection, StoreError> {
     for name in [
@@ -753,7 +1426,7 @@ fn connect(root: &Path, create: bool) -> Result<Connection, StoreError> {
         flags |= OpenFlags::SQLITE_OPEN_CREATE;
     }
     let connection = Connection::open_with_flags(root.join("project.sqlite"), flags)?;
-    connection.busy_timeout(Duration::from_secs(5))?;
+    connection.busy_timeout(BUSY_TIMEOUT)?;
     connection.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
     Ok(connection)
 }
@@ -789,45 +1462,822 @@ pub(crate) fn write_snapshot(
         return Err(StoreError::Invalid("snapshot size"));
     }
     connection.execute("INSERT INTO snapshots(host_seq,state,state_hash,created_at,checkpoint,checkpoint_hash) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(host_seq) DO UPDATE SET state=excluded.state,state_hash=excluded.state_hash,created_at=excluded.created_at,checkpoint=excluded.checkpoint,checkpoint_hash=excluded.checkpoint_hash",
-        params![sql_u64(host.revision()?.host_seq)?,state,host.project().state_hash()?.as_str(),now_ms,&checkpoint,AssetId::hash(&checkpoint).as_str()])?;
+        params![sql_u64(host.revision()?.host_seq)?,state,host.state_hash()?.as_str(),now_ms,&checkpoint,AssetId::hash(&checkpoint).as_str()])?;
     Ok(())
 }
+
+/// Read one checkpoint row and check everything it says about itself: its
+/// digest, the canonical sequencing state, the separately stored project and
+/// hash, its revision and the project it belongs to. What it says about the
+/// log is checked by `verify_prefix`.
+fn load_checkpoint(connection: &Connection, seq: i64) -> Result<HostSequencer, StoreError> {
+    let (state, hash, time, checkpoint, digest): (Vec<u8>, String, i64, Vec<u8>, String) =
+        connection.query_row(
+            "SELECT state,state_hash,created_at,checkpoint,checkpoint_hash FROM snapshots WHERE host_seq=?1",
+            [seq],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )?;
+    if seq < 0 || time < 0 || AssetId::hash(&checkpoint).as_str() != digest {
+        return Err(StoreError::Corrupt("checkpoint binding"));
+    }
+    let host = HostSequencer::from_checkpoint_bytes(&checkpoint)?;
+    let state = Project::from_canonical_bytes(&state)?;
+    if host.project() != &state
+        || host.project().state_hash()?.as_str() != hash
+        || host.revision()?.host_seq != seq as u64
+    {
+        return Err(StoreError::Corrupt("snapshot state"));
+    }
+    let device: String =
+        connection.query_row("SELECT value FROM meta WHERE key='host_device'", [], |r| {
+            r.get(0)
+        })?;
+    let project_id: String =
+        connection.query_row("SELECT value FROM meta WHERE key='project_id'", [], |r| {
+            r.get(0)
+        })?;
+    if device != host.host_device().as_str() || project_id != host.project().id.as_str() {
+        return Err(StoreError::Corrupt("project identity"));
+    }
+    Ok(host)
+}
+
+/// Store one accepted transaction of a verified checkpoint as a log row, with
+/// any original it introduced. Returns the seal that includes the row and the
+/// size of the stored transaction.
+fn insert_accepted(
+    connection: &Connection,
+    host: &HostSequencer,
+    txn: &v1::Transaction,
+    ack: &v1::TxnAck,
+    seal: &LogSeal,
+) -> Result<(LogSeal, usize), StoreError> {
+    let id = Id::from_proto(txn.txn_id.as_ref())?;
+    let accepted_at = host
+        .accepted_at(&id)
+        .ok_or(StoreError::Invalid("checkpoint receipt time"))?;
+    let base = txn
+        .base_revision
+        .as_ref()
+        .ok_or(StoreError::Invalid("checkpoint base"))?;
+    for op in &txn.ops {
+        sql_u64(
+            op.op_id
+                .as_ref()
+                .ok_or(StoreError::Invalid("op ID"))?
+                .lamport,
+        )?;
+        // Preserve originals introduced then removed before this checkpoint.
+        if let Some(v1::op::Kind::AddAsset(asset)) = &op.kind {
+            super::projections::persist_asset(connection, asset)?;
+        }
+    }
+    let hash: [u8; 32] = ack
+        .state_hash
+        .as_slice()
+        .try_into()
+        .map_err(|_| StoreError::Invalid("checkpoint receipt hash"))?;
+    let hash = blake3::Hash::from_bytes(hash).to_hex().to_string();
+    let seq = sql_u64(ack.host_seq)?;
+    let (txn_bytes, ack_bytes) = (bounded_encode(txn)?, bounded_encode(ack)?);
+    let sealed = seal.with_row(seq, &txn_bytes, &hash, accepted_at, &ack_bytes);
+    let stored = txn_bytes.len();
+    connection.execute("INSERT INTO op_log(host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        params![seq,id.as_str(),txn.device_id,sql_u64(base.host_seq)?,optional_uuid(txn.gesture_id.as_ref())?,txn_bytes,hash,txn.created_at_wall_ms,accepted_at,ack_bytes])?;
+    Ok((sealed, stored))
+}
+
+/// Record in `into` every cancellation `from` holds. One for a gesture that
+/// `into` has as committed is left out: the commit already settled it.
+fn carry_cancellations(into: &mut HostSequencer, from: &HostSequencer) -> Result<(), StoreError> {
+    for (device, gesture) in from.cancelled_gestures() {
+        if !into.gesture_closed(device, gesture) {
+            into.cancel_gesture(device.clone(), gesture.clone())?;
+        }
+    }
+    Ok(())
+}
+
+const CANCELLED_PREFIX: &str = "cancelled ";
+
+/// A second copy of one cancellation, as a row of its own. The checkpoint
+/// that cancellations are recorded in is one row; if that row is ever damaged
+/// the project opens from another checkpoint, and these keep what only the
+/// damaged one held.
+fn write_cancellation(
+    connection: &Connection,
+    device: &DeviceId,
+    gesture: &Id,
+) -> Result<(), StoreError> {
+    connection
+        .prepare("INSERT INTO meta(key,value) VALUES(?1,'') ON CONFLICT(key) DO NOTHING")?
+        .execute([format!("{CANCELLED_PREFIX}{device} {gesture}")])?;
+    Ok(())
+}
+fn write_cancellations(connection: &Connection, host: &HostSequencer) -> Result<(), StoreError> {
+    for (device, gesture) in host.cancelled_gestures() {
+        write_cancellation(connection, device, gesture)?;
+    }
+    Ok(())
+}
+fn read_cancellations(connection: &Connection) -> Result<BTreeSet<(DeviceId, Id)>, StoreError> {
+    let mut query = connection.prepare("SELECT key FROM meta WHERE key GLOB 'cancelled *'")?;
+    let mut rows = query.query([])?;
+    let mut cancelled = BTreeSet::new();
+    while let Some(row) = rows.next()? {
+        let key: String = row.get(0)?;
+        let (device, gesture) = key
+            .strip_prefix(CANCELLED_PREFIX)
+            .and_then(|pair| pair.split_once(' '))
+            .ok_or(StoreError::Corrupt("cancellation record"))?;
+        cancelled.insert((
+            DeviceId::try_from(device.to_owned())
+                .map_err(|_| StoreError::Corrupt("cancellation record"))?,
+            Id::try_from(gesture.to_owned())
+                .map_err(|_| StoreError::Corrupt("cancellation record"))?,
+        ));
+    }
+    Ok(cancelled)
+}
+fn cancelled(host: &HostSequencer) -> BTreeSet<(DeviceId, Id)> {
+    host.cancelled_gestures()
+        .map(|(device, gesture)| (device.clone(), gesture.clone()))
+        .collect()
+}
+
+/// What replaying a stretch of the log costs. It is estimated from what each
+/// transaction took when it was decided (`vw_ops::Work`) and never timed, so
+/// that the same log gives the same answer on every machine and every run.
+/// The unit is a microsecond on the machine the estimate was fitted on (a
+/// four-core Linux container); only its ratio to `LogSpan::load_micros`,
+/// fitted on the same machine, matters.
+///
+/// Replaying a transaction costs what deciding it did: a little for each
+/// entity it touched, a pass over every byte of those entities to decide,
+/// journal, check and serialize them again, the hash of the canonical bytes
+/// from the first change to the end (a new stroke has next to nothing
+/// behind it, a layer, an instruction or the title has the whole project
+/// behind it), an undo's comparison with what other devices did since, and
+/// a look through every object's references when anything but objects
+/// changed. The coefficients are fitted on measured replays of strokes,
+/// moves, layer and title changes, large instructions, large results,
+/// large semantic snapshots and undos after many edits by another device
+/// (`vw-ffi/benches/edits.rs` prints both side by side).
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct ReplayCost {
+    micros: u64,
+    span: LogSpan,
+}
+impl ReplayCost {
+    /// One transaction, given what it touched and what deciding it took.
+    fn add(&mut self, touched: &Touched, stored: usize) {
+        let all = (touched.documents.len()
+            + touched.assets.len()
+            + touched.layers.len()
+            + touched.objects.len()
+            + touched.groups.len()
+            + touched.instructions.len()
+            + touched.semantic_snapshots.len()
+            + touched.results.len()
+            + touched.mask_versions.len()) as u64;
+        let created = (touched.created as u64).min(all);
+        let changed = all - created;
+        let work = &touched.work;
+        self.micros = self.micros.saturating_add(
+            REPLAY_TRANSACTION
+                .saturating_add(created.saturating_mul(REPLAY_CREATED))
+                .saturating_add(changed.saturating_mul(REPLAY_CHANGED))
+                .saturating_add(work.serialized as u64 / REPLAY_SERIALIZED)
+                .saturating_add(work.values as u64 / REPLAY_VALUES)
+                .saturating_add(work.hashed as u64 / REPLAY_HASHED)
+                .saturating_add(work.compared as u64 / REPLAY_COMPARED)
+                .saturating_add(work.scanned as u64 / REPLAY_SCANNED),
+        );
+        self.span.add(stored);
+    }
+}
+/// Every transaction: reading the row, admitting, recording.
+const REPLAY_TRANSACTION: u64 = 50;
+/// Each entity it created, and each it changed, besides its bytes.
+const REPLAY_CREATED: u64 = 15;
+const REPLAY_CHANGED: u64 = 45;
+/// Bytes of touched entities per microsecond, and JSON values in them per
+/// microsecond: a long text passes fast, a long list of numbers slowly.
+const REPLAY_SERIALIZED: u64 = 230;
+const REPLAY_VALUES: u64 = 12;
+/// Bytes hashed per microsecond.
+const REPLAY_HASHED: u64 = 2500;
+/// Journal entries compared per microsecond.
+const REPLAY_COMPARED: u64 = 50;
+/// Objects and groups looked through per microsecond.
+const REPLAY_SCANNED: u64 = 50;
+
+/// How much log a stretch is: its rows and the bytes of their transactions.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct LogSpan {
+    rows: u64,
+    bytes: u64,
+}
+impl LogSpan {
+    fn add(&mut self, stored: usize) {
+        self.rows = self.rows.saturating_add(1);
+        self.bytes = self.bytes.saturating_add(stored as u64);
+    }
+    /// What loading a checkpoint that covers this much log costs, in the
+    /// microseconds of `ReplayCost`. Loading parses, re-serializes and
+    /// compares every transaction the checkpoint covers, in proportion to
+    /// its size: measured 2.3 s for 8,000 strokes, 12 MB of log.
+    fn load_micros(&self) -> u64 {
+        self.rows.saturating_mul(60).saturating_add(self.bytes / 5)
+    }
+}
+
+/// How much a checkpoint at the end of a log of size `log` is needed when the
+/// next open would otherwise replay `tail`. For it to be due, replaying has
+/// to cost enough to notice, more than loading a checkpoint of the same rows
+/// would, and at least a quarter of loading one of the whole history, which
+/// is what gets rewritten. A log of new strokes never meets the second
+/// condition. Overdue and urgent compare the replay with loading the whole
+/// history, which is what the rest of an open costs.
+fn checkpoint_need(tail: &ReplayCost, log: &LogSpan) -> CheckpointNeed {
+    let whole = log.load_micros();
+    if tail.micros < CHECKPOINT_MIN_MICROS
+        || tail.micros < tail.span.load_micros()
+        || tail.micros.saturating_mul(4) < whole
+    {
+        CheckpointNeed::None
+    } else if tail.micros < whole {
+        CheckpointNeed::Due
+    } else if tail.micros < CHECKPOINT_URGENT_MICROS || tail.micros < whole.saturating_mul(4) {
+        CheckpointNeed::Overdue
+    } else {
+        CheckpointNeed::Urgent
+    }
+}
+
+const SEAL_KEY: &str = "log_seal";
+const SEAL_DOMAIN: &[u8] = b"VisualWorkbench.LogSeal.v1\n";
+
+/// A running digest of every accepted log row in host order: the stored
+/// transaction, acknowledgement, state hash and receipt time. It is stored in
+/// the transaction that adds a row and recomputed when the project opens, so
+/// a stored row that changed afterwards is found even where replaying it
+/// would give the same project. Rows added by a build that does not keep the
+/// seal are taken in at the next open.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LogSeal {
+    seq: i64,
+    digest: blake3::Hash,
+}
+impl LogSeal {
+    pub(crate) fn empty() -> Self {
+        Self {
+            seq: 0,
+            digest: blake3::hash(SEAL_DOMAIN),
+        }
+    }
+    fn with_row(
+        &self,
+        seq: i64,
+        txn: &[u8],
+        state_hash: &str,
+        accepted_at: i64,
+        ack: &[u8],
+    ) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(self.digest.as_bytes());
+        hasher.update(&seq.to_le_bytes());
+        hasher.update(&accepted_at.to_le_bytes());
+        for part in [txn, state_hash.as_bytes(), ack] {
+            hasher.update(&(part.len() as u64).to_le_bytes());
+            hasher.update(part);
+        }
+        Self {
+            seq,
+            digest: hasher.finalize(),
+        }
+    }
+    fn parse(text: &str) -> Option<Self> {
+        let mut fields = text.split(' ');
+        let (version, seq, digest) = (fields.next()?, fields.next()?, fields.next()?);
+        let seal = Self {
+            seq: seq.parse().ok().filter(|seq| *seq >= 0)?,
+            digest: blake3::Hash::from_hex(digest).ok()?,
+        };
+        // Only the exact text this build writes is a seal.
+        (version == "v1" && fields.next().is_none() && seal.text() == text).then_some(seal)
+    }
+    fn text(&self) -> String {
+        format!("v1 {} {}", self.seq, self.digest.to_hex())
+    }
+}
+
+pub(crate) fn write_seal(connection: &Connection, seal: &LogSeal) -> Result<(), StoreError> {
+    connection
+        .prepare("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")?
+        .execute(params![SEAL_KEY, seal.text()])?;
+    Ok(())
+}
+
+/// What the stored seal says about the log.
+struct Sealed {
+    /// The seal of the complete log.
+    seal: LogSeal,
+    /// Rows up to this revision are as the build that sealed them wrote them.
+    through: i64,
+    /// The stored seal is missing or ends before the last row.
+    stale: bool,
+    log: LogSpan,
+}
+
+/// Recompute the seal over the whole log and compare it with the stored one
+/// at the row the stored one ends on.
+fn verify_seal(connection: &Connection) -> Result<Sealed, StoreError> {
+    let stored: Option<String> = connection
+        .query_row("SELECT value FROM meta WHERE key=?1", [SEAL_KEY], |row| {
+            row.get(0)
+        })
+        .optional()?;
+    let stored = stored
+        .map(|text| LogSeal::parse(&text).ok_or(StoreError::Corrupt("operation log seal")))
+        .transpose()?;
+    let mut seal = LogSeal::empty();
+    let mut log = LogSpan::default();
+    let mut matched = stored.as_ref() == Some(&seal);
+    let mut query = connection
+        .prepare("SELECT host_seq,txn,state_hash,accepted_at,ack FROM op_log ORDER BY host_seq")?;
+    let mut rows = query.query([])?;
+    while let Some(row) = rows.next()? {
+        let txn: Vec<u8> = row.get(1)?;
+        log.add(txn.len());
+        seal = seal.with_row(
+            row.get(0)?,
+            &txn,
+            &row.get::<_, String>(2)?,
+            row.get(3)?,
+            &row.get::<_, Vec<u8>>(4)?,
+        );
+        if let Some(stored) = &stored
+            && stored.seq == seal.seq
+        {
+            if stored != &seal {
+                return Err(StoreError::Corrupt("operation log seal"));
+            }
+            matched = true;
+        }
+    }
+    // A seal that ends on a row the log no longer has means rows are gone.
+    if stored.is_some() && !matched {
+        return Err(StoreError::Corrupt("operation log seal"));
+    }
+    let stale = stored.as_ref() != Some(&seal);
+    Ok(Sealed {
+        seal,
+        through: stored.map_or(0, |stored| stored.seq),
+        stale,
+        log,
+    })
+}
+
+/// Make durable what `restore` found left to do: record cancellations a
+/// later checkpoint held in the first one, give every cancellation its
+/// second copy, remove every checkpoint that is not kept, and store the seal
+/// of the complete log. Returns whether there was anything to do.
+fn tidy<F: FnMut(OpenStage)>(
+    connection: &mut Connection,
+    host: &HostSequencer,
+    seal: &LogSeal,
+    upkeep: &Upkeep,
+    observer: &mut F,
+) -> Result<bool, StoreError> {
+    if !(upkeep.superseded || upkeep.cancellations || upkeep.copies || upkeep.seal) {
+        return Ok(false);
+    }
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    migrations::verify_schema(&tx, migrations::CURRENT_VERSION)?;
+    if upkeep.cancellations {
+        let created: i64 = tx.query_row(
+            "SELECT created_at FROM snapshots WHERE host_seq=?1",
+            [upkeep.keep[0]],
+            |row| row.get(0),
+        )?;
+        let mut ledger = load_checkpoint(&tx, upkeep.keep[0])?;
+        carry_cancellations(&mut ledger, host)?;
+        write_snapshot(&tx, &ledger, created)?;
+    }
+    if upkeep.copies {
+        write_cancellations(&tx, host)?;
+    }
+    if upkeep.superseded {
+        tx.execute(
+            "DELETE FROM snapshots WHERE host_seq NOT IN (?1,?2)",
+            upkeep.keep,
+        )?;
+    }
+    if upkeep.seal {
+        write_seal(&tx, seal)?;
+    }
+    observer(OpenStage::Pruned);
+    tx.commit()?;
+    observer(OpenStage::Committed);
+    Ok(true)
+}
+
+const RECLAIM_KEY: &str = "compaction_attempt";
+/// How often a compaction is started for about the same unused space.
+const RECLAIM_ATTEMPTS: u32 = 2;
+
+enum Reclaimed {
+    NotDue,
+    Skipped,
+    Done,
+}
+
+/// Why a compaction did not finish.
+enum Unreclaimed {
+    /// The store's connection is open, to the database as it was or as
+    /// compacted with the note of the attempt still in it.
+    Kept(StoreError),
+    /// A private copy replaced the database file, or was about to, and the
+    /// file could not be opened again: the store has no connection.
+    Closed(StoreError),
+}
+impl From<StoreError> for Unreclaimed {
+    fn from(error: StoreError) -> Self {
+        Self::Kept(error)
+    }
+}
+impl From<rusqlite::Error> for Unreclaimed {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Kept(error.into())
+    }
+}
+impl From<std::io::Error> for Unreclaimed {
+    fn from(error: std::io::Error) -> Self {
+        Self::Kept(error.into())
+    }
+}
+
+/// Hand unused pages back to the filesystem when they are a large part of the
+/// database, which happens once after an old checkpoint pile is removed.
+///
+/// Compacting copies the live pages once. A copy that fits
+/// `in_memory_bytes` is held in memory; a larger one goes where `larger`
+/// says: SQLite's temporary file, from which the pages are copied back in
+/// one transaction, or a private file that replaces the database file
+/// (`private_compaction`), where SQLite has no temporary directory.
+///
+/// A compaction that does not finish is not started again at every open. It
+/// ends with the process when the system takes the process away for the
+/// memory the copy needs. So each start is noted in the database first and
+/// the note is removed when the compaction is through; with two starts
+/// noted, nothing is tried until there is a quarter more to hand back.
+fn reclaim<F: FnMut(OpenStage) + Clone + Send + 'static>(
+    connection: &mut Connection,
+    root: &Path,
+    compaction: Compaction,
+    observer: &mut F,
+) -> Result<Reclaimed, Unreclaimed> {
+    if compaction.larger == LargeCopy::Private {
+        remove_private_copies(root);
+    }
+    let pragma = |name: &str| -> Result<i64, StoreError> {
+        Ok(connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))?)
+    };
+    let (pages, free, size) = (
+        pragma("page_count")?,
+        pragma("freelist_count")?,
+        pragma("page_size")?,
+    );
+    if free.saturating_mul(size) < RECLAIM_MIN_BYTES || free.saturating_mul(4) < pages {
+        return Ok(Reclaimed::NotDue);
+    }
+    let in_memory = (pages - free).saturating_mul(size) <= compaction.in_memory_bytes;
+    let noted: Option<String> = connection
+        .query_row(
+            "SELECT value FROM meta WHERE key=?1",
+            [RECLAIM_KEY],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let (attempts, noted_free) = noted
+        .as_deref()
+        .and_then(|note| note.split_once(' '))
+        .and_then(|(attempts, free)| {
+            Some((attempts.parse::<u32>().ok()?, free.parse::<i64>().ok()?))
+        })
+        .unwrap_or((0, 0));
+    let more = free > noted_free.saturating_add(noted_free / 4);
+    if attempts >= RECLAIM_ATTEMPTS && !more {
+        return Ok(Reclaimed::Skipped);
+    }
+    let attempts = if more { 1 } else { attempts + 1 };
+    let private = if in_memory || compaction.larger == LargeCopy::Temporary {
+        None
+    } else {
+        Some(private_copy(root)?)
+    };
+    connection
+        .prepare("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value")?
+        .execute(params![RECLAIM_KEY, format!("{attempts} {free}")])?;
+    // A private copy has to be of the database it replaces: from here on,
+    // what other connections commit changes this.
+    let version = match &private {
+        Some(_) => data_version(connection)?,
+        None => 0,
+    };
+    observer(OpenStage::Compacting);
+    // Tell the observer once from inside the copy.
+    let mut inside = Some(observer.clone());
+    connection.progress_handler(
+        1000,
+        Some(move || {
+            if let Some(mut observer) = inside.take() {
+                observer(OpenStage::Copying);
+            }
+            false
+        }),
+    )?;
+    // Kept as a result, not returned: the connection is restored below
+    // whatever became of the copy.
+    let compacted = match &private {
+        Some(staging) => {
+            let copy = staging.path().join("project.sqlite");
+            crate::archive::sqlite_path(&copy).and_then(|copy| {
+                connection
+                    .execute("VACUUM INTO ?1", [copy])
+                    .map(|_| ())
+                    .map_err(StoreError::from)
+            })
+        }
+        None if in_memory => connection
+            .execute_batch("PRAGMA temp_store=MEMORY; VACUUM")
+            .map_err(StoreError::from),
+        None => connection.execute_batch("VACUUM").map_err(StoreError::from),
+    };
+    // Whatever became of it, the connection goes back to how it was.
+    let _ = connection.progress_handler(0, None::<fn() -> bool>);
+    if in_memory {
+        let _ = connection.execute_batch("PRAGMA temp_store=DEFAULT");
+    }
+    compacted?;
+    if let Some(staging) = private {
+        return private_compaction(connection, root, staging, version, observer);
+    }
+    connection.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
+    // The compacted pages are in the write-ahead log. Move them into the
+    // database file, then empty the log. With a reader connected either step
+    // gives up after the busy timeout and the next checkpoint finishes it.
+    observer(OpenStage::Vacuumed);
+    connection.execute_batch("PRAGMA wal_checkpoint(FULL)")?;
+    observer(OpenStage::Transferred);
+    connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
+    Ok(Reclaimed::Done)
+}
+
+/// Put the compacted copy `VACUUM INTO` made in `staging` in place of the
+/// database file, all or nothing. The copy is checked and on disk before
+/// the database file is touched, and one rename replaces the file, so a
+/// crash at any point leaves either the database as it was, with the note
+/// of the attempt, or the whole copy, which holds the same rows without it.
+///
+/// Only this store may have the file open. Its lock rules that out for
+/// every program that keeps to it, and on Android for any other, since an
+/// application's files are its own. What the lock cannot rule out stops
+/// the swap and leaves the database as it was: another connection that
+/// committed since the copy was made, or that still has the file open, as
+/// its write-ahead log shows, which the last connection to close removes.
+fn private_compaction<F: FnMut(OpenStage)>(
+    connection: &mut Connection,
+    root: &Path,
+    staging: tempfile::TempDir,
+    version: i64,
+    observer: &mut F,
+) -> Result<Reclaimed, Unreclaimed> {
+    let copy = staging.path().join("project.sqlite");
+    prepare_copy(&copy)?;
+    observer(OpenStage::Vacuumed);
+    if data_version(connection)? != version {
+        return Err(Unreclaimed::Kept(StoreError::Busy));
+    }
+    // Closing moves the write-ahead log into the database file and removes
+    // the log and its index, if no other connection has the file open.
+    let closing = std::mem::replace(connection, Connection::open_in_memory()?);
+    if let Err((kept, error)) = closing.close() {
+        *connection = kept;
+        return Err(Unreclaimed::Kept(error.into()));
+    }
+    let alone = [
+        "project.sqlite-wal",
+        "project.sqlite-shm",
+        "project.sqlite-journal",
+    ]
+    .iter()
+    .all(|name| {
+        matches!(fs::symlink_metadata(root.join(name)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+    });
+    let replaced = if alone {
+        fs::rename(&copy, root.join("project.sqlite")).map_err(StoreError::from)
+    } else {
+        Err(StoreError::Busy)
+    };
+    let synced = match replaced {
+        Ok(()) => {
+            let synced = blobs::sync_directory(root);
+            observer(OpenStage::Transferred);
+            synced
+        }
+        Err(_) => Ok(()),
+    };
+    // Whatever became of it, the store opens the database file again.
+    *connection = reopen(root).map_err(Unreclaimed::Closed)?;
+    replaced?;
+    synced?;
+    // The directory is empty now; dropping it removes it.
+    drop(staging);
+    Ok(Reclaimed::Done)
+}
+
+/// Make the copy what replaces the database: without the note of this
+/// attempt, which a finished compaction does not leave, and checked to be a
+/// whole database of this schema that SQLite finds sound, on disk (`VACUUM
+/// INTO` does not sync what it writes).
+fn prepare_copy(copy: &Path) -> Result<(), StoreError> {
+    let checked = Connection::open_with_flags(
+        copy,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    checked.execute_batch("PRAGMA trusted_schema=OFF")?;
+    migrations::verify_schema(&checked, migrations::CURRENT_VERSION)?;
+    checked.execute("DELETE FROM meta WHERE key=?1", [RECLAIM_KEY])?;
+    let verdict: String = checked.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+    checked
+        .close()
+        .map_err(|(_, error)| StoreError::Database(error))?;
+    if verdict != "ok" {
+        return Err(StoreError::Corrupt("compacted copy"));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true).write(true);
+    blobs::no_follow(&mut options);
+    let file = options.open(copy)?;
+    blobs::check_regular_metadata(&file.metadata()?)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+/// The store's connection to the database file, as `open` makes it.
+fn reopen(root: &Path) -> Result<Connection, StoreError> {
+    let connection = connect(root, false)?;
+    connection.busy_timeout(UPKEEP_BUSY_TIMEOUT)?;
+    migrations::verify_schema(&connection, migrations::CURRENT_VERSION)?;
+    Ok(connection)
+}
+
+fn data_version(connection: &Connection) -> Result<i64, StoreError> {
+    Ok(connection.query_row("PRAGMA data_version", [], |row| row.get(0))?)
+}
+
+/// A new, empty private directory for a compaction's copy, in the project's
+/// own storage.
+fn private_copy(root: &Path) -> Result<tempfile::TempDir, StoreError> {
+    blobs::check_directory(root)?;
+    let cache = root.join("cache");
+    blobs::ensure_directory(&cache)?;
+    let directory = cache.join(RECLAIM_DIRECTORY);
+    blobs::ensure_directory(&directory)?;
+    Ok(tempfile::Builder::new()
+        .prefix(RECLAIM_PREFIX)
+        .tempdir_in(directory)?)
+}
+
+/// Remove the copies of compactions that ended with their process, as far
+/// as that goes: nothing else uses the directory and the store's lock is
+/// held, but whatever cannot be removed is left for a later open and stops
+/// nothing, neither the open nor a compaction. Nothing is removed through a
+/// link, and a link is never followed.
+fn remove_private_copies(root: &Path) {
+    let cache = root.join("cache");
+    let directory = cache.join(RECLAIM_DIRECTORY);
+    let real = |path: &Path| {
+        fs::symlink_metadata(path)
+            .is_ok_and(|metadata| !blobs::is_link(&metadata) && metadata.is_dir())
+    };
+    if !real(root) || !real(&cache) || !real(&directory) {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(&directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with(RECLAIM_PREFIX)
+        {
+            continue;
+        }
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if blobs::is_link(&metadata) {
+            continue;
+        }
+        let _ = if metadata.is_dir() {
+            fs::remove_dir_all(&path)
+        } else {
+            fs::remove_file(&path)
+        };
+    }
+}
+
+/// How replaying a stretch of the log ended.
+pub(crate) enum Replay {
+    /// Every row was decided as stored: how many rows, and what that cost.
+    Done(u64, ReplayCost),
+    /// The cost reached the limit first.
+    GaveUp,
+    /// This engine does not decide the row at this revision as stored.
+    Differs(i64),
+}
+
+/// What replay does with the acknowledgement of each row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Acks {
+    /// Keep the stored one. The engine has to reproduce the revision and the
+    /// state hash it names; its notices are text and are kept as stored.
+    Stored,
+    /// Store the one the engine gives: the first migration, whose rows have
+    /// none yet.
+    Write,
+}
+
+/// Replay the log after revision `after`. An error is a row that is not what
+/// a log row has to be, or a failed read; a row this engine decides
+/// differently is reported as that and leaves the host at the row before.
 pub(crate) fn replay_log(
     connection: &Connection,
     host: &mut HostSequencer,
     after: i64,
-    verify_ack: bool,
-) -> Result<u64, StoreError> {
+    acks: Acks,
+    give_up_at: Option<u64>,
+) -> Result<Replay, StoreError> {
     let mut query=connection.prepare("SELECT host_seq,txn_id,device_id,base_host_seq,gesture_id,txn,state_hash,created_at_wall,accepted_at,ack FROM op_log WHERE host_seq>?1 ORDER BY host_seq")?;
     let mut rows = query.query([after])?;
     let mut count = 0;
+    let mut cost = ReplayCost::default();
     while let Some(row) = rows.next()? {
         let seq: i64 = row.get(0)?;
         let bytes: Vec<u8> = row.get(5)?;
         let txn: v1::Transaction = decode(&bytes)?;
         verify_log_columns(row, &txn)?;
-        let device = DeviceId::try_from(txn.device_id.clone())?;
-        let accepted = host.submit(txn, &device, row.get(8)?)?;
-        if accepted.duplicate
-            || sql_u64(accepted.ack.host_seq)? != seq
-            || host.project().state_hash()?.as_str() != row.get::<_, String>(6)?
-        {
-            return Err(StoreError::Corrupt("operation replay"));
-        }
-        if verify_ack {
-            let ack: Vec<u8> = row.get(9)?;
-            if ack != accepted.ack.encode_to_vec() {
-                return Err(StoreError::Corrupt("operation ack"));
+        let accepted_at: i64 = row.get(8)?;
+        match acks {
+            Acks::Stored => {
+                let stored: v1::TxnAck = decode(&row.get::<_, Vec<u8>>(9)?)?;
+                let hash = AssetId::try_from(row.get::<_, String>(6)?)?;
+                // The row has to agree with itself before the engine is asked.
+                if stored.txn_id != txn.txn_id
+                    || sql_u64(stored.host_seq)? != seq
+                    || stored.state_hash != hash.bytes()
+                {
+                    return Err(StoreError::Corrupt("operation ack"));
+                }
+                match host.replay(txn, accepted_at, &stored) {
+                    Ok(Some(touched)) => cost.add(&touched, bytes.len()),
+                    Ok(None) | Err(_) => return Ok(Replay::Differs(seq)),
+                }
             }
-        } else {
-            connection.execute(
-                "UPDATE op_log SET ack=?1 WHERE host_seq=?2",
-                params![accepted.ack.encode_to_vec(), seq],
-            )?;
+            Acks::Write => {
+                let device = DeviceId::try_from(txn.device_id.clone())?;
+                let (accepted, replayed) =
+                    host.submit_with(txn, &device, accepted_at, |_, _, touched| {
+                        cost.add(touched, bytes.len());
+                        Ok::<(), StoreError>(())
+                    })?;
+                // A stored row is never a retry of an earlier one.
+                if replayed.is_none()
+                    || sql_u64(accepted.ack.host_seq)? != seq
+                    || host.state_hash()?.as_str() != row.get::<_, String>(6)?
+                {
+                    return Err(StoreError::Corrupt("operation replay"));
+                }
+                connection.execute(
+                    "UPDATE op_log SET ack=?1 WHERE host_seq=?2",
+                    params![accepted.ack.encode_to_vec(), seq],
+                )?;
+            }
         }
         count += 1;
+        if give_up_at.is_some_and(|limit| cost.micros >= limit) {
+            return Ok(Replay::GaveUp);
+        }
     }
-    Ok(count)
+    Ok(Replay::Done(count, cost))
 }
 fn verify_log_columns(row: &rusqlite::Row<'_>, txn: &v1::Transaction) -> Result<(), StoreError> {
     if uuid(txn.txn_id.as_ref())? != row.get::<_, String>(1)?
@@ -1059,44 +2509,194 @@ pub(crate) fn check_all_column_bounds(db: &Connection) -> Result<(), StoreError>
 /// transaction before any schema mutation. Canonical history stays authoritative.
 pub(crate) struct Restored {
     pub(crate) host: HostSequencer,
-    pub(crate) seq: u64,
-    pub(crate) time: i64,
     pub(crate) replayed: u64,
+    /// What replaying the log after the checkpoint that was used cost.
+    pub(crate) cost: ReplayCost,
+    pub(crate) log: LogSpan,
+    pub(crate) seal: LogSeal,
+    pub(crate) upkeep: Upkeep,
+    /// Stored checkpoints that did not load.
+    pub(crate) skipped: u64,
 }
+
+/// What an open still has to write once the project is verified.
+#[derive(Debug)]
+pub(crate) struct Upkeep {
+    /// Revisions of the checkpoints to keep: the one cancellations are
+    /// recorded in, then the one the log was replayed from. Often the same.
+    pub(crate) keep: [i64; 2],
+    /// Other checkpoints are stored.
+    pub(crate) superseded: bool,
+    /// The first of `keep` lacks cancellations the project holds.
+    pub(crate) cancellations: bool,
+    /// Some cancellation has no second copy.
+    pub(crate) copies: bool,
+    /// The stored log seal is missing or ends before the last row.
+    pub(crate) seal: bool,
+    /// A read failed while working out what to keep. The project is open
+    /// from a verified checkpoint; nothing is written this time.
+    pub(crate) unsettled: bool,
+}
+
+enum Replayed {
+    Done(Box<HostSequencer>, u64, ReplayCost),
+    GaveUp,
+    Differs(i64),
+}
+
+/// The checkpoint at `seq` with the log after it replayed, how many rows that
+/// was and what it cost.
+fn replay_from(
+    connection: &Connection,
+    mut host: HostSequencer,
+    seq: i64,
+    give_up_at: Option<u64>,
+) -> Result<Replayed, StoreError> {
+    verify_prefix(connection, &host, seq)?;
+    match replay_log(connection, &mut host, seq, Acks::Stored, give_up_at)? {
+        Replay::Done(replayed, cost) => {
+            // Each replayed step was matched with the hash the host carries
+            // forward. Recompute the final state from nothing once, so the
+            // stored history and the carried hash cannot agree on a state
+            // the project is not in.
+            if replayed > 0 && &host.project().state_hash()? != host.state_hash()? {
+                return Err(StoreError::Corrupt("operation replay"));
+            }
+            Ok(Replayed::Done(Box::new(host), replayed, cost))
+        }
+        Replay::GaveUp => Ok(Replayed::GaveUp),
+        Replay::Differs(seq) => Ok(Replayed::Differs(seq)),
+    }
+}
+
+/// Load the project and check everything stored against it. Nothing is
+/// written.
+///
+/// The log is replayed from the newest checkpoint that loads. When this
+/// engine does not decide a row of it as stored, the project is refused, and
+/// how depends on what is known about the row. Rows the seal covers are as
+/// the build that accepted them wrote them, so the difference is the engine:
+/// the project was saved by another version, `EngineMismatch`. A row the seal
+/// does not cover may have changed since, and is reported as damage, as it
+/// always was. Either way nothing has been changed, and the build that saved
+/// the project still opens it. An earlier checkpoint is no way round this:
+/// the same rows would have to be replayed from there as well.
 pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
     integrity(connection)?;
     check_all_column_bounds(connection)?;
     check_payload_bounds(connection)?;
-    let (seq,state,hash,time,checkpoint,digest):(i64,Vec<u8>,String,i64,Vec<u8>,String) = connection.query_row(
-            "SELECT host_seq,state,state_hash,created_at,checkpoint,checkpoint_hash FROM snapshots ORDER BY host_seq DESC LIMIT 1", [],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)))?;
-    if seq < 0 || time < 0 || AssetId::hash(&checkpoint).as_str() != digest {
-        return Err(StoreError::Corrupt("checkpoint binding"));
+    let Sealed {
+        seal,
+        through,
+        stale,
+        log,
+    } = verify_seal(connection)?;
+    let rows = connection
+        .prepare("SELECT host_seq FROM snapshots ORDER BY host_seq")?
+        .query_map([], |row| row.get::<_, i64>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    // Start from the newest checkpoint that loads, as every build has. One
+    // that does not load is skipped and counted: an earlier one and more of
+    // the log give the same project.
+    let mut failure = None;
+    let mut newest = None;
+    let mut skipped = 0;
+    for (index, seq) in rows.iter().enumerate().rev() {
+        match load_checkpoint(connection, *seq) {
+            Ok(checkpoint) => {
+                newest = Some((index, checkpoint));
+                break;
+            }
+            Err(error) => {
+                skipped += 1;
+                failure.get_or_insert(error);
+            }
+        }
     }
-    let mut host = HostSequencer::from_checkpoint_bytes(&checkpoint)?;
-    let state = Project::from_canonical_bytes(&state)?;
-    if host.project() != &state
-        || host.project().state_hash()?.as_str() != hash
-        || host.revision()?.host_seq != seq as u64
+    let Some((index, checkpoint)) = newest else {
+        return Err(failure.unwrap_or(StoreError::Corrupt("checkpoint binding")));
+    };
+    let start = rows[index];
+    // The cancellations held by the checkpoint they are recorded in.
+    let mut recorded = cancelled(&checkpoint);
+    // Conflict records up to here are the checkpoint's; later ones are
+    // decided again by the replay.
+    let mut loaded_conflicts = checkpoint.conflicts().len();
+    let (mut host, mut replayed, mut cost) = match replay_from(connection, checkpoint, start, None)?
     {
-        return Err(StoreError::Corrupt("snapshot state"));
+        Replayed::Done(host, replayed, cost) => (*host, replayed, cost),
+        Replayed::Differs(seq) if seq <= through => return Err(StoreError::EngineMismatch),
+        Replayed::Differs(_) | Replayed::GaveUp => {
+            return Err(StoreError::Corrupt("operation replay"));
+        }
+    };
+    let mut keep = [start, start];
+    let mut unsettled = false;
+    // The revision-zero checkpoint, when the project has one besides the one
+    // just used, is where cancellations are recorded. It is never removed.
+    if index > 0 && rows[0] == 0 {
+        match load_checkpoint(connection, 0) {
+            Ok(first) => {
+                if rows.len() > 2 || stale {
+                    // An older build was here: it wrote a checkpoint for
+                    // every 500 saves whether or not replaying them was
+                    // cheaper, and for a log of strokes it is. Find out by
+                    // replaying the whole log from revision zero, up to the
+                    // cost at which a checkpoint pays.
+                    let limit = CHECKPOINT_MIN_MICROS.max(log.load_micros());
+                    match replay_from(connection, first.clone(), 0, Some(limit)) {
+                        // Use it only if it is the history the checkpoint
+                        // holds, journal and all.
+                        Ok(Replayed::Done(mut whole, count, whole_cost))
+                            if whole.same_history(&host) =>
+                        {
+                            carry_cancellations(&mut whole, &host)?;
+                            (host, replayed, cost) = (*whole, count, whole_cost);
+                            keep = [0, 0];
+                            loaded_conflicts = 0;
+                        }
+                        // Replaying everything costs more than loading the
+                        // later checkpoint, or this engine does not decide
+                        // the early history as it was decided, or the log
+                        // was not written on top of this checkpoint: the
+                        // later checkpoint stays in use.
+                        Ok(_) => {}
+                        // The database could not be read. That says nothing
+                        // about the checkpoints; decide another time.
+                        Err(_) => unsettled = true,
+                    }
+                }
+                carry_cancellations(&mut host, &first)?;
+                recorded = cancelled(&first);
+                keep[0] = 0;
+            }
+            Err(_) => skipped += 1,
+        }
     }
-    let device: String =
-        connection.query_row("SELECT value FROM meta WHERE key='host_device'", [], |r| {
-            r.get(0)
-        })?;
-    let project_id: String =
-        connection.query_row("SELECT value FROM meta WHERE key='project_id'", [], |r| {
-            r.get(0)
-        })?;
-    if device != host.host_device().as_str() || project_id != host.project().id.as_str() {
-        return Err(StoreError::Corrupt("project identity"));
+    let copies = read_cancellations(connection)?;
+    for (device, gesture) in &copies {
+        if !host.gesture_closed(device, gesture) {
+            host.cancel_gesture(device.clone(), gesture.clone())?;
+        }
     }
-    verify_prefix(connection, &host, seq)?;
-    let replayed = replay_log(connection, &mut host, seq, true)?;
+    // The host now holds every cancellation stored anywhere.
+    let held = cancelled(&host);
     let conflicts = read_conflicts(connection)?;
     if conflicts != host.conflicts() {
-        return Err(StoreError::Corrupt("conflict projection"));
+        // What a checkpoint held has to be in the table as it is. What the
+        // replay of sealed rows decided again differs only if the engine does.
+        let loaded = host.conflicts().get(..loaded_conflicts);
+        return Err(
+            if replayed > 0
+                && !stale
+                && loaded.is_some()
+                && conflicts.get(..loaded_conflicts) == loaded
+            {
+                StoreError::EngineMismatch
+            } else {
+                StoreError::Corrupt("conflict projection")
+            },
+        );
     }
     super::projections::verify_assets(connection, host.project())?;
     super::projections::verify(
@@ -1107,8 +2707,18 @@ pub(crate) fn restore(connection: &Connection) -> Result<Restored, StoreError> {
     validate_pending(connection, host.project())?;
     Ok(Restored {
         host,
-        seq: seq as u64,
-        time,
         replayed,
+        cost,
+        log,
+        seal,
+        upkeep: Upkeep {
+            keep,
+            superseded: !unsettled && rows.iter().any(|seq| !keep.contains(seq)),
+            cancellations: !held.is_subset(&recorded),
+            copies: !held.is_subset(&copies),
+            seal: stale,
+            unsettled,
+        },
+        skipped,
     })
 }

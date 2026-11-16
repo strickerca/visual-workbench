@@ -4,8 +4,7 @@
 //! the pair from checked catalog/receipt owners and recheck their retirement
 //! under the existing caller mutex; this store is not a capture authority.
 //! Portable archive scrubbing/refusal must cover this raw-byte namespace,
-//! including malformed BLOB keys; see the archive portability finding in
-//! vw-ffi/src/verification/INTEGRATION.md. GLOB's BLOB matching is build-dependent.
+//! including malformed BLOB keys. GLOB's BLOB matching is build-dependent.
 use crate::{ProjectStore, StoreError, migrations};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde::{

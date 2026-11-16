@@ -102,12 +102,12 @@ late OS callbacks remain the platform adapter's responsibility.
 
 ## Dependency provenance (checked 2026-10-03)
 
-Only new direct pin: `zstd =0.13.3`, default features disabled. The upstream
-[tagged Cargo manifest](https://raw.githubusercontent.com/gyscos/zstd-rs/v0.13.3/Cargo.toml)
+Only new direct pin: `zstd =0.13.5`, default features disabled. The upstream
+[tagged Cargo manifest](https://raw.githubusercontent.com/gyscos/zstd-rs/v0.13.5/Cargo.toml)
 declares MIT. The same tag's
-[zstd-safe manifest](https://raw.githubusercontent.com/gyscos/zstd-rs/v0.13.3/zstd-safe/Cargo.toml)
+[zstd-safe manifest](https://raw.githubusercontent.com/gyscos/zstd-rs/v0.13.5/zstd-safe/Cargo.toml)
 declares 7.2.2, MIT OR Apache-2.0; its
-[zstd-sys manifest](https://raw.githubusercontent.com/gyscos/zstd-rs/v0.13.3/zstd-safe/zstd-sys/Cargo.toml)
+[zstd-sys manifest](https://raw.githubusercontent.com/gyscos/zstd-rs/v0.13.5/zstd-safe/zstd-sys/Cargo.toml)
 declares 2.0.14+zstd.1.5.7, MIT/Apache-2.0 wrapper and explicitly includes native
 `zstd/LICENSE` and `zstd/COPYING`. The native codec offers a BSD option in
 [Zstandard v1.5.7 LICENSE](https://raw.githubusercontent.com/facebook/zstd/v1.5.7/LICENSE);
@@ -121,7 +121,7 @@ multithread, external system library or experimental codec feature is selected.
 The root must run the central native/transitive license and Android packaging gate.
 
 The bounded decoder uses the documented
-[single_frame/window_log_max APIs](https://docs.rs/zstd/0.13.3/zstd/stream/read/struct.Decoder.html).
+[single_frame/window_log_max APIs](https://docs.rs/zstd/0.13.5/zstd/stream/read/struct.Decoder.html).
 All other direct dependency versions already match project pins. No dependency
 was fetched, and no build, test, device or real-capture operation was performed
 during source implementation. Written regressions require central execution.

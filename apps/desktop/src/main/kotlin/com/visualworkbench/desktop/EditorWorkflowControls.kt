@@ -6,7 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.visualworkbench.shared.*
-import com.visualworkbench.desktop.offline.OfflineReviewPanel
+import com.visualworkbench.ui.*
 
 @Composable internal fun EditorWorkflowControls(controller:EditorController,editor:EditorState){
     val owner=controller.workflows
@@ -15,7 +15,7 @@ import com.visualworkbench.desktop.offline.OfflineReviewPanel
     DocumentNavigatorPanel(owner.navigator,{owner.activate(EditorWorkflowPanel.Documents,it)},owner::choose,owner::cancelSwitch,Modifier.fillMaxWidth())
     LocalViewsPanel(owner.views,{owner.activate(EditorWorkflowPanel.SavedViews,it)},owner::saveView,owner::restoreView,Modifier.fillMaxWidth())
     LayersPanel(owner.controls,controller::workflowId,editor.selected,{owner.activate(EditorWorkflowPanel.Layers,it)},Modifier.fillMaxWidth())
-    ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)})
+    ToneControlsPanel(owner.tones,{owner.activate(EditorWorkflowPanel.Tones,it)},{TonePreviewTile(it)})
     if(editor.document?.page==null&&editor.document?.let(::giantDisplayRequired)==false)
         ImageFramesPanel(controller.frames,controller::activateFrames,Modifier.fillMaxWidth())
     OutlinedButton({owner.activate(EditorWorkflowPanel.OfflineReview,true)},Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=editor.document!=null){Text("Offline conflicts")}

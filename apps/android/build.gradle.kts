@@ -12,6 +12,10 @@ val remoteIntegrationValue=providers.gradleProperty("vwRemoteIntegration").orNul
 check(remoteIntegrationValue==null||remoteIntegrationValue=="true")
 val remoteIntegration=remoteIntegrationValue=="true"
 check(!remoteIntegration||vwAndroidHil) { "Real remote integration requires the isolated HIL application" }
+// The product is arm64 only. Emulator tests on an x86_64 build machine opt in
+// with -PvwEmulatorAbi=x86_64; that package is for the emulator, never a phone.
+val vwEmulatorAbi = providers.gradleProperty("vwEmulatorAbi").orNull
+check(vwEmulatorAbi == null || vwEmulatorAbi == "x86_64") { "vwEmulatorAbi must be absent or exactly x86_64" }
 if(remoteIntegration)layout.buildDirectory.set(layout.projectDirectory.dir("build-remote-integration"))
 android {
     namespace = "com.visualworkbench.android"
@@ -27,7 +31,7 @@ android {
         versionCode = 1
         versionName = "0.0.1-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        ndk { abiFilters += "arm64-v8a" }
+        ndk { abiFilters += vwEmulatorAbi ?: "arm64-v8a" }
     }
     buildFeatures { compose = true }
     buildTypes {
@@ -41,6 +45,9 @@ android {
         jniLibs.keepDebugSymbols += "**/libvw_core.so"
     }
     sourceSets.getByName("main").assets.srcDir(rootProject.file("../third_party/notices"))
+    // Screens that are the same on the phone and the PC exist once, in
+    // apps/shared-ui, and are compiled into each app with that app's Compose.
+    sourceSets.getByName("main").kotlin.directories.add(rootProject.file("shared-ui/src/main/kotlin").path)
     if(remoteIntegration) {
         // This opt-in source graph has its own real integration census. The
         // ordinary166-case app HIL source set and artifacts stay unchanged.

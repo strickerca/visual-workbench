@@ -23,7 +23,7 @@ internal class NativeDesktopHandoff(private val host: HostService) : DesktopHand
     private val producers = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val slots = Semaphore(2)
     private suspend fun <T> call(release: (T) -> Unit = {}, invoke: suspend (HostOperation) -> T): T {
-        if (!slots.tryAcquire()) throw HandoffFailure("The Windows handoff queue is busy. Retry when current work finishes.")
+        if (!slots.tryAcquire()) throw HandoffFailure("Another copy or drag is still being prepared. Try again when it has finished.")
         try {
             val operation = HostOperation()
             val owned = AtomicReference<T?>(null)
@@ -88,10 +88,10 @@ private fun hostMessage(error: HostException): String = when (error) {
     is HostException.ClipboardUnavailable -> "The clipboard is busy. Its contents were preserved; retry in a moment."
     is HostException.ClipboardPublicationFailed -> "Windows could not publish every requested format. The clipboard may contain a partial copy; retry explicitly."
     is HostException.InvalidPng, is HostException.InvalidDib, is HostException.UnsupportedDib -> "The selected clipboard image is malformed or uses an unsupported layout. No fallback image was substituted."
-    is HostException.ExportBindingMismatch -> "The PNG does not match its completed source/revision receipt. Prepare it again."
+    is HostException.ExportBindingMismatch -> "The PNG does not match the image version it was prepared from. Prepare it again."
     is HostException.HandoffStorage -> "The temporary drag folder could not be used safely. Existing files were preserved."
-    is HostException.Busy -> "The Windows handoff queue or temporary-file budget is full. Retry after current work finishes."
-    is HostException.Cancelled -> "Windows handoff cancelled before publication."
-    is HostException.Timeout -> "Windows handoff timed out before publication."
-    else -> "The Windows handoff service is unavailable. No successful handoff is claimed."
+    is HostException.Busy -> "Too many copies or drags are waiting, or their temporary files take too much space. Try again when current work has finished."
+    is HostException.Cancelled -> "The copy or drag was cancelled before anything was handed to Windows."
+    is HostException.Timeout -> "The copy or drag took too long and was stopped before anything was handed to Windows."
+    else -> "Copy and drag are unavailable right now. Nothing was handed to Windows."
 }

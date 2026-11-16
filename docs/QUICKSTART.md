@@ -4,8 +4,8 @@ Before replacing or removing a build, follow [Back up, update, recover and
 remove](UNINSTALL_RECOVERY.md). A rendered image export is not an editable
 project backup.
 
-This guide describes the current development app. Check `docs/evidence/` for
-the tested build and outstanding checks. Current isolated app tests also run on
+This guide describes the current development app. The README status table and
+the plan list what is verified and what is still open. Isolated app tests run on
 the S23 Ultra; neither automated phone suite establishes physical S Pen
 performance or daily-use acceptance.
 
@@ -43,7 +43,7 @@ performance or daily-use acceptance.
    or Export on the phone. Choose Marked or Clean, the area, and PNG/JPEG/WebP.
    Review the revision and dimensions, then **Save file…**. For Claude Code,
    attach the saved image in your own terminal and review it before sending.
-   Windows also offers **Copy PNG + DIBV5** and **Prepare file drag**; after
+   Windows also offers **Copy PNG + bitmap** and **Prepare file drag**; after
    preparing a drag, use **Drag prepared PNG** on the transfer shelf. These
    actions transfer an image only when you choose them. Receiving applications
    can handle clipboard and file attachments differently.

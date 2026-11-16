@@ -24,7 +24,7 @@ documents `claude/channel`, stdio notifications, and the owner development
 allowlist flag. A completed notification write does not establish agent receipt.
 
 Native dependencies reuse existing repository pins: serde 1.0.229, serde_json
-1.0.151, getrandom 0.4.3, zeroize 1.9.0, fs2 0.4.3, windows-sys 0.61.2 and test
+1.0.151, getrandom 0.4.3, zeroize 1.9.0, windows-sys 0.61.2 and test
 tempfile 3.27.0. The only local path dependency is exact vw-package 0.1.0.
 Kotlin uses the existing coroutines/JDK/JUnit runtime, with no new Gradle library.
 

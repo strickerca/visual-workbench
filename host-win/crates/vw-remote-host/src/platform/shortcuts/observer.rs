@@ -607,6 +607,8 @@ impl<'a> Observer<'a> {
         let mut result = Vec::new();
         for index in 0..2 {
             // Index enumerates every candidate; it never selects a semantic role.
+            // SAFETY: found is the owned array returned by FindAll above and index
+            // is below its Length, verified to be exactly 2.
             let element = self.budget.call("Krita numeric witness", || unsafe {
                 found.GetElement(index)
             })?;

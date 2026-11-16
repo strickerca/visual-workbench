@@ -55,21 +55,97 @@ internal class PairingController(
     var scanner by mutableStateOf(false)
     var problem by mutableStateOf<String?>(null); private set
 
+    // Pair once, then no typing. What is remembered is app-level, beside the
+    // peer names: never in a project, a log or a report.
+    private val automaticPairing by lazy {
+        AutomaticPairing(AutomaticRouteKeeper(
+            KnownRouteStore(context.noBackupFilesDir.canonicalFile.toPath().resolve("known-routes.properties")),
+            AndroidRouteDiscovery(context.applicationContext),
+            { _ -> { address -> isAndroidUsbTetherInterface(address.interfaceName) } },
+            // Wi-Fi and the phone's own USB tethering only; never mobile data.
+            { _ -> { address -> isAndroidWifiInterface(address.interfaceName) || isAndroidUsbTetherInterface(address.interfaceName) } }))
+    }
+    private var realService: WorkbenchSessions? = null
+    private var automaticOperation: Job? = null
+    /** The owner's setting. While on and no address is typed, connecting needs no address. */
+    var automatic by mutableStateOf(AUTOMATIC_BY_DEFAULT); private set
+    /** It is staying out of the way after the owner ended the connection. */
+    var automaticQuiet by mutableStateOf(false); private set
+
+    /** The editor's service. Its connect, host and receive calls take automatic
+     * routes when they are given the endpoints from [endpoint] in automatic mode. */
     suspend fun service(): WorkbenchSessions = serviceLock.withLock {
         check(!closed)
         service?.let { return@withLock it }
         val created = factory(context.applicationContext, installationId())
         if (closed) { withContext(NonCancellable) { created.close() }; throw CancellationException() }
-        service = created
-        created
+        realService = created
+        automaticPairing.routed(created).also { service = it }
     }
+    private suspend fun nativeService(): WorkbenchSessions { service(); return checkNotNull(realService) }
+    private fun manualAddresses(): Boolean = tetherAddress.isNotBlank() || wifiAddress.isNotBlank() || adbAddress.isNotBlank()
+
+    /** One step of automatic connection, called while the app is in the
+     * foreground. True when the caller should now connect the open project to
+     * [selectedPeer]. It never interrupts pairing or the owner's own actions. */
+    suspend fun automaticStep(project: () -> String?, status: () -> SessionStatus?, busy: () -> Boolean): Boolean {
+        if (closed) return false
+        // Switched off: nothing is opened, announced, looked for, dialled or saved.
+        if (!automaticPairing.load()) { automatic = false; automaticQuiet = false; return false }
+        automatic = true
+        // Nothing to connect and the protected pairing store not yet opened:
+        // leave it closed until a project or the Connect screen needs it.
+        if (realService == null && project() == null) return false
+        val native = nativeService()
+        if (!peersLoaded) {
+            val paired = native.pairedDevices()
+            if (!peersLoaded && !closed) { peersChanged(paired); peersLoaded = true }
+        }
+        val target = automaticPairing.step(native, { peers }) { AutomaticView(project(), status(), busy() || working, manualAddresses()) }
+        automatic = automaticPairing.enabled; automaticQuiet = automaticPairing.quiet
+        if (target == null || closed) return false
+        // The same choice the owner would make; the editor still checks that
+        // the project belongs to this computer.
+        if (peers.none { it.deviceId == target && it.revokedAtMs == null }) return false
+        selectedPeer = target
+        return true
+    }
+    fun chooseAutomatic(value: Boolean) {
+        if (closed || automaticOperation?.isActive == true) return
+        // The choice counts at once; saving it follows.
+        automatic = value
+        automaticOperation = scope.launch {
+            try { automaticPairing.setEnabled(value) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { /* It holds for this run even if it could not be saved. */ }
+            finally { automatic = automaticPairing.enabled; automaticQuiet = automaticPairing.quiet }
+        }
+    }
+    /** The connection automatic connection started is still only waiting or looking. */
+    fun automaticWaiting(status: SessionStatus?): Boolean = automaticPairing.waiting(status)
+    /** Automatic connection is off, yet a connection whose start was under
+     * way when it was switched off is waiting or looking: end it. */
+    fun automaticShouldStop(status: SessionStatus?): Boolean = automaticPairing.shouldStop(status)
+    /** The list of paired computers was read or changed. What was saved for a
+     * computer that is no longer on it goes, with automatic connection on or off. */
+    private suspend fun peersChanged(paired: List<PairedDevice>) {
+        updatePeers(paired)
+        try { automaticPairing.prune(paired) }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { /* Tried again the next time the list is read. */ }
+    }
+    fun automaticProjectClosed() { automaticPairing.projectClosed(); automaticQuiet = false }
+    /** The editor was busy and did not start the connection [automaticStep] asked for. */
+    fun automaticMissed() = automaticPairing.missed()
+    /** The app left the foreground: stop announcing and looking. */
+    suspend fun automaticRest() { if (!closed) automaticPairing.rest() }
     fun enter() { launch {
         val token = secretEpoch
         val native = service()
         val paired = native.pairedDevices()
         currentCoroutineContext().ensureActive()
         if (token != secretEpoch || closed) return@launch
-        updatePeers(paired); peersLoaded = true
+        peersChanged(paired); peersLoaded = true
         loadNames(token)
         // Optional address enumeration cannot turn loaded trust into unknown-empty.
         val device = native.localDevice()
@@ -130,6 +206,8 @@ internal class PairingController(
     private fun updatePeers(paired: List<PairedDevice>) {
         peers = paired
         if (currentHint() == null) connectionHint = null
+        // With exactly one paired computer there is nothing to choose.
+        if (automatic && selectedPeer == null) activePeers().singleOrNull()?.let { selectedPeer = it.deviceId }
     }
     private fun currentHint(): PairingConnectionHint? {
         val hint = connectionHint ?: return null
@@ -148,6 +226,9 @@ internal class PairingController(
             .filter { it.second.isNotBlank() }.map { it.first }
     fun endpoint(): List<SessionEndpoint> {
         val configured = listOf(SessionCarrier.QuicTether to tetherAddress, SessionCarrier.QuicWifi to wifiAddress, SessionCarrier.TcpAdb to adbAddress).filter { it.second.isNotBlank() }
+        // No typed address and automatic connection on: the routed service
+        // finds the computer itself. A typed address always means manual.
+        if (configured.isEmpty() && automatic) return automaticPairing.endpoints
         require(configured.isNotEmpty() && configured.all { validEndpoint(it.second) }) { "Enter a numeric session address and port for each configured route." }
         return configured.map { SessionEndpoint(it.first, it.second.trim()) }
     }
@@ -211,15 +292,26 @@ internal class PairingController(
     private suspend fun paired(peer: String, selectedEndpoint: String, expectedFingerprint: String, expectedPeer: String? = null) {
         val paired = service().pairedDevices()
         currentCoroutineContext().ensureActive()
-        updatePeers(paired); peersLoaded = true; selectedPeer = peer
+        peersChanged(paired); peersLoaded = true; selectedPeer = peer
         val authenticated = paired.singleOrNull { it.deviceId == peer && it.revokedAtMs == null && it.fingerprint == expectedFingerprint }
         connectionHint = authenticated?.takeIf { (expectedPeer == null || it.deviceId == expectedPeer) && validEndpoint(selectedEndpoint) }
             ?.let { PairingConnectionHint(it.deviceId, it.fingerprint, selectedEndpoint) }
+        // Pairing reached the computer's pairing listener at this address, and
+        // its project listener uses the same one. That makes the address a
+        // good place to try, no more: it is kept in memory as a hint, never
+        // saved and never trusted, until the computer has authenticated there.
+        val hinted = connectionHint
+        if (authenticated != null && hinted != null) {
+            try { automaticPairing.learned(authenticated, hinted.endpoint) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { /* Discovery can still find the computer. */ }
+        }
         loadNames(secretEpoch); pairingCompletion++
-        notify("Computer paired. On the PC, start its project connection; then use the pairing connection here or enter its session address.")
+        notify(if (automatic && !manualAddresses()) "Computer paired. Open a project on the computer, then tap Receive computer project here. No address is needed."
+            else "Computer paired. On the PC, start its project connection; then use the pairing connection here or enter its session address.")
     }
     fun revoke(peer: String, before: suspend () -> Unit) = launch {
-        before(); service().revoke(peer); updatePeers(service().pairedDevices())
+        before(); service().revoke(peer); peersChanged(service().pairedDevices())
         if (connectionHint?.peerDeviceId == peer) connectionHint = null
         if (selectedPeer == peer) selectedPeer = null
     }
@@ -249,8 +341,9 @@ internal class PairingController(
         if (pending != null) withContext(NonCancellable) { pending.close() }
     }
     suspend fun close() {
-        closed = true; leave(); operation?.join(); namingOperation?.join()
-        serviceLock.withLock { service?.close(); service = null }
+        closed = true; leave(); operation?.join(); namingOperation?.join(); automaticOperation?.cancelAndJoin()
+        withContext(NonCancellable) { runCatching { automaticPairing.rest() } }
+        serviceLock.withLock { service?.close(); service = null; realService = null }
     }
 }
 

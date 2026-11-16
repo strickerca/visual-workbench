@@ -46,7 +46,43 @@ internal data class CanvasScene(
     val giantMode:Boolean=false,
     val giantFrame:GiantVisibleFrame<Bitmap>?=null,
     val rotationHandle:ObjectRotationHandle?=null,
+    /** Diagnostics only: input-clock time of the newest real pen sample in the
+     * wet ink of this scene and of that stroke's pen-down; 0 without wet ink. */
+    val wetSampleMs: Long = 0,
+    val wetStartMs: Long = 0,
+    /** Developer switch, fixed when the scene is published: an ink frame may
+     * keep the picture of everything but the wet ink instead of redrawing it. */
+    val keepDryPicture: Boolean = false,
 )
+
+/** The path commands of a stroke's contours, in f32 coordinates around an f64
+ * origin: per contour one move, its lines and a close. Every stroke path is
+ * built with this arithmetic, from arrays and from packed contours alike. */
+internal interface ContourCommands : ContourVisitor {
+    val originX: Double
+    val originY: Double
+    /** Whether the current contour has had its first vertex. */
+    var started: Boolean
+    fun moveTo(x: Float, y: Float)
+    fun lineTo(x: Float, y: Float)
+    fun close()
+    override fun begin(vertexCount: Int) { require(vertexCount >= 3); started = false }
+    override fun vertex(x: Long, y: Long) {
+        val px = (x.toDouble() / 256.0 - originX).toFloat()
+        val py = (y.toDouble() / 256.0 - originY).toFloat()
+        if (started) lineTo(px, py) else { moveTo(px, py); started = true }
+    }
+    override fun end() = close()
+}
+
+/** A stroke path that takes its own contours, so building it allocates
+ * nothing besides the path. */
+internal class ContourPath(override val originX: Double, override val originY: Double) : Path(), ContourCommands {
+    override var started: Boolean = false
+    override fun moveTo(x: Float, y: Float) = super.moveTo(x, y)
+    override fun lineTo(x: Float, y: Float) = super.lineTo(x, y)
+    override fun close() = super.close()
+}
 
 internal object EditorDrawing {
     fun argb(rgba: UInt): Int = ((rgba shr 8) or (rgba shl 24)).toInt()
@@ -62,22 +98,12 @@ internal object EditorDrawing {
         setValues(floatArrayOf(t.a.toFloat(), t.c.toFloat(), t.e.toFloat(), t.b.toFloat(), t.d.toFloat(), t.f.toFloat(), 0f, 0f, 1f))
     }
 
+    /** Reads [contours] in whichever form it is held, without unpacking or
+     * boxing it; the path itself is the only allocation. */
     fun contourPath(contours: Contours, origin: Point = Point(0.0, 0.0)): Path {
-        require(contours.x.size == contours.y.size && contours.x.size <= 1_000_000)
-        val path = Path().apply { fillType = Path.FillType.WINDING }
-        var first = 0
-        for (endValue in contours.ends) {
-            require(endValue <= contours.x.size.toUInt())
-            val end = endValue.toInt()
-            require(end >= first + 3)
-            for (i in first until end) {
-                val x = (contours.x[i].toDouble() / 256.0 - origin.x).toFloat()
-                val y = (contours.y[i].toDouble() / 256.0 - origin.y).toFloat()
-                if (i == first) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            path.close(); first = end
-        }
-        require(first == contours.x.size)
+        require(contours.vertexCount <= 1_000_000)
+        val path = ContourPath(origin.x, origin.y).apply { fillType = Path.FillType.WINDING }
+        contours.visit(path)
         return path
     }
 
@@ -92,21 +118,23 @@ internal object EditorDrawing {
         } }
     }
 
+    /** The local origin [objectPath] builds [item]'s path around. */
+    fun objectOrigin(item: RenderItem): Point = when (val shape = item.shape) {
+        is Shape.Result -> Point(0.0,0.0)
+        is Shape.Text -> shape.anchor
+        is Shape.Stroke -> Point(item.contours.firstX.toDouble() / 256, item.contours.firstY.toDouble() / 256)
+        is Shape.Line -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
+        is Shape.Arrow -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
+        is Shape.Polygon -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
+        is Shape.Rectangle -> Point(shape.rectangle.x, shape.rectangle.y)
+        is Shape.Ellipse -> Point(shape.rectangle.x, shape.rectangle.y)
+        is Shape.Guide -> Point(shape.rectangle.x, shape.rectangle.y)
+        else -> throw UnsupportedOperationException("This document contains an object the Android editor cannot display yet. Its original and edits are preserved.")
+    }
+
     fun objectPath(item: RenderItem): DrawObject {
         val shape = item.shape
-        val origin = when (shape) {
-            is Shape.Result -> Point(0.0,0.0)
-            is Shape.Text -> shape.anchor
-            is Shape.Stroke -> Point(item.contours.x.firstOrNull()?.toDouble()?.div(256) ?: 0.0,
-                item.contours.y.firstOrNull()?.toDouble()?.div(256) ?: 0.0)
-            is Shape.Line -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
-            is Shape.Arrow -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
-            is Shape.Polygon -> shape.points.firstOrNull() ?: Point(0.0, 0.0)
-            is Shape.Rectangle -> Point(shape.rectangle.x, shape.rectangle.y)
-            is Shape.Ellipse -> Point(shape.rectangle.x, shape.rectangle.y)
-            is Shape.Guide -> Point(shape.rectangle.x, shape.rectangle.y)
-            else -> throw UnsupportedOperationException("This document contains an object the Android editor cannot display yet. Its original and edits are preserved.")
-        }
+        val origin = objectOrigin(item)
         fun poly(points: List<Point>, closed: Boolean = false) = Path().apply {
             points.forEachIndexed { index, p ->
                 if (index == 0) moveTo((p.x - origin.x).toFloat(), (p.y - origin.y).toFloat())
@@ -203,6 +231,36 @@ internal object EditorDrawing {
     fun surroundArgb(dark: Boolean): Int = if (dark) 0xff17252d.toInt() else 0xffdce5e3.toInt()
     /** Full opaque front frame makes multiply wet ink correct across SurfaceControls. */
     fun draw(canvas: Canvas, scene: CanvasScene) {
+        if (drawDocument(canvas, scene, scene.provisional, null)) drawOverlays(canvas, scene)
+    }
+
+    /** As [draw], leaving out saved objects that cannot touch [visible] (a
+     * document-space rectangle). Used for the magnifier panes of an ink frame,
+     * which show a small part of the document. */
+    fun drawVisible(canvas: Canvas, scene: CanvasScene, visible: Rect) {
+        if (drawDocument(canvas, scene, scene.provisional, visible)) drawOverlays(canvas, scene)
+    }
+
+    /** Everything except the wet ink and the overlays: the picture an ink frame
+     * keeps and reuses while only the stroke in progress changes. */
+    fun drawDry(canvas: Canvas, scene: CanvasScene) { drawDocument(canvas, scene, emptyList(), null) }
+
+    /** The wet ink alone, clipped to the page like the document, for a frame
+     * whose kept picture already holds everything beneath it. Only valid when
+     * [wetInkOnTop] holds for the scene. */
+    fun drawWetOnTop(canvas: Canvas, scene: CanvasScene) {
+        val clipSave = canvas.save()
+        val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
+        page.transform(matrix(scene.matrix)); canvas.clipPath(page)
+        scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+        canvas.restoreToCount(clipSave)
+    }
+
+    /** Surround, page, source pixels and every object layer. False: results are
+     * not ready and nothing more may be drawn over the page. With [visible],
+     * saved objects whose bounds lie wholly outside it are skipped; they would
+     * be clipped away entirely, so the pixels are the same. */
+    private fun drawDocument(canvas: Canvas, scene: CanvasScene, provisional: List<DrawObject>, visible: Rect?): Boolean {
         canvas.drawColor(surroundArgb(scene.dark))
         val pageSave = canvas.save()
         canvas.concat(matrix(scene.matrix))
@@ -214,7 +272,7 @@ internal object EditorDrawing {
         val clipSave = canvas.save()
         val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
         page.transform(matrix(scene.matrix)); canvas.clipPath(page)
-        if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return}
+        if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return false}
         val documentLayer=canvas.saveLayer(null,null)
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
@@ -226,7 +284,8 @@ internal object EditorDrawing {
             canvas.drawRect(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat(),maxOf(a.x,b.x).toFloat(),maxOf(a.y,b.y).toFloat(),paint)
         }
         canvas.restoreToCount(sourceSave)
-        val combined = (scene.objects + scene.provisional).filter { it.item.objectId !in scene.hidden }
+        val saved = if (visible == null) scene.objects else scene.objects.filter { mayTouch(scene, it, visible) }
+        val combined = (saved + provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
         val grouped = combined.groupBy { it.item.layerId }
         for (layerId in orderedLayers) {
@@ -246,6 +305,21 @@ internal object EditorDrawing {
         }
         canvas.restoreToCount(documentLayer)
         canvas.restoreToCount(clipSave)
+        return true
+    }
+
+    /** Whether a saved object could put a pixel inside [visible]. Only objects
+     * whose native bounds are known to contain everything drawn for them are
+     * ever skipped: markers, results, screen-constant outlines and objects
+     * under a preview transform are always drawn. */
+    private fun mayTouch(scene: CanvasScene, obj: DrawObject, visible: Rect): Boolean {
+        val item = obj.item
+        if (obj.marker != null || item.shape is Shape.Result || item.style.screenConstantWidth || item.objectId in scene.transformed) return true
+        return boundsMayTouch(item.bounds, visible, 4.0 / scene.camera.scale)
+    }
+
+    /** Peer viewport outline, rotation handle, selection and hover: drawn after the document. */
+    fun drawOverlays(canvas: Canvas, scene: CanvasScene) {
         if (scene.peerViewport.size == 4) {
             val points = scene.peerViewport.map { map(scene.matrix, it) }
             val outline = Path().apply {

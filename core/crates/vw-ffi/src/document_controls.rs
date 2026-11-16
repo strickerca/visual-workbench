@@ -16,8 +16,8 @@ const MAX_GROUPS: usize = 256;
 const MAX_TARGETS: usize = 256;
 // Covers bounded source DTO + staging + generated/common DTO copies: <=384
 // 4096-byte titles with eight representations, <=4096 1KiB object row envelopes,
-// group/ID collections and command construction. Canonical/new-txn clones are
-// separately charged by the reviewed workflow meter before hashing/validation.
+// group/ID collections and command construction. Controls read the project in
+// place; what deciding a planned transaction touches is admitted with it.
 const CONTROL_WORK: u64 = 32 * 1024 * 1024;
 
 fn bounded_id(value: &str) -> WorkflowResult<Id> {
@@ -48,7 +48,7 @@ impl ProjectSession {
             .call(move |state| {
                 Ok((|| {
                     check_live(&closed, &cancellation)?;
-                    admit(state, memory_budget_bytes, false, CONTROL_WORK)?;
+                    admit_borrowed(memory_budget_bytes, CONTROL_WORK)?;
                     snapshot::snapshot(state, &document, &cancellation)
                 })())
             })
@@ -73,7 +73,7 @@ impl ProjectSession {
             .call(move |state| {
                 Ok((|| {
                     check_live(&owner.closed, &cancellation)?;
-                    admit(state, memory_budget_bytes, true, CONTROL_WORK)?;
+                    admit_borrowed(memory_budget_bytes, CONTROL_WORK)?;
                     check_binding(state, &binding)?;
                     check_metadata(state, &metadata)?;
                     let document = bounded_id(&binding.document_id)?;
@@ -81,14 +81,11 @@ impl ProjectSession {
                     let (transaction, next) =
                         plan::transaction(state, &document, &metadata, command, &cancellation)?;
                     admit_transaction(state, &transaction, memory_budget_bytes, CONTROL_WORK)?;
-                    if let Some(replica) = &state.replica {
-                        let mut candidate = replica.clone();
-                        candidate
-                            .queue(transaction.clone())
-                            .map_err(plan::operation_error)?;
+                    if let Some(replica) = &mut state.replica {
+                        replica.check(&transaction).map_err(plan::operation_error)?;
                     } else {
                         state
-                            .store()?
+                            .store_mut()?
                             .validate_transaction(
                                 &transaction,
                                 &vw_model::DeviceId::try_from(metadata.device_id.clone())?,

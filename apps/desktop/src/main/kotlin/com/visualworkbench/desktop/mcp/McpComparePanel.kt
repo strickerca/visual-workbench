@@ -78,7 +78,7 @@ internal fun inboxTile(value:McpInboxPixels):InboxTile {
         issue?.let{Text(it,color=MaterialTheme.colors.error)}
         val density=LocalDensity.current.density
         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)){
-            before?.let{tile->Column{Text("Before | immutable package image");Image(tile.bitmap,"Before",Modifier.size((tile.bitmap.width/density).dp,(tile.bitmap.height/density).dp),contentScale=ContentScale.None)}}
+            before?.let{tile->Column{Text("Before | the image as published (it cannot change)");Image(tile.bitmap,"Before",Modifier.size((tile.bitmap.width/density).dp,(tile.bitmap.height/density).dp),contentScale=ContentScale.None)}}
             after?.let{tile->Column{Text(if(verification)"After | checked window recapture"else"After | untrusted agent PNG");Image(tile.bitmap,"After",Modifier.size((tile.bitmap.width/density).dp,(tile.bitmap.height/density).dp),contentScale=ContentScale.None)}}
         }
         Text("Full-resolution region up to 512 x 512 pixels. Different image sizes remain explicit; no stretch or hidden resampling.",style=MaterialTheme.typography.caption)

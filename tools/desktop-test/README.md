@@ -160,8 +160,7 @@ status and still refuses overflow, encoding and cleanup failures. Normal
 runner behavior is unchanged. The first real package built and bound correctly,
 then startup refused a virtualized native-cache path. That failure receipt is
 retained. The repaired app image then drew an actual frame with process/window
-PMv2 and completed ordinary shutdown; the startup receipt and its limits are in
-`docs/evidence/T1.09.md`. Real directory-rename tests also verified the access
+PMv2 and completed ordinary shutdown. Real directory-rename tests also verified the access
 flags required to make Windows sharing restrictions effective.
 
 ## Primary packaging provenance

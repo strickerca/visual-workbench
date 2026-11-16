@@ -22,6 +22,8 @@ unsafe extern "system" fn visit(hwnd: HWND, param: LPARAM) -> BOOL {
     if census.seen > 1024 || census.values.len() >= 256 {
         return BOOL(0);
     }
+    // SAFETY: read-only state queries that take the enumerated HWND by value;
+    // a window destroyed since enumeration just reports false.
     if !unsafe { IsWindowVisible(hwnd) }.as_bool() || unsafe { IsIconic(hwnd) }.as_bool() {
         return BOOL(1);
     }
@@ -34,10 +36,14 @@ unsafe extern "system" fn visit(hwnd: HWND, param: LPARAM) -> BOOL {
         return BOOL(1);
     };
     let mut label = [0u16; 512];
+    // SAFETY: the binding derives the capacity from this live 512-unit slice,
+    // so at most that many units are written; the HWND is passed by value.
     let n = unsafe { GetWindowTextW(hwnd, &mut label) };
     if n <= 0 {
         return BOOL(1);
     }
+    // SAFETY: image_name has no caller obligations (see its Safety section);
+    // any PID value is acceptable and a stale one only yields an error.
     let executable_name = unsafe { image_name(target.process_id) }.unwrap_or_default();
     if crate::platform::unchanged(&target, census.owner).is_err() {
         return BOOL(1);
@@ -51,21 +57,33 @@ unsafe extern "system" fn visit(hwnd: HWND, param: LPARAM) -> BOOL {
     });
     BOOL(1)
 }
+/// # Safety
+/// There is no caller obligation: `pid` is passed by value and any value,
+/// including a stale or reused PID, is memory-safe (a failed lookup returns
+/// `Error::Unavailable`). The function is `unsafe` only by declaration; all
+/// handle and buffer invariants are established and upheld in the body.
 unsafe fn image_name(pid: u32) -> Result<String> {
     struct Process(HANDLE);
     impl Drop for Process {
         fn drop(&mut self) {
+            // SAFETY: closes the handle this wrapper exclusively owns, exactly once;
+            // it only ever holds a successful OpenProcess result.
             unsafe {
                 let _ = CloseHandle(self.0);
             }
         }
     }
+    // SAFETY: OpenProcess takes only by-value arguments; the handle is stored
+    // in the owning wrapper only on success, so it is closed exactly once.
     let owner = Process(
         unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }
             .map_err(|_| Error::Unavailable)?,
     );
     let mut path = vec![0u16; 32768];
     let mut count = path.len() as u32;
+    // SAFETY: owner.0 is the live query handle opened above. path is a live
+    // 32768-unit buffer and count is initialized to exactly that capacity, so
+    // the API cannot write past it; both outlive this synchronous call.
     unsafe {
         QueryFullProcessImageNameW(
             owner.0,

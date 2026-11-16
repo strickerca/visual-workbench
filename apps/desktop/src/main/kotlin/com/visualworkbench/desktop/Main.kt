@@ -29,6 +29,7 @@ import androidx.compose.ui.window.*
 import com.visualworkbench.bindings.host.*
 import com.visualworkbench.shared.*
 import com.visualworkbench.desktop.mcp.*
+import com.visualworkbench.ui.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.collect
@@ -79,6 +80,8 @@ fun main(args: Array<String>) {
         nativeRuntime.directory.resolve("vw-capture-helper.exe"),nativeRuntime.packagedHash("vw-capture-helper.exe"))}
     application {
         val scope=rememberCoroutineScope();val sessions=remember{DesktopSessionController(scope,device,labelStore=PeerLabelStore(local.resolve("Visual Workbench/peer-labels.properties")))};val assistance=remember{ConnectionAssistanceController(scope,NativeConnectionAssistance())};val controller=remember{EditorController(scope,core,host,location,device,local.resolve("VisualWorkbench/transfer-work")).also{it.useSessionService(sessions);it.useAiDirectory(local.resolve("Visual Workbench"))}};val editor by controller.state.collectAsState()
+        // Pair once, then the phone connects by itself. App-level memory only: never part of a project.
+        val automatic=remember{DesktopAutomaticConnection(scope,sessions,EditorAutomaticPort(controller,sessions),AutomaticRouteKeeper(KnownRouteStore(local.resolve("Visual Workbench/known-routes.properties")),NativeRouteDiscovery(),::chosenTetherAdapter,::chosenAdapters)).also{it.start()}}
         val documentState by controller.documents.state.collectAsState()
         val streamRoot by controller.captureStream.collectAsState()
         var quitting by remember { mutableStateOf(false) }
@@ -241,7 +244,7 @@ fun main(args: Array<String>) {
                     startupMillis = measuredDiagnosticValue(startupMs),
                     heapUsedBytes = measuredDiagnosticValue(memory.totalMemory() - memory.freeMemory()),
                     echoRoundTripMillis = measuredEchoRoundTripMillis(sync?.echoSamples ?: 0u, sync?.echoRttP50Ms),
-                )))
+                ), coreEventsForReport()))
             }, apply = {
                 controller.instructionModal(value != null)
                 dialog = value
@@ -311,6 +314,7 @@ fun main(args: Array<String>) {
                                 withRetiredVerificationAccess(mcpTasks::close,{mcp.close();mcpModal.close()}) {
                                     // Every verification borrow has joined before the
                                     // editor, links and native parents can retire.
+                                    automatic.close()
                                     controller.close();assertRemoteEditRetired();assertAndroidTunnelRetired();assertDesktopStreamsRetired()
                                     assistance.close();sessions.close()
                                     host.shutdown();host.destroy()
@@ -567,7 +571,7 @@ fun main(args: Array<String>) {
                 if(editor.exportOpen&&editor.document!=null&&documentState.descriptor!=null)AlertDialog(onDismissRequest=controller::dismissExport,title={Text("Document export")},text={Column(Modifier.heightIn(max=560.dp).verticalScroll(rememberScrollState())){EditableDocumentControls(controller.documents,::saveDocument)}},confirmButton={TextButton(controller::dismissExport){Text("Close")}})
                 if(editor.exportOpen&&editor.document!=null&&documentState.descriptor==null)ExportDialog(controller,editor,::save)
                 if(editor.pasteOpen)PasteDialog(controller,editor)
-                if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
+                if(dialog==Command.Pairing)SessionDialog(sessions,controller,assistance,automatic,connectionDraft,{change -> connectionDraft=change(connectionDraft)},
                     importFile={pickerReturnsToConnection=true;instructionDialog(Command.Import)},
                     openProject={pickerReturnsToConnection=true;instructionDialog(Command.Open)}){instructionDialog(null)}
                 if(dialog==Command.Diagnostics){
@@ -647,6 +651,7 @@ fun main(args: Array<String>) {
                 }
                 if(editor.document==null)Column(Modifier.align(Alignment.Center).widthIn(max=420.dp).padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(18.dp)){
                     Text("Make the detail clear.",style=MaterialTheme.typography.h4,fontWeight=FontWeight.Medium);Text("Open an image to annotate, refine and export.",color=Color(0xffaebccb));Button(onClick={action(Command.Import)}){Text("Import image  ·  Ctrl+I")};TextButton(onClick={action(Command.Open)}){Text("Open a saved project")}
+                    GettingStartedGuide(onPhone=false)
                 };if(editor.busy||quitting)LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
             }
             Column(Modifier.width(390.dp).fillMaxHeight().background(Color(0xff141e29)).padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){

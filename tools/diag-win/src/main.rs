@@ -1,6 +1,8 @@
+#[cfg_attr(not(windows), allow(dead_code))] // Only the Windows entry point calls these.
 mod json;
 #[cfg(windows)]
 mod platform;
+#[cfg_attr(not(windows), allow(dead_code))] // Only the Windows entry point calls these.
 mod png;
 
 #[cfg(windows)]

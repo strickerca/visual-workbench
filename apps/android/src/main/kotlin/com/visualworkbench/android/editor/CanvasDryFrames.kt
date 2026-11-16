@@ -12,6 +12,10 @@ internal class CanvasDryFrames {
     private var requestDrawn = false
     private var draws = 0
     private var closed = false
+    /** Diagnostics only: draws recorded whose buffer completion has not arrived. */
+    val inFlight: Int get() = draws
+    /** Diagnostics only: an application request is neither drawn nor completed yet. */
+    val requestPending: Boolean get() = requested != null
 
     fun request(): Request? {
         if (closed || requested != null || draws != 0) return null

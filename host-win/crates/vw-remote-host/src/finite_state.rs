@@ -3,6 +3,7 @@ use crate::{Error, Result};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Button {
     Left,
+    #[cfg_attr(not(windows), allow(dead_code))] // Built only by the Windows input parser.
     Right,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

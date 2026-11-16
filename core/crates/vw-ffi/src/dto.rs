@@ -326,6 +326,114 @@ pub struct DocumentSnapshot {
     /// and marked export evaluate these recognized canonical parameters.
     pub has_tone_adjustments: bool,
 }
+/// A stroke the caller still holds from an earlier snapshot of the document.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct KnownStroke {
+    pub object_id: String,
+    /// The 32-byte digest returned with that stroke.
+    pub digest: Vec<u8>,
+    /// The `cost` returned with that stroke.
+    pub cost: u64,
+}
+/// One place in the display list.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct RenderItemChange {
+    pub object_id: String,
+    /// Strokes only: pass it back as `KnownStroke::digest` next time.
+    pub digest: Option<Vec<u8>>,
+    /// What this entry counts toward the size limit of a complete read of the
+    /// document, whether or not the item is sent this time. A kept stroke
+    /// still fills the caller's memory, so the limit is the same one
+    /// `document_snapshot` applies. Pass it back as `KnownStroke::cost`.
+    pub cost: u64,
+    /// Absent when the stroke the caller holds under this digest is still
+    /// exact; its layer fields below may nevertheless have changed.
+    pub item: Option<RenderItem>,
+    pub layer_opacity: f64,
+    pub layer_blend: String,
+    pub locked: bool,
+}
+/// `DocumentSnapshot` with its display list given as changes.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct DocumentSnapshotChanges {
+    pub document_id: String,
+    pub title: String,
+    pub width: u32,
+    pub height: u32,
+    pub bit_depth: u32,
+    pub layers: Vec<LayerInfo>,
+    pub revision: ProjectInfo,
+    pub items: Vec<RenderItemChange>,
+    pub has_tone_adjustments: bool,
+}
+/// `RenderItem` with its stroke outline packed into one byte buffer, for the
+/// complete document reads the apps repeat after every save. It leaves out
+/// the stored object bytes (`RenderItem::object_protobuf`), which no app reads.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct PackedRenderItem {
+    pub object_id: String,
+    pub layer_id: String,
+    pub layer_opacity: f64,
+    pub layer_blend: String,
+    pub bounds: QueryRect,
+    /// Exactly the vertices and contour ends of `RenderItem::stroke_contours`.
+    /// Empty when the item has no contour. Otherwise a sequence of unsigned
+    /// LEB128 numbers (seven bits per byte, lowest group first, the high bit
+    /// set on every byte of a number but its last): the format version 1, the
+    /// contour count, the vertex count, then for each contour its vertex count
+    /// followed by each vertex as two signed numbers dx and dy. A signed number
+    /// n is sent as 2n when n >= 0 and as -2n - 1 otherwise (zigzag). dx and dy
+    /// are the vertex minus the previous vertex of the item (the first minus
+    /// 0, 0) in the same 1/256 document units, in wrapping 64-bit arithmetic,
+    /// so every coordinate comes back as the same 64-bit value.
+    pub contours: Vec<u8>,
+    pub transform: Transform,
+    pub style: ObjectStyle,
+    pub shape: DrawShape,
+    pub locked: bool,
+}
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct PackedRenderList {
+    pub revision: ProjectInfo,
+    pub items: Vec<PackedRenderItem>,
+}
+/// `DocumentSnapshot` with its display items as `PackedRenderItem`.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct PackedDocumentSnapshot {
+    pub document_id: String,
+    pub title: String,
+    pub width: u32,
+    pub height: u32,
+    pub bit_depth: u32,
+    pub layers: Vec<LayerInfo>,
+    pub render: PackedRenderList,
+    pub has_tone_adjustments: bool,
+}
+/// `RenderItemChange` with a `PackedRenderItem`. Its `cost` is what the packed
+/// item counts; pass it back only to `document_snapshot_changes_packed`.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct PackedRenderItemChange {
+    pub object_id: String,
+    pub digest: Option<Vec<u8>>,
+    pub cost: u64,
+    pub item: Option<PackedRenderItem>,
+    pub layer_opacity: f64,
+    pub layer_blend: String,
+    pub locked: bool,
+}
+/// `DocumentSnapshotChanges` with its entries as `PackedRenderItemChange`.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct PackedDocumentSnapshotChanges {
+    pub document_id: String,
+    pub title: String,
+    pub width: u32,
+    pub height: u32,
+    pub bit_depth: u32,
+    pub layers: Vec<LayerInfo>,
+    pub revision: ProjectInfo,
+    pub items: Vec<PackedRenderItemChange>,
+    pub has_tone_adjustments: bool,
+}
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct BackgroundImage {
     pub width: u32,

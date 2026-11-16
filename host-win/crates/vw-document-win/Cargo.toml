@@ -8,17 +8,17 @@ publish.workspace = true
 
 [dependencies]
 vw-document-protocol = { path = "../../../core/crates/vw-document-protocol", version = "=0.1.0" }
-thiserror = "=2.0.21"
-sha2 = "=0.11.0"
-blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
+thiserror.workspace = true
+sha2.workspace = true
+blake3 = { workspace = true, features = ["std", "pure"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 
 [dev-dependencies]
-tempfile = "=3.27.0"
+tempfile.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Pipes", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
 
 [lints]
 workspace = true

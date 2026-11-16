@@ -17,6 +17,6 @@ vw-model = { path = "../vw-model", version = "=0.1.0" }
 vw-ops = { path = "../vw-ops", version = "=0.1.0" }
 vw-proto = { path = "../vw-proto", version = "=0.1.0" }
 vw-geom = { path = "../vw-geom", version = "=0.1.0" }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
-thiserror = "=2.0.21"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+thiserror.workspace = true

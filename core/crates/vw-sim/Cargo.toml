@@ -14,4 +14,7 @@ vw-model = { path = "../vw-model", version = "=0.1.0" }
 vw-ops = { path = "../vw-ops", version = "=0.1.0" }
 vw-proto = { path = "../vw-proto", version = "=0.1.0" }
 vw-net = { path = "../vw-net", version = "=0.1.0", features = ["test-support"] }
-thiserror = "=2.0.21"
+thiserror.workspace = true
+
+[dev-dependencies]
+vw-ops = { path = "../vw-ops", version = "=0.1.0", features = ["cross-check"] }

@@ -26,10 +26,12 @@ import kotlinx.coroutines.*
 
 @Composable
 internal fun SessionDialog(sessions: DesktopSessionController, editor: EditorController, assistance: ConnectionAssistanceController,
+    automatic: DesktopAutomaticConnection,
     draft: ConnectionDraft, changeDraft: ((ConnectionDraft) -> ConnectionDraft) -> Unit, importFile: () -> Unit, openProject: () -> Unit, dismiss: () -> Unit) {
     val connection by sessions.state.collectAsState()
     val document by editor.state.collectAsState()
     val assistanceState by assistance.state.collectAsState()
+    val automaticState by automatic.state.collectAsState()
     var addresses by remember { mutableStateOf<List<LocalSessionAddress>>(emptyList()) }
     var addressError by remember { mutableStateOf<String?>(null) }
     var addressRevision by remember { mutableStateOf(0) }
@@ -119,7 +121,8 @@ internal fun SessionDialog(sessions: DesktopSessionController, editor: EditorCon
                                     refresh = { addressRevision++ }, choose = { address -> changeDraft { it.selectConnection(address) } })
                                 addressError?.let { Text(it, color = MaterialTheme.colors.secondary) }
                                 PairingConnectionDetails(chosenAddress, bind, connectionDetails) { connectionDetails = !connectionDetails }
-                                Button(onClick = { sessions.offer(bind, method == PairingMethod.Code) }, enabled = pairingBlocker == null) {
+                                // Pairing on a connection the owner picked also allows automatic connection on it.
+                                Button(onClick = { sessions.offer(bind, method == PairingMethod.Code); if (chosenAddress != null && bind == pairingEndpoint(chosenAddress)) automatic.rememberAdapter(chosenAddress) }, enabled = pairingBlocker == null) {
                                     Text(if (connection.pairing && connection.display == null && connection.fingerprint == null) "Preparing pairing…" else if (method == PairingMethod.Qr) "Show QR code" else "Show eight-digit code")
                                 }
                                 pairingBlocker?.let { Text(pairingBlockerMessage(it), color = MaterialTheme.colors.secondary, style = MaterialTheme.typography.caption) }
@@ -163,6 +166,18 @@ internal fun SessionDialog(sessions: DesktopSessionController, editor: EditorCon
                         if (activePeers.isNotEmpty()) TextButton(onClick = { requestedNewPhone = false }, enabled = !connection.pairing) { Text("Use a paired phone instead") }
                     }
                     ConnectionScreenPath.PairedProject -> {
+                        Text("Automatic connection", style = MaterialTheme.typography.h6)
+                        Row { Checkbox(automaticState.enabled, automatic::setEnabled); Text("Connect to my paired phone by itself", Modifier.padding(top = 12.dp)) }
+                        Text(automaticSummary(automaticState, document.document != null, activePeers.size, document.sync), style = MaterialTheme.typography.body2)
+                        val automaticAdapters = (automaticState.adapters + listOfNotNull(automaticState.tetherAdapter)).distinct()
+                        if (automaticAdapters.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Listens only on the PC network connections you chose: ${automaticAdapters.joinToString()}." +
+                                (automaticState.tetherAdapter?.let { " USB tethering uses $it, so Remote Paint is ready whenever the phone connects through it." } ?: ""),
+                                Modifier.weight(1f).padding(top = 12.dp), style = MaterialTheme.typography.caption)
+                            TextButton(onClick = automatic::forgetAdapters) { Text("Forget") }
+                        }
+                        if (automaticState.enabled) Text("Nothing below is needed while this works. The same pairing check protects every connection.", style = MaterialTheme.typography.caption)
+                        Divider()
                         Text("Choose a paired phone", style = MaterialTheme.typography.h6)
                         Text(if (activePeers.isEmpty()) "No currently paired phones are available. Choose Pair a new phone to add one." else "Already paired: select the phone by its saved name, then connect the project below. You do not need another QR or code.", style = MaterialTheme.typography.caption)
                         TextButton(onClick = { requestedNewPhone = true }, enabled = !connection.pairing) { Text("Pair a new phone…") }
@@ -217,21 +232,27 @@ internal fun SessionDialog(sessions: DesktopSessionController, editor: EditorCon
                             }
                             if (connection.ready) Text("The connection dialog returns after the picker closes. Your selected connection and phone stay selected while they remain available. Opening a project does not start sharing it.", style = MaterialTheme.typography.caption)
                         }
-                        Text(document.sessionRole?.let { if (it.isHost) "This PC hosts the Workbench project. Use the selected connection for USB project, choose Connect phone to this project, then Receive computer project on the phone." else "Local replica · ${it.pending} pending · ${it.blocked} blocked. Connect to its original host; project ownership stays unchanged." } ?: if (document.document == null) { if (connection.ready) "Open a project or import an image first. Receive from another device is in Other connection options." else "Local pairing startup must be ready before setting up this connection." } else "Project ownership could not be verified yet. Check the current project status below, then retry the role check.", style = MaterialTheme.typography.body2)
+                        Text(document.sessionRole?.let { if (it.isHost) "This PC hosts the Workbench project. Use the selected connection for USB project, choose Connect phone to this project, then Receive computer project on the phone." else "This project is a copy from another device · ${it.pending} edits waiting to send · ${it.blocked} need review. Connect to the device it came from; that device stays the owner." } ?: if (document.document == null) { if (connection.ready) "Open a project or import an image first. Receive from another device is in Other connection options." else "Local pairing startup must be ready before setting up this connection." } else "Project ownership could not be verified yet. Check the current project status below, then retry the role check.", style = MaterialTheme.typography.body2)
                         PcConnectionPicker(addresses, chosenAddress, refreshingAddresses, !connection.pairing,
                             refresh = { addressRevision++ }, choose = { address -> changeDraft { it.selectConnection(address) } })
                         addressError?.let { Text(it, color = MaterialTheme.colors.secondary) }
                         PairingConnectionDetails(chosenAddress, bind, connectionDetails) { connectionDetails = !connectionDetails }
+                        // One explicit choice, remembered: the automatic listener never uses an adapter the owner did not pick.
+                        chosenAddress?.takeIf { !it.loopback && it.interfaceName != null && it.interfaceName !in automaticAdapters }?.let { address ->
+                            OutlinedButton(onClick = { automatic.rememberAdapter(address) }, enabled = automaticState.enabled) { Text("Connect automatically on ${adapterLabel(address, addresses)}") }
+                            Text("Choose this once for the Wi-Fi or USB connection your phone uses. Other networks this PC is on are left alone.", style = MaterialTheme.typography.caption)
+                        }
                         if (document.document != null) Text("USB tethering (recommended for Paint)", style = MaterialTheme.typography.subtitle1)
                         if (document.sessionRole?.isHost == true) {
                             Text(if (local.tether.isBlank()) "Choose Use selected connection to prepare the USB project connection, or enter a listener address in Other connection options." else "USB project connection selected. Choose Connect phone to this project to start sharing it.", style = MaterialTheme.typography.caption)
-                            TextButton(onClick = { changeDraft { it.useSelectedUsb(addresses, refreshingAddresses) } }, enabled = usbBlocker == null) { Text(if (local.tether.isBlank()) "Use selected connection for USB project" else "Replace USB listener with selected connection") }
+                            // The owner's explicit choice of the USB adapter is also what automatic connection uses for USB.
+                            TextButton(onClick = { changeDraft { it.useSelectedUsb(addresses, refreshingAddresses) }; automatic.rememberTetherAdapter(chosenAddress) }, enabled = usbBlocker == null) { Text(if (local.tether.isBlank()) "Use selected connection for USB project" else "Replace USB listener with selected connection") }
                             if (usbBlocker != null && usbBlocker != projectBlocker) Text(projectBlockerMessage(usbBlocker, true), style = MaterialTheme.typography.caption)
                             Button(onClick = { chosenPeer?.let { editor.connectSession(sessions, it.deviceId, local.endpoints(), true, chosenAddress?.interfaceIndex) } }, enabled = projectBlocker == null) { Text("Connect phone to this project") }
                             Text("On the phone, select this computer and use the pairing connection for USB when offered, then Receive computer project. If the same computer-owned project is already open, choose Connect current project. Manual addresses remain in Other connection options. Copying a pairing connection does not start the project listener.", style = MaterialTheme.typography.caption)
                         } else if (document.document != null && document.sessionRole?.isHost == false) {
                             Text(if (remote.tether.isBlank()) "Enter the other device's USB project address in Other connection options." else "Other device USB project address configured; review it in Other connection options.", style = MaterialTheme.typography.caption)
-                            if (document.sessionRole?.isHost == false) Button(onClick = { chosenPeer?.let { editor.connectSession(sessions, it.deviceId, remote.endpoints(), false, chosenAddress?.interfaceIndex) } }, enabled = projectBlocker == null) { Text("Connect replica to host") }
+                            if (document.sessionRole?.isHost == false) Button(onClick = { chosenPeer?.let { editor.connectSession(sessions, it.deviceId, remote.endpoints(), false, chosenAddress?.interfaceIndex) } }, enabled = projectBlocker == null) { Text("Connect to the owning device") }
                             Button(onClick = { chosenPeer?.let { editor.receiveProject(sessions, it.deviceId, remote.endpoints(), expectedProject, chosenAddress?.interfaceIndex) } }, enabled = receiveBlocker == null) { Text("Receive as a new local project") }
                             Text("Receiving saves a complete authenticated copy, with a 2 GiB transfer bound. Existing project folders are preserved.", style = MaterialTheme.typography.caption)
                         }
@@ -341,7 +362,7 @@ private fun projectBlockerMessage(blocker: ProjectConnectionBlocker, hosting: Bo
     ProjectConnectionBlocker.SelectPeer -> "Select a currently paired phone before connecting a project."
     ProjectConnectionBlocker.OpenProject -> "Open or import a Workbench image before hosting this PC's connection."
     ProjectConnectionBlocker.ProjectRole -> "Check the current project status, then choose Retry project role check. Sharing needs verified project ownership."
-    ProjectConnectionBlocker.OriginalHost -> "Select this replica's original paired host. The project's ownership is unchanged."
+    ProjectConnectionBlocker.OriginalHost -> "Select the paired device this project came from. It stays the owner."
     ProjectConnectionBlocker.RefreshingConnections -> "Wait for PC connections to finish refreshing."
     ProjectConnectionBlocker.SelectConnection -> "Choose the PC tether connection above so its default-route safety can be checked."
     ProjectConnectionBlocker.PairingEndpointMismatch -> "The manual pairing address does not match the selected PC connection. Choose the connection again, or enter the USB project listener in Other connection options."

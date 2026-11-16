@@ -200,8 +200,7 @@ are written. `VW_CONTRAST` records ratios for each declared text pair;
   cross-device and physical acceptance remains unverified.
 - The current fonts intentionally refuse missing glyphs; there is no host-font
   fallback. Failed text remains in the text editor for correction.
-- T2.01 integration is specified in [SELECTION_INTEGRATION.md](SELECTION_INTEGRATION.md).
-  Selection tools, mask history/export and stroke-splitting erasure are not yet
+- Selection tools, mask history/export and stroke-splitting erasure are not yet
   exposed as functioning application controls.
 
 ## Dependency changes

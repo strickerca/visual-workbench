@@ -62,11 +62,17 @@ pub struct PairedDevice {
 pub struct SessionService {
     pub(crate) store: Arc<dyn TrustStore>,
     pub(crate) manager: PairingManager,
+    /// Address hints only; pairing and revocation never read this.
+    pub(crate) routes: Arc<super::routing::RouteBook>,
 }
 impl SessionService {
     pub(crate) fn from_store(store: Arc<dyn TrustStore>) -> SessionResult<Arc<Self>> {
         let manager = PairingManager::new(store.clone())?;
-        Ok(Arc::new(Self { store, manager }))
+        Ok(Arc::new(Self {
+            store,
+            manager,
+            routes: Arc::default(),
+        }))
     }
 }
 #[uniffi::export]
@@ -148,6 +154,11 @@ impl SessionService {
     pub async fn revoke_device(&self, device_id: String) -> SessionResult<()> {
         let id = device(device_id)?;
         let manager = self.manager.clone();
-        crate::worker::startup(move || Ok(manager.revoke(&id).map_err(SessionError::from))).await?
+        let revoked = id.clone();
+        crate::worker::startup(move || Ok(manager.revoke(&revoked).map_err(SessionError::from)))
+            .await??;
+        // A revoked device is no longer dialled; its address hints go with it.
+        self.routes.forget(&id);
+        Ok(())
     }
 }

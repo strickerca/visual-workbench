@@ -67,7 +67,56 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject {
+private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchDeferredStrokes, WorkbenchSettling {
+    override suspend fun settle(): Boolean = call { handle.settle() }
+    override fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke? {
+        if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
+        if(options.family=="highlighter")return null
+        // One short native call that never waits for the project worker. The
+        // handle goes straight to the caller, which owns and disposes it.
+        return try { NativeStroke(handle.beginStrokeDeferred(options.native())) }
+            // The project's queue is full: the ordinary begin waits for it.
+            catch(_:CoreException.Backpressure) { null }
+            catch(error:CoreException) { throw mapFailure(error) }
+    }
+    /** The strokes of the snapshot last returned by [documentChanges], each with
+     * the digest the core gave for it. Only an instance still held by the
+     * caller's snapshot is ever named to the core as known. */
+    private class HeldStroke(val item: RenderItem, val digest: ByteArray, val cost: ULong)
+    private class HeldStrokes(val documentId: String, val strokes: Map<String, HeldStroke>)
+    private val heldStrokes = java.util.concurrent.atomic.AtomicReference<HeldStrokes?>(null)
+    override suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot? {
+        if (documentDescriptor(documentId) != null) return null
+        return try { call { cancel ->
+            // Off the caller's thread: one pass over the strokes it still holds.
+            val held = heldStrokes.get()?.takeIf { it.documentId == documentId }?.strokes.orEmpty()
+            val known = if (previous == null || previous.documentId != documentId) emptyMap()
+                else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
+            val d = handle.documentSnapshotChangesPacked(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest, it.cost) }, cancel)
+            val next = HashMap<String, HeldStroke>(d.items.size)
+            val items = d.items.map { change ->
+                val sent = change.item
+                val item = if (sent != null) nativePackedItem(sent) else {
+                    // Kept: the core vouches for exactly the bytes named to it.
+                    val kept = known[change.objectId]?.takeIf { it.digest.contentEquals(change.digest) } ?: throw CoreFailure(CoreFailureKind.Worker)
+                    val old = kept.item
+                    if (old.layerOpacity == change.layerOpacity && old.layerBlend == change.layerBlend && old.locked == change.locked) old
+                    else old.copy(layerOpacity = change.layerOpacity, layerBlend = change.layerBlend, locked = change.locked)
+                }
+                change.digest?.let { next[change.objectId] = HeldStroke(item, it, change.cost) }
+                item
+            }
+            heldStrokes.set(HeldStrokes(documentId, next))
+            DocumentSnapshot(d.documentId, d.title, d.width, d.height, d.bitDepth,
+                d.layers.map { LayerInfo(it.id, it.name, it.visible, it.locked, it.opacity, it.blend) },
+                RenderList(d.revision.common(), items), hasToneAdjustments = d.hasToneAdjustments)
+        } } catch (error: CoreFailure) {
+            // The document, kept strokes included, is at the size limit of a
+            // complete read. That read decides, exactly as without this call.
+            if (error.kind != CoreFailureKind.Backpressure) throw error
+            null
+        }
+    }
     suspend fun <T> withGiantProject(block: suspend (ProjectSession) -> T): T = closeMutex.withLock {
         if (closed.get()) throw GiantImageFailure(GiantImageFailureKind.Closed)
         if (giantOwner != null) giantOwner.call(block) else block(handle)
@@ -102,7 +151,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
         EditableSource(value.descriptor.documentCommon(),value.bytes)
     }
     override suspend fun documentPage(documentId: String,page: UInt): DocumentSnapshot = documentNativeCall {
-        checkDocumentOpen(); handle.editableDocumentPage(documentId,page,it).documentCommon().copy(page=page)
+        checkDocumentOpen(); handle.editableDocumentPagePacked(documentId,page,it).common().copy(page=page)
     }
     override suspend fun selectDocumentPage(documentId: String,page: UInt): DocumentSnapshot {
         val value=documentPage(documentId,page)
@@ -151,17 +200,14 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
         if(documentDescriptor(documentId)!=null)return documentPage(documentId,selectedDocumentPage(documentId))
         return imageDocument(documentId)
     }
-    private suspend fun imageDocument(documentId: String): DocumentSnapshot = call { cancel ->
-        val d=handle.documentSnapshot(documentId,cancel)
-        DocumentSnapshot(d.documentId,d.title,d.width,d.height,d.bitDepth,d.layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },d.render.common(),hasToneAdjustments=d.hasToneAdjustments)
-    }
+    private suspend fun imageDocument(documentId: String): DocumentSnapshot = call { cancel -> handle.documentSnapshotPacked(documentId,cancel).common() }
     override suspend fun background(documentId: String,memoryBudgetBytes: ULong,assumeUntaggedSrgb: Boolean): BackgroundImage = call { cancel ->
         val b=handle.backgroundImage(documentId,memoryBudgetBytes,assumeUntaggedSrgb,cancel)
         BackgroundImage(b.width,b.height,b.rgba,b.sourceAssetId,b.sourceBitDepth,b.iccProfile)
     }
     override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke {
         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
-        return acquireNative({handle.beginStroke(NStrokeOptions(options.gestureId,options.transactionId,options.objectId,options.documentId,options.layerId,options.deviceId,options.lamport,options.createdAtMs,options.family,options.width,options.rgba,options.stabilization,options.pressureCurve))},{NativeStroke(it)},{try{it.shutdown()}finally{it.destroy()}})
+        return acquireNative({handle.beginStroke(options.native())},{NativeStroke(it)},{try{it.shutdown()}finally{it.destroy()}})
     }
     override suspend fun edit(options: EditOptions,commands: List<EditCommand>): ProjectInfo = call {
         if ((options.expectedHostSeq == null) != (options.expectedStateHash == null)) throw CoreFailure(CoreFailureKind.Invalid)
@@ -204,7 +250,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
             try { handle.closeSession() }
             catch(error:CoreException) { failure = mapFailure(error) }
             catch(error:Throwable) { failure = error }
-            closed.set(true);documentPasswords.clear();documentPages.clear()
+            closed.set(true);documentPasswords.clear();documentPages.clear();heldStrokes.set(null)
             try { handle.destroy() }
             catch(error:Throwable) {
                 val prior = failure
@@ -232,6 +278,7 @@ private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
         } }
     }
 }
+private fun StrokeOptions.native(): NStrokeOptions = NStrokeOptions(gestureId,transactionId,objectId,documentId,layerId,deviceId,lamport,createdAtMs,family,width,rgba,stabilization,pressureCurve)
 private fun Camera.native(): NCamera = NCamera(center.native(),scale,rotation,viewportWidth,viewportHeight)
 private fun Point.native(): NPoint = NPoint(x,y)
 private fun NPoint.common(): Point = Point(x,y)
@@ -254,6 +301,13 @@ private fun DrawShape.common(): Shape = when(this) {
 }
 private fun NRender.common(): RenderList = RenderList(revision.common(),items.map { RenderItem(it.objectId,it.layerId,it.layerOpacity,it.layerBlend,it.bounds.common(),it.strokeContours.common(),it.transform.common(),it.style.common(),it.shape.common(),it.locked) })
 internal fun nativeRenderItem(item: com.visualworkbench.bindings.core.RenderItem): RenderItem = RenderItem(item.objectId,item.layerId,item.layerOpacity,item.layerBlend,item.bounds.common(),item.strokeContours.common(),item.transform.common(),item.style.common(),item.shape.common(),item.locked)
+/** The outline stays in the ByteArray the bindings made: no boxed list, no second copy. */
+internal fun nativePackedItem(item: PackedRenderItem): RenderItem {
+    val contours = try { Contours.packed(item.contours) } catch (error: IllegalArgumentException) { throw CoreFailure(CoreFailureKind.Worker, error) }
+    return RenderItem(item.objectId,item.layerId,item.layerOpacity,item.layerBlend,item.bounds.common(),contours,item.transform.common(),item.style.common(),item.shape.common(),item.locked)
+}
+private fun PackedDocumentSnapshot.common(): DocumentSnapshot = DocumentSnapshot(documentId,title,width,height,bitDepth,layers.map { LayerInfo(it.id,it.name,it.visible,it.locked,it.opacity,it.blend) },
+    RenderList(render.revision.common(),render.items.map(::nativePackedItem)),hasToneAdjustments=hasToneAdjustments)
 internal fun nativeProjectHandle(project: WorkbenchProject): ProjectSession = (project as? NativeProject)?.handle ?: throw SessionFailure(SessionFailureKind.Invalid)
 private fun EditOptions.native(): NEditOptions = NEditOptions(transactionId,documentId,deviceId,lamport,createdAtMs)
 private fun Shape.newNative(): NewShape = when(this) {

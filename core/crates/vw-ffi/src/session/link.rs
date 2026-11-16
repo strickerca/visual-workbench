@@ -1,5 +1,5 @@
 use super::{
-    SessionError, SessionResult, SessionService, device, endpoint, replication as sync,
+    SessionError, SessionResult, SessionService, device, endpoint, replication as sync, routing,
     runtime::NetworkRuntime,
 };
 use crate::ProjectSession;
@@ -51,7 +51,7 @@ impl AppCarrier {
             Self::TcpAdb => pb::Carrier::TcpAdb,
         }
     }
-    fn rank(self) -> u8 {
+    pub(super) fn rank(self) -> u8 {
         match self {
             Self::QuicTether => 0,
             Self::QuicWifi => 1,
@@ -98,17 +98,63 @@ pub(super) enum Listener {
     Quic(QuicListener),
 }
 impl Listener {
-    async fn accept(&self) -> SessionResult<CarrierIo> {
+    pub(super) async fn accept(&self) -> SessionResult<CarrierIo> {
         match self {
             Self::Tcp(listener, tls) => TcpCarrier::accept(listener, tls).await.map(CarrierIo::Tcp),
             Self::Quic(listener) => listener.accept().await.map(CarrierIo::Quic),
         }
         .map_err(incoming_handshake_error)
     }
+    pub(super) fn local_addr(&self) -> SessionResult<SocketAddr> {
+        match self {
+            Self::Tcp(listener, _) => listener.local_addr().map_err(|_| SessionError::Transport),
+            Self::Quic(listener) => listener.local_addr().map_err(|_| SessionError::Transport),
+        }
+    }
 }
 pub(super) enum Route {
     Host(Vec<(AppCarrier, Arc<Listener>)>),
     Client(Vec<(AppCarrier, SocketAddr)>),
+    /// Automatic host: listeners keep accepting while a connection is live.
+    Standby(Arc<routing::Standby>),
+    /// Automatic client: remembered routes and offered hints, no fixed address.
+    Seek(Arc<routing::Seeker>),
+}
+impl Route {
+    fn is_host(&self) -> bool {
+        matches!(self, Self::Host(_) | Self::Standby(_))
+    }
+    fn automatic(&self) -> bool {
+        matches!(self, Self::Standby(_) | Self::Seek(_))
+    }
+    /// Ends a reconnect pause early when new address hints arrive.
+    async fn woken(&self) {
+        match self {
+            Self::Seek(seeker) => seeker.changed().await,
+            _ => std::future::pending().await,
+        }
+    }
+    /// A connection that should replace the live one; never for fixed routes.
+    async fn successor(&self, watch: routing::Watch<'_>) -> Established {
+        match self {
+            Self::Standby(standby) => standby.next().await,
+            Self::Seek(seeker) => seeker.successor(watch).await,
+            Self::Host(_) | Self::Client(_) => std::future::pending().await,
+        }
+    }
+}
+/// An authenticated connection that has completed Hello. `address` is the
+/// address this side dialled, absent on the accepting side.
+pub(super) struct Established {
+    pub carrier: AppCarrier,
+    pub address: Option<SocketAddr>,
+    pub connection: SecureConnection,
+}
+/// What the owner of a live session may still change about its routes.
+enum RouteControl {
+    Fixed,
+    Standby(Arc<routing::Standby>),
+    Seek(Arc<routing::Seeker>),
 }
 struct LinkPermit(Arc<AtomicBool>);
 impl Drop for LinkPermit {
@@ -146,7 +192,8 @@ pub struct LiveSession {
     status: watch::Receiver<SessionStatus>,
     commands: mpsc::Sender<super::preview::Command>,
     epoch: Arc<AtomicU64>,
-    endpoints: Vec<SessionEndpoint>,
+    endpoints: Arc<Mutex<Vec<SessionEndpoint>>>,
+    routes: RouteControl,
     closed: AtomicBool,
     previews: Arc<Mutex<super::preview::Previews>>,
     project: Weak<ProjectSession>,
@@ -175,8 +222,47 @@ impl LiveSession {
         }
         status
     }
+    /// A fixed session reports the addresses it was given. An automatic host
+    /// reports what it listens on now; an automatic client reports the route
+    /// in use, and nothing while it is not connected.
     pub fn endpoints(&self) -> Vec<SessionEndpoint> {
-        self.endpoints.clone()
+        self.endpoints
+            .lock()
+            .map(|endpoints| endpoints.clone())
+            .unwrap_or_default()
+    }
+    /// Automatic client only. Replace the address hints (for example from
+    /// discovery). Hints say where to try; only the pinned certificate decides
+    /// whether the paired device is there. An offer also asks for a fresh look
+    /// for a better carrier.
+    pub fn offer_routes(&self, hints: Vec<SessionEndpoint>) -> SessionResult<()> {
+        if self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        let RouteControl::Seek(seeker) = &self.routes else {
+            return Err(SessionError::Invalid);
+        };
+        seeker.offer(routing::paths(hints, routing::MAX_HINTS, false)?);
+        Ok(())
+    }
+    /// Automatic host only. Make the listeners match these local addresses:
+    /// new ones are bound, missing ones retired, the rest and any live
+    /// connection are left untouched. Returns what is bound now.
+    pub async fn listen_on(
+        &self,
+        bind_endpoints: Vec<SessionEndpoint>,
+    ) -> SessionResult<Vec<SessionEndpoint>> {
+        if self.closed.load(Ordering::Acquire) {
+            return Err(SessionError::Closed);
+        }
+        let RouteControl::Standby(standby) = &self.routes else {
+            return Err(SessionError::Invalid);
+        };
+        let wanted = routing::paths(bind_endpoints, routing::MAX_LISTENERS, true)?;
+        let standby = standby.clone();
+        self.runtime
+            .call(async move { standby.listen(wanted).await })
+            .await
     }
     /// Admission is bounded. Preserve/retry the exact batch on Backpressure.
     /// first_sample is the number of real samples preceding this batch.
@@ -488,6 +574,20 @@ fn command_error(error: mpsc::error::TrySendError<super::preview::Command>) -> S
     }
 }
 pub(super) fn hello(device: DeviceId) -> LocalHello {
+    hello_for(device, false)
+}
+/// `handoff` is offered only by automatic links: a host that keeps accepting
+/// while connected, and a client that may then move to another route.
+fn hello_for(device: DeviceId, handoff: bool) -> LocalHello {
+    let mut local = fixed_hello(device);
+    if handoff {
+        local
+            .capabilities
+            .insert(routing::HANDOFF_CAPABILITY.into());
+    }
+    local
+}
+fn fixed_hello(device: DeviceId) -> LocalHello {
     LocalHello {
         device,
         platform: if cfg!(target_os = "android") {
@@ -543,8 +643,7 @@ impl SessionService {
         self.start_link(
             project,
             device(peer_device_id)?,
-            routes(bind_endpoints, true)?,
-            true,
+            Plan::Host(routes(bind_endpoints, true)?),
         )
         .await
     }
@@ -557,20 +656,68 @@ impl SessionService {
         self.start_link(
             project,
             device(peer_device_id)?,
-            routes(endpoints, false)?,
-            false,
+            Plan::Client(routes(endpoints, false)?),
         )
         .await
     }
+    /// Listen for the paired device on every given local address (several may
+    /// share a carrier) and keep accepting while connected, so the device can
+    /// return on another route without waiting for a timeout. An address that
+    /// cannot be bound is skipped; at least one must bind. Every arrival must
+    /// pass the same pinned mutual TLS as with `host_project`.
+    pub async fn host_project_automatic(
+        &self,
+        project: Arc<ProjectSession>,
+        peer_device_id: String,
+        bind_endpoints: Vec<SessionEndpoint>,
+    ) -> SessionResult<Arc<LiveSession>> {
+        if bind_endpoints.is_empty() {
+            return Err(SessionError::Invalid);
+        }
+        self.start_link(
+            project,
+            device(peer_device_id)?,
+            Plan::Standby(routing::paths(
+                bind_endpoints,
+                routing::MAX_LISTENERS,
+                true,
+            )?),
+        )
+        .await
+    }
+    /// Connect to the paired device without a typed address: the routes it was
+    /// last authenticated on are tried first, then `hints` and anything given
+    /// later through `offer_routes`. With nowhere to dial the session waits,
+    /// offline, until a hint arrives. A hint never grants trust.
+    pub async fn connect_project_automatic(
+        &self,
+        project: Arc<ProjectSession>,
+        peer_device_id: String,
+        hints: Vec<SessionEndpoint>,
+    ) -> SessionResult<Arc<LiveSession>> {
+        self.start_link(
+            project,
+            device(peer_device_id)?,
+            Plan::Seek(routing::paths(hints, routing::MAX_HINTS, false)?),
+        )
+        .await
+    }
+}
+enum Plan {
+    Host(Vec<(AppCarrier, SocketAddr)>),
+    Client(Vec<(AppCarrier, SocketAddr)>),
+    Standby(Vec<(AppCarrier, SocketAddr)>),
+    Seek(Vec<(AppCarrier, SocketAddr)>),
 }
 impl SessionService {
     async fn start_link(
         &self,
         project: Arc<ProjectSession>,
         peer: DeviceId,
-        addresses: Vec<(AppCarrier, SocketAddr)>,
-        host: bool,
+        plan: Plan,
     ) -> SessionResult<Arc<LiveSession>> {
+        let host = matches!(plan, Plan::Host(_) | Plan::Standby(_));
+        let book = self.routes.clone();
         let initial = sync::state(&project).await?;
         let identity = self.local_device().await?;
         if initial.local.as_str() != identity.device_id
@@ -591,43 +738,76 @@ impl SessionService {
         runtime
             .call(async move {
                 let mut public_endpoints = Vec::new();
-                let route = if host {
-                    let mut listeners = Vec::new();
-                    for (carrier, address) in addresses {
-                        let tls = manager.pinned_tls(&peer)?;
-                        let listener = if carrier == AppCarrier::TcpAdb {
-                            let listener = tokio::net::TcpListener::bind(address)
-                                .await
-                                .map_err(|_| SessionError::Transport)?;
-                            public_endpoints.push(SessionEndpoint {
-                                carrier,
-                                address: listener
-                                    .local_addr()
-                                    .map_err(|_| SessionError::Transport)?
-                                    .to_string(),
-                            });
-                            Listener::Tcp(listener, tls)
-                        } else {
-                            let listener = QuicListener::bind(address, tls)?;
-                            public_endpoints.push(SessionEndpoint {
-                                carrier,
-                                address: listener.local_addr()?.to_string(),
-                            });
-                            Listener::Quic(listener)
-                        };
-                        listeners.push((carrier, Arc::new(listener)));
+                let endpoints = Arc::new(Mutex::new(Vec::new()));
+                let causes = Arc::new(routing::Causes::new("session"));
+                let (route, control) = match plan {
+                    Plan::Host(addresses) => {
+                        let mut listeners = Vec::new();
+                        for (carrier, address) in addresses {
+                            let tls = manager.pinned_tls(&peer)?;
+                            let listener = if carrier == AppCarrier::TcpAdb {
+                                let listener =
+                                    tokio::net::TcpListener::bind(address).await.map_err(|_| {
+                                        causes.note("listener bind failed");
+                                        SessionError::Transport
+                                    })?;
+                                public_endpoints.push(SessionEndpoint {
+                                    carrier,
+                                    address: listener
+                                        .local_addr()
+                                        .map_err(|_| SessionError::Transport)?
+                                        .to_string(),
+                                });
+                                Listener::Tcp(listener, tls)
+                            } else {
+                                let listener =
+                                    QuicListener::bind(address, tls).inspect_err(|_| {
+                                        causes.note("listener bind failed");
+                                    })?;
+                                public_endpoints.push(SessionEndpoint {
+                                    carrier,
+                                    address: listener.local_addr()?.to_string(),
+                                });
+                                Listener::Quic(listener)
+                            };
+                            listeners.push((carrier, Arc::new(listener)));
+                        }
+                        (Route::Host(listeners), RouteControl::Fixed)
                     }
-                    Route::Host(listeners)
-                } else {
-                    public_endpoints = addresses
-                        .iter()
-                        .map(|(carrier, address)| SessionEndpoint {
-                            carrier: *carrier,
-                            address: address.to_string(),
-                        })
-                        .collect();
-                    Route::Client(addresses)
+                    Plan::Client(addresses) => {
+                        public_endpoints = addresses
+                            .iter()
+                            .map(|(carrier, address)| SessionEndpoint {
+                                carrier: *carrier,
+                                address: address.to_string(),
+                            })
+                            .collect();
+                        (Route::Client(addresses), RouteControl::Fixed)
+                    }
+                    Plan::Standby(addresses) => {
+                        let standby = routing::Standby::new(
+                            manager.clone(),
+                            peer.clone(),
+                            hello_for(local.clone(), true),
+                            endpoints.clone(),
+                            causes.clone(),
+                        );
+                        if standby.listen(addresses).await?.is_empty() {
+                            return Err(SessionError::Transport);
+                        }
+                        (
+                            Route::Standby(standby.clone()),
+                            RouteControl::Standby(standby),
+                        )
+                    }
+                    Plan::Seek(hints) => {
+                        let seeker = routing::Seeker::new(book.clone(), hints);
+                        (Route::Seek(seeker.clone()), RouteControl::Seek(seeker))
+                    }
                 };
+                if matches!(control, RouteControl::Fixed) {
+                    *endpoints.lock().map_err(|_| SessionError::Worker)? = public_endpoints;
+                }
                 let status = SessionStatus {
                     sequence: 1,
                     status: SyncStatus::Reconnecting,
@@ -660,6 +840,7 @@ impl SessionService {
                 let incoming_previews = previews.clone();
                 let project_ref = Arc::downgrade(&project);
                 let local_identity = local.clone();
+                let in_use = endpoints.clone();
                 tokio::spawn(async move {
                     let _permit = permit;
                     drive(Driver {
@@ -676,6 +857,9 @@ impl SessionService {
                         stream_hub: incoming_stream_hub,
                         agent_capture: incoming_capture,
                         remote: incoming_remote,
+                        book,
+                        causes,
+                        in_use,
                     })
                     .await;
                 });
@@ -684,7 +868,8 @@ impl SessionService {
                     status,
                     commands,
                     epoch,
-                    endpoints: public_endpoints,
+                    endpoints,
+                    routes: control,
                     closed: AtomicBool::new(false),
                     previews,
                     project: project_ref,
@@ -713,12 +898,14 @@ fn publish(status: &watch::Sender<SessionStatus>, change: impl FnOnce(&mut Sessi
     next.sequence = next.sequence.saturating_add(1);
     status.send_replace(next);
 }
+/// Each failed attempt leaves its cause in `causes` instead of being discarded.
 pub(super) async fn establish(
     route: &Route,
     manager: &vw_net::pairing::PairingManager,
     peer: &DeviceId,
     local: &LocalHello,
-) -> SessionResult<(AppCarrier, SecureConnection)> {
+    causes: &routing::Causes,
+) -> SessionResult<Established> {
     match route {
         Route::Host(listeners) => {
             let mut accepts = tokio::task::JoinSet::new();
@@ -738,11 +925,21 @@ pub(super) async fn establish(
             let mut error = SessionError::Transport;
             while let Some(result) = accepts.join_next().await {
                 match result {
-                    Ok(Ok(connection)) => {
+                    Ok(Ok((carrier, connection))) => {
                         accepts.abort_all();
-                        return Ok(connection);
+                        return Ok(Established {
+                            carrier,
+                            address: None,
+                            connection,
+                        });
                     }
-                    Ok(Err(value)) => error = value,
+                    Ok(Err(value)) => {
+                        // An idle listener reaching its accept bound is not a failure.
+                        if !matches!(value, SessionError::Timeout) {
+                            causes.note(routing::incoming_cause(&value));
+                        }
+                        error = value;
+                    }
                     Err(_) => error = SessionError::Worker,
                 }
             }
@@ -751,7 +948,9 @@ pub(super) async fn establish(
         Route::Client(addresses) => {
             let mut error = SessionError::Transport;
             for (carrier, address) in addresses {
-                let tls = manager.pinned_tls(peer)?;
+                let tls = manager.pinned_tls(peer).inspect_err(|_| {
+                    causes.note("paired device revoked or unknown");
+                })?;
                 let io = if *carrier == AppCarrier::TcpAdb {
                     TcpCarrier::connect(*address, &tls)
                         .await
@@ -771,13 +970,54 @@ pub(super) async fn establish(
                 };
                 match io {
                     Ok(io) => match SecureConnection::client(io, local).await {
-                        Ok(connection) => return Ok((*carrier, connection)),
-                        Err(value) => error = value.into(),
+                        Ok(connection) => {
+                            return Ok(Established {
+                                carrier: *carrier,
+                                address: Some(*address),
+                                connection,
+                            });
+                        }
+                        Err(value) => {
+                            causes.note(routing::dial_cause(&value));
+                            error = value.into();
+                        }
                     },
-                    Err(value) => error = value.into(),
+                    Err(value) => {
+                        causes.note(routing::dial_cause(&value));
+                        error = value.into();
+                    }
                 }
             }
             Err(error)
+        }
+        Route::Standby(standby) => Ok(standby.next().await),
+        Route::Seek(seeker) => {
+            let limits = (routing::DIAL_TIMEOUT, routing::DIAL_GRACE);
+            let dialled = routing::dial(
+                &seeker.candidates(peer),
+                manager,
+                peer,
+                limits,
+                Some(causes),
+            )
+            .await?;
+            let hello = SecureConnection::client(dialled.io, local);
+            match tokio::time::timeout(routing::HELLO_TIMEOUT, hello).await {
+                Ok(Ok(connection)) => Ok(Established {
+                    carrier: dialled.carrier,
+                    address: Some(dialled.address),
+                    connection,
+                }),
+                Ok(Err(value)) => {
+                    causes.note(routing::dial_cause(&value));
+                    // A reset during Hello is a route problem, not storage.
+                    Err(incoming_handshake_error(value))
+                }
+                Err(_) => {
+                    causes.note(routing::dial_cause(&vw_net::NetError::Timeout));
+                    Err(SessionError::Timeout)
+                }
+            }
         }
     }
 }
@@ -785,8 +1025,14 @@ async fn establish_for_project(
     driver: &Driver,
     local: &LocalHello,
     first_loss: Instant,
-) -> SessionResult<(AppCarrier, SecureConnection)> {
-    let attempt = establish(&driver.route, &driver.manager, &driver.peer, local);
+) -> SessionResult<Established> {
+    let attempt = establish(
+        &driver.route,
+        &driver.manager,
+        &driver.peer,
+        local,
+        &driver.causes,
+    );
     tokio::pin!(attempt);
     let deadline = tokio::time::Instant::from_std(first_loss + Duration::from_secs(2));
     let mut reported = false;
@@ -815,21 +1061,31 @@ struct Driver {
     agent_capture: Arc<agent_capture::CaptureStatusHub>,
     stream_hub: Arc<super::stream::Hub>,
     remote: Arc<remote_edit::RemoteHub>,
+    book: Arc<routing::RouteBook>,
+    causes: Arc<routing::Causes>,
+    /// What `LiveSession::endpoints` reports for an automatic client.
+    in_use: Arc<Mutex<Vec<SessionEndpoint>>>,
 }
 async fn drive(mut driver: Driver) {
-    let local = hello(driver.local.clone());
+    let local = hello_for(driver.local.clone(), driver.route.automatic());
     let mut first_loss = Instant::now();
     let mut delay = Duration::from_millis(250);
     let mut incoming = None;
+    // A connection that replaced the live one; it is used without a pause.
+    let mut moved: Option<Established> = None;
     loop {
         if driver.project.check_open().is_err() {
             break;
         }
-        let connection = establish_for_project(&driver, &local, first_loss).await;
+        let connection = match moved.take() {
+            Some(next) => Ok(next),
+            None => establish_for_project(&driver, &local, first_loss).await,
+        };
         let Driver {
             project,
             peer,
             route,
+            manager,
             status,
             commands,
             epoch,
@@ -838,10 +1094,18 @@ async fn drive(mut driver: Driver) {
             agent_capture,
             stream_hub,
             remote,
+            book,
+            causes,
+            in_use,
             ..
         } = &mut driver;
+        let seeking = matches!(route, Route::Seek(_));
         match connection {
-            Ok((carrier, connection)) => {
+            Ok(Established {
+                carrier,
+                address,
+                connection,
+            }) => {
                 if [
                     "app_sync_v1",
                     "preview_lifecycle_v2",
@@ -853,12 +1117,25 @@ async fn drive(mut driver: Driver) {
                 .iter()
                 .any(|capability| !connection.session().capabilities().contains(*capability))
                 {
+                    causes.note("upgrade required");
                     publish(status, |s| {
                         s.status = SyncStatus::Offline;
                         s.failure = Some("upgrade_required".into());
                     });
                     break;
                 }
+                // Only now is the route proven: the pinned certificate matched
+                // and Hello completed. Remember where the paired device was.
+                if let Some(address) = address {
+                    book.remember(peer, (carrier, address));
+                    if seeking && let Ok(mut current) = in_use.lock() {
+                        *current = vec![SessionEndpoint {
+                            carrier,
+                            address: address.to_string(),
+                        }];
+                    }
+                }
+                causes.settle();
                 publish(status, |s| {
                     s.carrier = Some(carrier);
                     s.status = SyncStatus::Syncing;
@@ -866,7 +1143,7 @@ async fn drive(mut driver: Driver) {
                     s.peer_viewport = None;
                 });
                 delay = Duration::from_millis(250);
-                match connected(
+                let ended = connected(
                     connection,
                     Connected {
                         project,
@@ -875,19 +1152,45 @@ async fn drive(mut driver: Driver) {
                         status,
                         commands,
                         epoch,
-                        host: matches!(route, Route::Host(_)),
+                        host: route.is_host(),
                         incoming: &mut incoming,
                         previews,
                         focus,
                         stream_hub,
                         agent_capture,
                         remote,
+                        route,
+                        manager,
+                        local: &local,
+                        address,
+                        causes,
                     },
                 )
-                .await
-                {
-                    Ok(()) => break,
+                .await;
+                if seeking && let Ok(mut current) = in_use.lock() {
+                    current.clear();
+                }
+                match ended {
+                    Ok(None) => break,
+                    Ok(Some(next)) => {
+                        // The same boundary as any reconnect, without the wait:
+                        // volatile commands and previews never cross carriers.
+                        first_loss = Instant::now();
+                        publish(status, |s| {
+                            s.status = SyncStatus::Reconnecting;
+                            s.carrier = None;
+                            s.peer_viewport = None;
+                            s.failure = None;
+                        });
+                        while commands.try_recv().is_ok() {}
+                        if let Ok(mut preview) = previews.lock() {
+                            preview.clear();
+                        }
+                        moved = Some(next);
+                        continue;
+                    }
                     Err(error) => {
+                        causes.note(routing::link_cause(&error));
                         first_loss = Instant::now();
                         publish(status, |s| {
                             s.status = SyncStatus::Reconnecting;
@@ -899,6 +1202,11 @@ async fn drive(mut driver: Driver) {
                 }
             }
             Err(error) => {
+                let code = if causes.last() == Some(routing::NO_ROUTE) {
+                    "no_known_route"
+                } else {
+                    failure(&error)
+                };
                 if let Ok(current) = sync::state(project).await {
                     publish(status, |s| {
                         s.status = if first_loss.elapsed() >= Duration::from_secs(2) {
@@ -909,11 +1217,11 @@ async fn drive(mut driver: Driver) {
                         s.carrier = None;
                         s.pending = current.pending as u32;
                         s.blocked = current.blocked as u32;
-                        s.failure = Some(failure(&error).into());
+                        s.failure = Some(code.into());
                         s.peer_viewport = None;
                     });
                 }
-                if terminal_establish_failure(matches!(route, Route::Host(_)), &error) {
+                if terminal_establish_failure(route.is_host(), &error) {
                     break;
                 }
             }
@@ -923,8 +1231,17 @@ async fn drive(mut driver: Driver) {
         if let Ok(mut preview) = previews.lock() {
             preview.clear();
         }
-        tokio::time::sleep(delay).await;
+        tokio::select! {
+            _ = tokio::time::sleep(delay) => {}
+            _ = route.woken() => {}
+        }
         delay = (delay * 2).min(Duration::from_secs(2));
+    }
+    // Nobody serves an arrival after this loop. An automatic host stops
+    // listening here, as a fixed host does when its listeners drop with the
+    // driver; otherwise the paired device would connect to a mute host.
+    if let Route::Standby(standby) = &driver.route {
+        standby.retire();
     }
     driver.remote.stop();
     driver.focus.stop();
@@ -1037,8 +1354,20 @@ struct Connected<'a> {
     stream_hub: &'a Arc<super::stream::Hub>,
     agent_capture: &'a Arc<agent_capture::CaptureStatusHub>,
     remote: &'a Arc<remote_edit::RemoteHub>,
+    route: &'a Route,
+    manager: &'a vw_net::pairing::PairingManager,
+    local: &'a LocalHello,
+    /// The address this side dialled for the connection, if it dialled.
+    address: Option<SocketAddr>,
+    causes: &'a routing::Causes,
 }
-async fn connected(connection: SecureConnection, context: Connected<'_>) -> SessionResult<()> {
+/// `Ok(None)` ends the session. `Ok(Some(next))` is an authenticated
+/// connection that replaces this one: the paired device arrived on another
+/// route, or this side found a better or a living one.
+async fn connected(
+    connection: SecureConnection,
+    context: Connected<'_>,
+) -> SessionResult<Option<Established>> {
     if !connection
         .session()
         .capabilities()
@@ -1064,7 +1393,16 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         agent_capture,
         stream_hub,
         remote,
+        route,
+        manager,
+        local,
+        address,
+        causes,
     } = context;
+    let negotiated_handoff = connection
+        .session()
+        .capabilities()
+        .contains(routing::HANDOFF_CAPABILITY);
     let stream_supported = connection
         .session()
         .capabilities()
@@ -1094,6 +1432,22 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
     } else {
         None
     };
+    // Beside this connection: the paired device arriving on another listener
+    // (automatic host), or the search for a better or a living route
+    // (automatic client). Never resolves for fixed routes. It outlives the
+    // loop below so that a replacement is not lost when the old route ends.
+    let pulse = routing::Pulse::default();
+    let successor = route.successor(routing::Watch {
+        manager,
+        peer,
+        local,
+        carrier,
+        address,
+        pulse: &pulse,
+        handoff: negotiated_handoff,
+        causes,
+    });
+    tokio::pin!(successor);
     let outcome = async {
     let start = Instant::now();
     let _remote_epoch = remote.activate(
@@ -1128,15 +1482,32 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         sender.enqueue(Body::SyncRequest(sync::request(project).await?))?;
         waiting = true;
     }
+    let mut turn = Instant::now();
+    let mut silence = Duration::ZERO;
     loop {
         if project.check_open().is_err() || stream.as_ref().is_some_and(super::stream::Bridge::is_stopped) {
-            return Ok(());
+            return Ok(None);
         }
+        // Peer silence counts only while this loop was free to read; a long
+        // local operation is not evidence that the route died.
+        let now = Instant::now();
+        silence = silence.saturating_add(now.duration_since(turn).min(routing::TURN_CAP));
+        turn = now;
+        pulse.report(
+            silence,
+            !waiting
+                && incoming.is_none()
+                && outbound.is_empty()
+                && missing.is_empty()
+                && acquiring.is_none()
+                && stream.as_ref().is_none_or(super::stream::Bridge::is_quiet),
+        );
         tokio::select! {
             body=receive.receive(start.elapsed().as_millis().min(u128::from(u64::MAX))as u64)=>{
                 let body=match body {Ok(value)=>value,
                     Err(vw_net::NetError::KeyframeRequired) if negotiated_remote=>{remote.recover()?;continue;},
                     Err(error)=>return Err(error.into())};
+                silence=Duration::ZERO;
                 let Receive::Deliver(body)=body else{continue;};last_receive=Instant::now();
                 match body{
                     Body::Ping(ping)=>{let received=wall_ns()?;sender.enqueue(Body::Pong(pb::Pong{nonce:ping.nonce,t_sent_ns:ping.t_sent_ns,t_recv_ns:received,t_reply_ns:wall_ns()?}))?;},
@@ -1203,7 +1574,8 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
                     _=>return Err(SessionError::Invalid),
                 }
             },
-            command=commands.recv()=>{let Some(command)=command else{return Ok(());};if !command.belongs_to(active_epoch.value){continue;}match command.kind{
+            next=&mut successor=>{return Ok(Some(next));},
+            command=commands.recv()=>{let Some(command)=command else{return Ok(None);};if !command.belongs_to(active_epoch.value){continue;}match command.kind{
                 super::preview::CommandKind::Wire(body)=>sender.enqueue(body)?,
                 super::preview::CommandKind::Stroke{options,batch,offset}=>{let local=sync::state(project).await?.local;let gesture=Id::try_from(options.gesture_id.clone()).map_err(|_|SessionError::Invalid)?;if !sync::gesture_closed(project,local.clone(),gesture).await?{previews.lock().map_err(|_|SessionError::Worker)?.record(options,batch,offset,&local)?;}},
                 super::preview::CommandKind::Object(value)=>{let local=sync::state(project).await?.local;let gesture=Id::try_from(value.gesture_id.clone()).map_err(|_|SessionError::Invalid)?;if !sync::gesture_closed(project,local,gesture).await?{previews.lock().map_err(|_|SessionError::Worker)?.record_object(value)?;}},
@@ -1350,11 +1722,29 @@ async fn connected(connection: SecureConnection, context: Connected<'_>) -> Sess
         });
     }
     }.await;
+    // The two ends do not move at the same instant: the one that moves first
+    // closes the old route while the other is still confirming the new one,
+    // or already holds it. That is the hand-over, not a lost link, so the
+    // replacement is taken instead of reconnecting from nothing.
+    let outcome = match outcome {
+        Err(error @ (SessionError::Transport | SessionError::Timeout)) => loop {
+            let ready = tokio::time::timeout(routing::HANDOVER_POLL, &mut successor).await;
+            match ready {
+                Ok(next) => break Ok(Some(next)),
+                Err(_) if pulse.confirming() => {}
+                Err(_) => break Err(error),
+            }
+        },
+        other => other,
+    };
     let cleanup = match stream.as_mut() {
         Some(value) => value.shutdown().await,
         None => Ok(()),
     };
-    outcome.and(cleanup)
+    match (outcome, cleanup) {
+        (Ok(next), Ok(())) => Ok(next),
+        (Err(error), _) | (Ok(_), Err(error)) => Err(error),
+    }
 }
 async fn receive_preview(
     project: &ProjectSession,

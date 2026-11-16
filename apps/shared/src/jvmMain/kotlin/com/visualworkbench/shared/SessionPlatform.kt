@@ -39,6 +39,8 @@ public actual suspend fun localSessionAddresses(): List<LocalSessionAddress> = L
             if(network.index<=0||!network.isUp) continue
             val interfaceName=checkedPeerLabel(network.displayName ?: "") ?: checkedPeerLabel(network.name ?: "")
             val loopback=network.isLoopback
+            // Subnet sizes let the app tell which local link a hinted address is on.
+            val prefixes=try { network.interfaceAddresses.orEmpty().filterNotNull().take(64).associate { it.address to it.networkPrefixLength.toInt() } } catch(_: RuntimeException) { emptyMap() }
             val addresses=network.inetAddresses
             var addressCount=0
             while(addresses.hasMoreElements()) {
@@ -49,7 +51,7 @@ public actual suspend fun localSessionAddresses(): List<LocalSessionAddress> = L
                 val endpoint=if(address is Inet6Address) "[$numeric]:0" else "$numeric:0"
                 try { validateSessionEndpoint(endpoint,true) } catch(_: SessionException.Invalid) { continue }
                 if(result.size>=256) throw SessionFailure(SessionFailureKind.Backpressure)
-                result.add(LocalSessionAddress(numeric,network.index.toUInt(),interfaceName,loopback))
+                result.add(LocalSessionAddress(numeric,network.index.toUInt(),interfaceName,loopback,prefixes[address]?.takeIf { it in 1..128 }))
             }
         }
     } catch(error: SessionFailure) { throw error }

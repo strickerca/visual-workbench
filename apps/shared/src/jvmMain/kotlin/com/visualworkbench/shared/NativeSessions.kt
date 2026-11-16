@@ -101,6 +101,12 @@ private class NativeSessions(private val handle: SessionService) : WorkbenchSess
     override suspend fun host(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink = acquireOwned(owner, { owner.checkOpen(); handle.hostProject(nativeProjectHandle(project), peer, endpoints.map { it.native() }) }, { NativeLink(it, owner) }, { try { it.closeSession() } finally { it.destroy() } })
     override suspend fun connect(project: WorkbenchProject, peer: String, endpoints: List<SessionEndpoint>): ProjectLink = acquireOwned(owner, { owner.checkOpen(); handle.connectProject(nativeProjectHandle(project), peer, endpoints.map { it.native() }) }, { NativeLink(it, owner) }, { try { it.closeSession() } finally { it.destroy() } })
     override suspend fun receiveProject(path: String, peer: String, endpoints: List<SessionEndpoint>, expectedProjectId: String?, maxBlobBytes: ULong): WorkbenchProject = acquireNative({ owner.checkOpen(); handle.receiveProject(ReceiveProjectOptions(path, peer, endpoints.map { it.native() }, expectedProjectId, maxBlobBytes), it) }, { owner.checkOpen(); wrapNativeProject(it) }, { try { it.closeSession() } finally { it.destroy() } })
+    override suspend fun knownRoutes(peer: String): List<SessionEndpoint> = sessionCall { owner.checkOpen(); handle.knownRoutes(peer).map { it.common() } }
+    override suspend fun restoreRoutes(peer: String, endpoints: List<SessionEndpoint>) { sessionCall { owner.checkOpen(); handle.restoreRoutes(peer, endpoints.map { it.native() }) } }
+    override suspend fun forgetRoutes(peer: String) { sessionCall { owner.checkOpen(); handle.forgetRoutes(peer) } }
+    override suspend fun hostAutomatic(project: WorkbenchProject, peer: String, bindEndpoints: List<SessionEndpoint>): ProjectLink = acquireOwned(owner, { owner.checkOpen(); handle.hostProjectAutomatic(nativeProjectHandle(project), peer, bindEndpoints.map { it.native() }) }, { NativeLink(it, owner) }, { try { it.closeSession() } finally { it.destroy() } })
+    override suspend fun connectAutomatic(project: WorkbenchProject, peer: String, hints: List<SessionEndpoint>): ProjectLink = acquireOwned(owner, { owner.checkOpen(); handle.connectProjectAutomatic(nativeProjectHandle(project), peer, hints.map { it.native() }) }, { NativeLink(it, owner) }, { try { it.closeSession() } finally { it.destroy() } })
+    override suspend fun receiveProjectAutomatic(path: String, peer: String, hints: List<SessionEndpoint>, expectedProjectId: String?, maxBlobBytes: ULong): WorkbenchProject = acquireNative({ owner.checkOpen(); handle.receiveProjectAutomatic(ReceiveProjectOptions(path, peer, hints.map { it.native() }, expectedProjectId, maxBlobBytes), it) }, { owner.checkOpen(); wrapNativeProject(it) }, { try { it.closeSession() } finally { it.destroy() } })
     override suspend fun close() { releaseNative { closeMutex.withLock { if (!retired.get()) { closed.set(true); owner.close();handle.destroy();retired.set(true);owner.releaseParent() } } } }
 }
 private class NativeDiscovery(private val handle: NDiscovery, private val owner: SessionOwner) : SessionDiscovery, OwnedSession {
@@ -167,6 +173,8 @@ private class NativeLink(private val handle: LiveSession, private val owner: Ses
     } }
     override suspend fun finishPreview(gestureId: String, cancel: Boolean) { sessionCall { handle.finishPreview(gestureId, cancel) } }
     override suspend fun peerPreviews(documentId: String): PeerPreviews = sessionCall { handle.peerPreviews(documentId).let { PeerPreviews(it.sequence, it.gestureIds, it.items.map(::nativeRenderItem)) } }
+    override fun offerRoutes(hints: List<SessionEndpoint>) { sessionNow { owner.checkOpen(); if (closed.get()) throw SessionFailure(SessionFailureKind.Closed); handle.offerRoutes(hints.map { it.native() }) } }
+    override suspend fun listenOn(bindEndpoints: List<SessionEndpoint>): List<SessionEndpoint> = sessionCall { owner.checkOpen(); if (closed.get()) throw SessionFailure(SessionFailureKind.Closed); handle.listenOn(bindEndpoints.map { it.native() }).map { it.common() } }
     override suspend fun close() { releaseNative { closeMutex.withLock { if (!retired.get()) {
         // Seal/publication share one synchronous fence. Construction either
         // finishes and is captured here, or sees Closed before creating an owner.

@@ -34,11 +34,9 @@ The assisted audit and scrcpy notice tests use this map. The audit continues to
 compare unchanged source/census records, including private sdist notice copies,
 against the exact preserved bytes.
 
-The dated [assisted license census](../ASSISTED_LICENSE_CLOSURE_20261019.md),
-[scrcpy handoff](../ANDROID_TUNNEL_RUNTIME_HANDOFF_20261019.md) and earlier receipts
-describe their original locations and runs. They remain history; this disposition
-does not rerun their full private artifact or DLL checks. New tooling bytes differ
-from the earlier tooling, and old tooling hashes are not claimed to describe them.
+This disposition does not rerun the original full private artifact or DLL
+checks. New tooling bytes differ from the earlier tooling, and old tooling
+hashes are not claimed to describe them.
 
 The root packaging check covers files actually in `third_party`; it must continue
 to refuse unlisted files there. This relocation changes only the placement of

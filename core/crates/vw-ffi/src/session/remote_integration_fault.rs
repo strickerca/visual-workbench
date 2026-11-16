@@ -264,6 +264,8 @@ impl RemoteHub {
 }
 #[cfg(windows)]
 fn actual_host_clock() -> Option<(u64, u64)> {
+    // SAFETY: both declarations match the documented kernel32 ABI: one
+    // LARGE_INTEGER (i64) output pointer and a BOOL result, `system` convention.
     #[link(name = "kernel32")]
     unsafe extern "system" {
         fn QueryPerformanceCounter(value: *mut i64) -> i32;

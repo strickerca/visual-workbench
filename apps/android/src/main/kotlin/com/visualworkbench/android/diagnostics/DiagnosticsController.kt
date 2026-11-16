@@ -7,11 +7,13 @@ import android.view.MotionEvent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.visualworkbench.shared.CoreEventLog
 import com.visualworkbench.shared.DiagnosticEventCode
 import com.visualworkbench.shared.DiagnosticMetrics
 import com.visualworkbench.shared.DiagnosticPlatform
 import com.visualworkbench.shared.PreparedDiagnosticsReport
 import com.visualworkbench.shared.PrivateDiagnosticLog
+import com.visualworkbench.shared.coreEventsForReport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,9 +23,13 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 
-internal class DiagnosticsController(context: Context, private val scope: CoroutineScope) {
+internal class DiagnosticsController(context: Context, private val scope: CoroutineScope,
+    /** The core's failure reasons and stage timings for the problem report. */
+    private val coreEvents: () -> CoreEventLog? = ::coreEventsForReport) {
     private val directory = File(context.applicationContext.filesDir, "traces")
     val recorder = TraceRecorder()
+    /** Pen-path timings from the canvas and the remote view: durations and counts only. */
+    val pen = PenPathMetrics()
     var recording by mutableStateOf(false)
         private set
     var samples by mutableStateOf(0)
@@ -115,7 +121,7 @@ internal class DiagnosticsController(context: Context, private val scope: Corout
         val heapBytes = (runtime.totalMemory() - runtime.freeMemory()).takeIf { it >= 0L }
         appendDiagnostic(DiagnosticEventCode.ReportPrepared)
         reportPreview = diagnosticLog.prepare(DiagnosticPlatform.Android,
-            DiagnosticMetrics(heapUsedBytes = heapBytes, traceSampleCount = recorder.count()))
+            DiagnosticMetrics(heapUsedBytes = heapBytes, traceSampleCount = recorder.count()), coreEvents())
         reportMessage = null
     }
 

@@ -36,6 +36,32 @@ impl Drop for Handle {
 fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(Some(0)).collect()
 }
+/// Take an exclusive lock on the whole file without waiting, through the same
+/// `LockFileEx` call the retired `fs2` crate made. The lock belongs to the
+/// open file and ends when the file is closed.
+pub fn try_lock_exclusive(file: &File) -> std::io::Result<()> {
+    let mut overlapped = windows_sys::Win32::System::IO::OVERLAPPED::default();
+    // SAFETY: the handle belongs to `file`, which outlives the call. The lock
+    // file is opened for synchronous I/O, so the call finishes before it
+    // returns and nothing refers to the zeroed OVERLAPPED (offset 0, no event)
+    // afterwards. The range is the whole file.
+    let locked = unsafe {
+        windows_sys::Win32::Storage::FileSystem::LockFileEx(
+            file.as_raw_handle(),
+            windows_sys::Win32::Storage::FileSystem::LOCKFILE_EXCLUSIVE_LOCK
+                | windows_sys::Win32::Storage::FileSystem::LOCKFILE_FAIL_IMMEDIATELY,
+            0,
+            u32::MAX,
+            u32::MAX,
+            &mut overlapped,
+        )
+    };
+    if locked == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
 /// Node's Windows crypto initialization requires SystemRoot. Resolve that one
 /// value from the OS; never inherit NODE_OPTIONS, OPENSSL_CONF or credentials.
 pub fn node_environment(command: &mut std::process::Command) -> Result<()> {

@@ -14,11 +14,11 @@ test = false
 workspace = true
 
 [dependencies]
-libm = { version = "=0.2.16", default-features = false }
-thiserror = "=2.0.21"
+libm.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
-proptest = { version = "=1.11.0", default-features = false, features = ["std"] }
+proptest = { workspace = true, features = ["std"] }
 
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
 criterion = { version = "=0.8.2", default-features = false, features = ["cargo_bench_support"] }

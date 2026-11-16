@@ -18,7 +18,7 @@ function Invoke-VwAdb {
 }
 
 function Select-VwAndroidTransport {
-    param([string[]]$Lines, [string]$ExpectedModel)
+    param([string[]]$Lines, [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][string]$ExpectedModel)
     $devices = @($Lines | ForEach-Object {
         if ($_ -match '^(\S+)\s+(device|offline|unauthorized)\b') {
             $serial = $Matches[1]; $state = $Matches[2]
@@ -26,7 +26,7 @@ function Select-VwAndroidTransport {
             [pscustomobject]@{ Serial = $serial; State = $state; Model = $model }
         }
     })
-    if ($ExpectedModel) { $devices = @($devices | Where-Object { $_.Model -ceq $ExpectedModel }) }
+    $devices = @($devices | Where-Object { $_.Model -ceq $ExpectedModel })
     if ($devices.Count -ne 1) { throw 'HIL requires exactly one matching authorized physical device; no fallback is allowed' }
     if ($devices[0].State -ne 'device') { throw 'HIL prerequisite: selected device is not online/authorized' }
     if ($devices[0].Serial -like 'emulator-*') { throw 'HIL acceptance requires physical hardware, not an emulator' }
@@ -41,6 +41,9 @@ function Get-VwAndroidDevice {
             $ExpectedModel = (Get-Content -Raw -LiteralPath $selectionFile | ConvertFrom-Json).model
         }
     }
+    # Never touch whichever phone happens to be attached: the model must be
+    # chosen by the caller, the environment or the local selection file.
+    if (-not $ExpectedModel) { throw 'HIL requires an explicitly selected device model (-ExpectedModel, VW_ANDROID_EXPECTED_MODEL or .local/android-target.json); no fallback to an attached device is allowed' }
     $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
     $adbPath = Join-Path $sdkRoot 'platform-tools\adb.exe'
     if (-not (Test-Path -LiteralPath $adbPath -PathType Leaf)) {
@@ -57,7 +60,7 @@ function Get-VwAndroidDevice {
     if (($qemu.Lines -join '').Trim() -eq '1') { throw 'HIL acceptance requires physical hardware, not an emulator' }
     $model = Invoke-VwAdb -Device $device -Arguments @('shell', 'getprop', 'ro.product.model') -Phase 'hil-device-model' -TimeoutSeconds 30 -Capture
     $device.Model = ($model.Lines -join ' ').Trim()
-    if ($ExpectedModel -and $device.Model -cne $ExpectedModel) { throw 'Selected device model differs from authorization; refusing further access' }
+    if ($device.Model -cne $ExpectedModel) { throw 'Selected device model differs from authorization; refusing further access' }
     Write-Host "Selected physical device model: $($device.Model)"
     return $device
 }

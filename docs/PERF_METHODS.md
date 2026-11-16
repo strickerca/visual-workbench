@@ -1,0 +1,255 @@
+# Performance measurement contract
+
+Date: 2026-10-01. QUALITY-004 is partial. This file defines methods; no PERF
+target has been measured or passed by T0.03. Static codec enumeration, a battery
+snapshot and synthetic screenshots are not latency, thermal or recovery baselines.
+Targets remain exactly those in REQUIREMENTS.json until T0.12 records a dated decision.
+
+## Shared record and statistics
+
+Every run records requirement/scenario, UTC date, operator, source/binary hashes,
+app version and debug/release/profile configuration, phone model/Android build/API/
+security patch, PC model/Windows build/driver version components, display physical
+resolution/DPI/scale/refresh/advanced-color flags, document dimensions/format/hash/
+layers/tiles/mask, tool versions, carrier/protocol, negotiated USB mode or Wi-Fi
+band/channel/radio/signal strength (no addresses, SSIDs or serials), charging state,
+battery level/temperature, ambient temperature, power mode, other load, cold/warm
+cache state, instrumentation overhead and failures/cancellations.
+
+Use monotonic nanosecond clocks (Windows QPC/Android elapsedRealtimeNanos); never
+subtract wall-clock timestamps. Cross-device timestamps need at least 100
+ping/pong clock-offset exchanges before and after each run; retain the chosen
+offset interval, drift and worst-case synchronization uncertainty. Correlate
+sequence/frame/operation IDs. If uncertainty crosses a target boundary, result
+is inconclusive. Prefer a common 240 fps camera for end-to-end visible latency
+when timestamps cannot establish presentation. One camera frame is about 4.17 ms;
+record interval censoring and exposure/readout uncertainty. Compositor submission
+or network arrival alone does not establish visible presentation.
+
+Keep each raw duration, units, start/end event definitions, sample validity and
+failure reason in text/CSV/JSON without private content. Sort valid samples
+ascending; nearest-rank p50 is x[ceil(0.50*N)-1] and p95 is
+x[ceil(0.95*N)-1]. Report N, min/max, p50/p95, failure count/rate, measurement
+resolution and uncertainty. Never average p95 values; show each environment/
+carrier/run separately, and label any pooled population. Do not discard slow
+samples. Invalid instrumentation is retained and explained separately. Timeouts
+are failures, not successful samples silently excluded. A small-N p95 is weak
+evidence; repeated trials below are minimums, not release certification.
+
+## PERF-001 — Phone pen contact to wet ink
+
+Target: <=25 ms p95. On the actual S23 Ultra, film pen contact and first changed
+wet-ink pixel with a 240 fps camera, or correlate MotionEvent eventTime/history
+with actual presentation fences/validated frame timestamps. Use 100 strokes per
+run, three runs after five labeled warmups; include slow/fast strokes and
+interior/edge locations, with front-buffer/prediction settings recorded.
+Compute p50/p95 for contact-to-first-visible-pixel, preserving prediction versus
+measured contact evidence. Record pen tool type, pressure/tilt/hover availability,
+display refresh, input sampling and renderer path. Future T0.04/T0.10 traces
+establish feasibility; final product measurement needs the implemented wet-ink path.
+
+## PERF-002 — Phone stroke visible on PC
+
+Targets: <=50 ms p95 USB and <=80 ms p95 5 GHz Wi-Fi. Correlate actual phone
+contact/input sample with first visible corresponding host stroke using a common
+camera or synchronized input-to-present markers. Record batching, send/receive/
+apply/render/present stages, frame IDs and clock uncertainty. Three runs of
+100 strokes per carrier, five labeled warmups per run; calculate carrier-specific
+p50/p95. Record protocol, RTT/loss/jitter, USB mode/Wi-Fi conditions, desktop
+refresh/DPI and other app load. T0.06 supplies transport baselines; later stroke
+sync measurements must include rendering rather than only packet delivery.
+
+## PERF-003 — Remote edit round trip
+
+Target: phone pen -> host render -> phone visible result <=80 ms p95 USB;
+ghost ink immediate. Use sequence-bound pen events, host capture/render frames,
+encode/send/decode stages and actual phone presentation, with camera validation.
+Three runs of 100 edits plus five labeled warmups; p50/p95 on the complete
+round trip, and separate ghost-ink latency using PERF-001's visible-pixel method.
+Record creative app/version, input injection mode, capture backend, codec/profile/
+resolution/bitrate, refresh, dropped/stale frames, prediction and clock uncertainty.
+T0.07/T0.08 characterize components; product acceptance follows tunnel integration.
+
+## PERF-004 — Freeze to lossless frame
+
+Target: <=300 ms for a 4K window over USB. Time freeze request dispatch to phone
+presentation of the hash-verified lossless frame for the selected physical
+3840x2160 window. Record capture/readback, encode, transfer, decode and display;
+confirm pixel equivalence and ensure a lossy preview is not counted as completion.
+Thirty trials across three runs, cold and warm results separate; p50/p95 and
+maximum, with the unqualified target assessed for each valid trial. Record
+content fixture/hash, actual crop, DPI, codec, USB mode and clock uncertainty.
+
+## PERF-005 — 200 MP import
+
+Targets: PC preview <=1.5 s; complete PC pyramid <=6 s; phone screen fill <=250 ms.
+Use a declared 200 MP fixture (exact pixel dimensions and hash), with monotonic
+markers for import acceptance, first useful preview presented, all pyramid tiles
+available, and phone fill request to required viewport tiles presented. Thirty
+trials across three runs for each stage, separate cold/warm filesystem/cache
+conditions; p50/p95 and maximum. The unqualified limits apply per valid trial.
+Record source format/bit depth/orientation, decoder, pyramid levels/tile size/
+compression, viewport/zoom, carrier, cache state and disk performance. Record
+peak memory alongside duration; incomplete preview/pyramid is a failed trial.
+
+## PERF-006 — Memory with a 200 MP document
+
+Targets: PC <=1.2 GB working set; phone <=700 MB PSS. Use decimal bytes
+(1,200,000,000 and 700,000,000), recording raw byte totals as well as MiB.
+Run three 10-minute sessions spanning import, pan/zoom, ink, edits, export and
+idle with a 200 MP document. Sample the exact owned PC process set's working
+sets at 1 Hz; include host helpers, avoid double-counting shared pages when
+reporting total versus per-process sums. Record process ownership and sampling
+gaps. Collect phone PSS via Android memory APIs/dumpsys meminfo for the selected
+package at 1 Hz when overhead permits; if slower, record cadence and missed
+peaks. Report p50/p95 and highest observed values per phase/run, baseline/deltas,
+sampling limitations and counters for allocation/high-water instrumentation.
+The caps apply to peak measured memory, not just p95; 2 s build-runner samples
+are not evidence of the product's worst-case peak.
+
+## PERF-007 — Carrier switch and recovery
+
+Target: sync resumes <=2 s after the new carrier becomes available; zero duplicate
+commits. T0.06 records 10 USB unplug/replug trials and 10 Wi-Fi-drop/recovery
+trials, plus 10 switches in each direction when both carriers exist. Record
+physical disruption, OS link availability, tethering re-enabled (when required),
+transport readiness, first successful acknowledged sync, and stable resumption.
+Start the target clock at new-carrier availability (USB tethering: switched back
+on), and report disruption-to-availability separately. Use monotonic/correlated
+markers, p50/p95/max, failures and every recovery over 2 s. Verify a fixed
+operation sequence/commit ledger before/after for zero duplicates, missing
+commits and ordering; input replay is separately owned by TUNNEL-008.
+Fields awaiting T0.06: trial_id, carrier_before/after, disruption_time,
+available_time, tethering_enabled_time, sync_resume_time, recovery_ms,
+duplicate_commit_count, missing_commit_count, clock_uncertainty_ms, result.
+
+## PERF-008 — Export speed and cancellation
+
+Targets: selection crop <=1 s; full 200 MP PNG <=20 s and cancellable. Time
+accepted export request to completed, closed/flushed, readable output; define
+any durability requirement separately. Validate dimensions/content/PNG integrity.
+Thirty selection-crop and 30 full-image trials across three runs, recording
+p50/p95/max and every unqualified target miss. Ten cancellation trials per
+export type at early/middle/late phases; record request-to-stop time, UI
+responsiveness, worker termination and partial-file cleanup. No invented
+cancellation latency threshold: report measured values. Record selected area,
+alpha/bit depth, encoder settings, destination class (no private path), disk/
+cloud-sync state and concurrent work.
+
+## PERF-009 — Masked AI composite
+
+Targets: zero changed pixels outside the dilated mask on EVERY composite;
+local processing <=2 s for 12 MP, excluding model/provider time. Use 30 declared
+12 MP fixtures over three runs, including empty/full masks, edges, holes,
+feathering, alpha, rotations and hostile oversized/incorrect provider results.
+Freeze the canonical mask/dilation space and compare exact output versus input
+bytes outside it (not screenshot appearance); retain changed-pixel count and
+comparison hashes for every case. Time local validation/resize/color conversion/
+masking/compositing through committed local result; report provider/network time
+separately. p50/p95/max for local duration, every <=2 s miss and any changed
+pixel as failure. Record mask hash/radius/coordinate space, image dimensions/
+format/color profile, provider response shape, local backend and source hashes.
+
+## Thermal baseline — awaiting T0.04
+
+On the target phone, record ambient temperature, charging/battery state, initial
+temperature, thermal status, display brightness/refresh, renderer/probe version
+and exact session activity. Log battery temperature at 1 Hz for 600 s while the
+owner draws continuously/casually, with monotonic elapsed times. Require 601
+samples including t=0, label missed samples and stop/interruptions; record
+start/end/min/max/delta and nearest-rank p50/p95, thermal status changes and
+throttling. Repeat three sessions after returning to an explicitly recorded
+baseline. A shared-phone interruption is labeled, not erased. T0.03's IN2019
+28.4 C snapshot is not this S23 baseline. Raw fields: elapsed_s, temperature_c,
+battery_percent, charging, thermal_status, activity_marker, validity/reason.
+
+## Pen-path switches — S23 measuring session
+
+Stage 7 added eight developer switches (phone: Settings → Developer options).
+All are off after install; with all off the app behaves as before. Each is
+switched on once, measured, and then left on or switched back off. Timings are
+on the same screen and under Pen diagnostics → Pen path timings; each line
+reads "typical · slow end · worst" (typical is the median, slow end is p95).
+
+Preparation: this build installed, all switches off, 120 Hz display, battery
+saver off, phone cool. One empty canvas and one full page with a few hundred
+strokes. For the remote part: PC app running, Paint open, connected, control
+granted.
+
+- Canvas exercise (on the full page): 30 long slow curves, then about 60 quick
+  short strokes at handwriting speed.
+- Remote exercise: 30 s of steady circles, then 30 s of fast zigzag in Paint.
+- Each measurement: Clear timings, do the exercise, Copy timings, paste into a
+  text file on the laptop. Compare two files with
+  `python tools/pen-trace/trace_tool.py timings before.txt after.txt`; it
+  answers `leave_on`, `switch_back_off`, `no_measurable_difference` or
+  `too_few_samples`.
+
+| Step | Switch on | Watch | Check by hand |
+| --- | --- | --- | --- |
+| 1 | none (canvas baseline) | every "Canvas:" line; take the PERF-001 camera measurement once | — |
+| 2 | Canvas: quick refresh after a save | "saved to canvas refreshed" falls | erase part of a stroke, undo, redo, move a selection, hide and show a layer, close and reopen: same picture |
+| 3 | Canvas: next stroke starts while the last one saves | "pen-down to stroke accepted", "pen-down to first ink" fall | count the strokes, undo ten (last first), reopen; on a page with no Highlighter layer make two quick highlighter strokes: one Highlighter layer, not two; draw a stroke and at once add a rectangle, then undo twice: the rectangle goes first |
+| 4 | Canvas: draw only the new stroke | "time to draw one ink frame", "ink drawn", "frame ready" fall | magnifier open and closed, after zoom and rotate, dark theme, a lower layer, highlighter; no flicker at pen-up |
+| 5 | — | PERF-001 camera measurement again with what stayed on | — |
+| 6 | none (remote baseline) | both "Remote:" lines; pauses in five minutes of drawing | — |
+| 7 | Remote pen: samples at the pen's own rate | "pen sample to sent" falls by several ms | if input pauses more often, decide together with step 9 |
+| 8 | Remote pen: exact sample times | by eye: the ghost line's tip wobbles less | — |
+| 9 | Remote pen: keep drawing through a hitch | fewer pauses in five minutes | no disconnect; after a hitch the line in Paint catches up within a frame or two |
+| 10 | Remote pen: fewer, typed calls to the core | "pen sample to sent" same or lower | drawing in Paint looks the same |
+| 11 | Remote view: show each frame sooner | "pen sample to frame that shows it" falls by 2–4 ms | the remote picture starts and runs as before |
+| 12 | everything that stayed on | both exercises again, ten minutes of mixed drawing | battery temperature |
+
+Remote switches take effect the next time the remote view is opened.
+
+With step 7 or 9 on, the phone hands the PC at most eight pen samples within
+one display frame, which is the most it can get with the switches off. Step 9
+admits a longer burst only while its oldest sample is under 50 ms old, as
+before: about 12 samples from a 240 Hz pen, 16 from a 480 Hz pen (about 24
+with step 10). A longer hitch still pauses input.
+
+The ink timings ("ink drawn", "frame ready", "time to draw one ink frame",
+"pen-down to first ink") count a frame only when it shows a pen sample for
+the first time.
+
+Optional hand check for step 3 with both devices: lock the active layer on the
+PC, then draw on the phone. Ink may appear briefly and then stop with the same
+message as with the switch off.
+
+Leave a switch on when the tool says `leave_on`, nothing else got worse and
+its hand check passed. Switch it back off when the tool says `switch_back_off`
+or a hand check fails even once (wrong picture, missing or misordered stroke,
+flicker, a new pause or disconnect, the remote picture not starting). A small
+rise in "saved to canvas refreshed" under step 3 is expected. The timings end
+when a frame is handed to the display, so the camera measurement still decides
+PERF-001 (25 ms p95) and PERF-003 (80 ms p95).
+
+## Background checkpoint — S23 check
+
+The phone writes the project's recovery checkpoint once the app has been out
+of sight for 2 s and the editor is idle; Android freezes a cached app about
+10 s after it leaves the screen. On a page with about 2,000 strokes, or the
+largest real project:
+
+1. Draw a few strokes, press Home, wait 15 s, come back.
+2. Projects → Diagnostics → Preview diagnostic report. The line
+   `project: checkpoint on background took … ms` should be well under 8,000 ms.
+   No such line means the checkpoint was not due or did not finish before the
+   freeze.
+3. Close the app from Recents, reopen the project, and read
+   `project: open took … ms` in the same report. Compare it with an open
+   after drawing as much and closing from Recents without waiting 15 s first.
+
+A project with more than 256 MiB of live data also compacts once on the phone,
+when the project list or the project is next opened; note how long that list
+takes to appear the first time.
+
+## Current environment and gaps
+
+PC and phone facts are in HARDWARE_TRUTH.md, which distinguishes the S23 target
+from the connected IN2019. Calibration/gamut, codec execution/low-latency, pen behavior,
+thermal sessions, recovery, release-mode numbers and all nine product PERF
+measurements remain untested. T0.04 and T0.06 fill baseline fields; T0.12 owns
+dated target confirmation. Further feature owners execute the relevant methods.
+Private recordings/screenshots must be inspected and disposed under the owner
+retention rule, retaining only text counts/hashes/source bindings and receipts.

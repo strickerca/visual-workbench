@@ -301,7 +301,7 @@ public fun admitEraserHit(query: EraserHitQuery) {
     var units = 0L
     for (item in query.document.render.items) {
         val count = when (val shape = item.shape) {
-            is Shape.Stroke -> item.contours.x.size.toLong() + item.contours.y.size + item.contours.ends.size
+            is Shape.Stroke -> 2L * item.contours.vertexCount + item.contours.contourCount
             is Shape.Text -> shape.outline.size.toLong() * 4 + shape.text.length
             is Shape.Line -> shape.points.size.toLong()
             is Shape.Arrow -> shape.points.size.toLong() + 8

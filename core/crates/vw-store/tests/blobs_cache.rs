@@ -197,6 +197,45 @@ fn blob_symlink_shards_and_file_targets_are_rejected() -> TestResult {
     assert_eq!(fs::read(&foreign)?, bytes);
     Ok(())
 }
+/// The checks before an open cannot see a file that is replaced by a link
+/// between the check and the open; only the open's own flag refuses that. The
+/// flag's value differs between processor families, so this is run on
+/// whatever machine builds the code.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test]
+fn an_open_refuses_a_final_link_and_still_opens_a_plain_file() -> TestResult {
+    use std::os::unix::fs::symlink;
+    let temp = fixture();
+    let plain = temp.path().join("plain");
+    fs::write(&plain, b"plain file")?;
+    let link = temp.path().join("link");
+    symlink(&plain, &link)?;
+
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    assert!(options.open(&link).is_ok(), "an ordinary open follows it");
+    vw_store::no_follow(&mut options);
+    let refused = options.open(&link).expect_err("the link is refused");
+    assert_eq!(
+        refused.raw_os_error(),
+        Some(rustix::io::Errno::LOOP.raw_os_error())
+    );
+    assert_eq!(fs::read(&plain)?, b"plain file");
+    let mut opened = options.open(&plain)?;
+    let mut read = Vec::new();
+    std::io::Read::read_to_end(&mut opened, &mut read)?;
+    assert_eq!(read, b"plain file");
+
+    // The project lock is opened the same way: a lock file replaced by a link
+    // must not lead the store to another file.
+    let project = fixture();
+    let elsewhere = temp.path().join("elsewhere");
+    fs::write(&elsewhere, b"")?;
+    symlink(&elsewhere, project.path().join(".store.lock"))?;
+    assert!(vw_store::ProjectStore::open(project.path()).is_err());
+    assert_eq!(fs::read(&elsewhere)?, b"");
+    Ok(())
+}
 #[test]
 fn ram_defaults_are_bytes_and_named_usage_is_exact() -> TestResult {
     assert_eq!(RamCacheBudget::phone().budget(), 256 * 1024 * 1024);

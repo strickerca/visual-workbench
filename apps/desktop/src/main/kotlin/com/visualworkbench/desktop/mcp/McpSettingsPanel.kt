@@ -25,12 +25,16 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
     var assumeSrgb by remember{mutableStateOf(false)};var depth by remember{mutableStateOf(false)}
     // The exact package and live route shown in the binding confirmation.
     var bindRequest by remember{mutableStateOf<Pair<PublishedPackage,McpPhoneScreenRoute>?>(null)}
-    fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}catch(error:CancellationException){throw error}
+    // withTimeout reports expiry as a CancellationException subtype. It is a
+    // failed owner operation, not cancellation of this panel, so it must be shown.
+    fun act(body:suspend()->Unit){if(busy)return;busy=true;message=null;scope.launch{try{body()}
+        catch(_:TimeoutCancellationException){message="The operation timed out and may still finish in the background. Refresh to see its durable result; do not assume it was sent."}
+        catch(error:CancellationException){throw error}
         catch(error:McpRecaptureUnavailable){message=error.reason.message}
         catch(_:Exception){message="The operation was refused or did not finish. Refresh to recover durable publication; do not assume it was sent."}finally{busy=false}}}
     AlertDialog(onDismissRequest=onClose,title={Text("Local agent access")},text={Column(Modifier.width(850.dp).heightIn(max=750.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Local service: 127.0.0.1:${state.port} | credentials stay in Windows Credential Manager")
-        Text("Access is limited to immutable packages. Capture requires a separate grant for a selected window and connection.",style=MaterialTheme.typography.caption)
+        Text("An assistant can read only packages you published; a published package never changes. Capturing a window needs your separate permission for that window and that connection.",style=MaterialTheme.typography.caption)
         Text("Connected bridges",style=MaterialTheme.typography.h6)
         if(state.agents.isEmpty())Text("No local bridge is connected. This screen does not configure or start an external client.")
         state.agents.forEach{agent->Row{RadioButton(selectedAgent==agent.connection,{selectedAgent=agent.connection});Text("Bridge process ${agent.bridgePid} | ${agent.connection.take(8)}",Modifier.padding(top=12.dp))}}
@@ -45,7 +49,7 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
             val target=when(profile){"claude"->PackageTarget.ClaudeModern(model);"claude-legacy"->PackageTarget.ClaudeLegacy(model);"openai"->PackageTarget.OpenAiResponses(model,2048u);"gemini"->PackageTarget.Gemini(model,2048u);else->PackageTarget.Generic()}
             val choice=McpCompileChoice(target,snapshot.takeIf{it.isNotBlank()},title,assumeSrgb,depth)
             act{onCompile(choice);owner.refresh()}
-        }){Text("Compile and expose immutable package")}
+        }){Text("Publish this marked-up image as a package")}
         Text("Compilation does not send a message. A target profile does not prove that the connected client supports inline images.",style=MaterialTheme.typography.caption)
         state.packages.forEach{published->val info=published.info
             Column(Modifier.border(1.dp,MaterialTheme.colors.onSurface.copy(alpha=.2f)).padding(8.dp)){
@@ -133,7 +137,8 @@ internal data class McpCompileChoice(val target:PackageTarget,val semanticSnapsh
     var issue by remember(owner){mutableStateOf<String?>(null)}
     fun revoke(){if(stopping)return;stopping=true;scope.launch{try{
         owner.revokeAll()
-    }catch(error:CancellationException){throw error}
+    }catch(_:TimeoutCancellationException){issue="Local revocation timed out. Cleanup is uncertain; retry or stop the service."}
+    catch(error:CancellationException){throw error}
     catch(_:Exception){issue="Local revocation was requested. Cleanup is uncertain; retry or stop the service."}
     finally{stopping=false}}}
     Window(onCloseRequest={revoke()},title="Visual Workbench capture grants",alwaysOnTop=true,resizable=false,

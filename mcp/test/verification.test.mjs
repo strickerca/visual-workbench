@@ -27,13 +27,14 @@ function entry(value, markers) {
   return Object.freeze({ hash: value.manifest_sha256, manifest: Object.freeze({ package_id: value.package_id,
     compiled_for: Object.freeze({ target: value.target }), markers: Object.freeze(Array.from({ length: markers }, (_, n) => Object.freeze({ n: n + 1 }))) }) });
 }
-function fixture({ recapture, comparison, owner: injectedOwner, missingAfter = false, afterHash = after.manifest_sha256 } = {}) {
+function fixture({ recapture, comparison, owner: injectedOwner, missingAfter = false, afterHash = after.manifest_sha256, busyAfter = 0 } = {}) {
   const calls = [], checks = [], tools = new Map();
   const entries = new Map([[original.package_id, entry(original, 2)],
     ...(missingAfter ? [] : [[after.package_id, entry({ ...after, manifest_sha256: afterHash }, 0)]])]);
   const packages = Object.freeze({ withChecked: async (id, target, signal, action) => {
     checks.push({ id, target, signal });
     if (signal?.aborted) throw new Refused('cancelled');
+    if (id === after.package_id && busyAfter-- > 0) throw new Refused('busy');
     const found = entries.get(id); requireThat(found && found.manifest.compiled_for.target === target, 'package_not_published');
     return action(found);
   } });
@@ -286,4 +287,19 @@ test('the tunnel runtime refusal reaches the agent before any recapture result i
   const f = fixture({ owner });
   await assert.rejects(recapture(f), error => error.code === 'tunnel_runtime_unavailable');
   assert.equal(f.checks.length, 1);
+});
+
+test('a committed recapture waits out a momentarily full reader pool and still returns its receipt', async () => {
+  const f = fixture({ busyAfter: 2 }); const result = await recapture(f);
+  assert.deepEqual(result.structuredContent, { original: { ...original }, after: { ...after }, ...receipt, marker_count: 2, source_kind: 'window' });
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.checks.map(check => check.id), [original.package_id, after.package_id, after.package_id, after.package_id]);
+});
+
+test('waiting after a committed recapture still honours cancellation and other refusals', async () => {
+  const stop = new AbortController(); const f = fixture({ busyAfter: Infinity });
+  const pending = recapture(f, original, stop.signal); setTimeout(() => stop.abort(), 120);
+  await assert.rejects(pending, error => error.code === 'cancelled'); assert.equal(f.calls.length, 1);
+  const missing = fixture({ missingAfter: true });
+  await assert.rejects(recapture(missing), error => error.code === 'package_not_published'); assert.equal(missing.checks.length, 2);
 });

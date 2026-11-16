@@ -57,7 +57,7 @@ internal fun ProjectsScreen(projects: List<ProjectCard>, busy: Boolean, onOpenIm
             Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("A clear place to begin", style = MaterialTheme.typography.h6)
-                    Text("Open a photo or start with a blank canvas. Use your pen to draw; use your fingers to move around.")
+                    com.visualworkbench.ui.GettingStartedGuide(onPhone = true)
                     Text("Originals stay intact. Every mark can be edited or undone.", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.secondary)
                 }
             }

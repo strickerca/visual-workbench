@@ -171,22 +171,33 @@ pub(crate) fn is_link(metadata: &Metadata) -> bool {
     }
 }
 
-pub(crate) fn open_regular_file(path: &Path) -> Result<File, StoreError> {
-    check_regular_metadata(&fs::symlink_metadata(path)?)?;
-    let mut options = OpenOptions::new();
-    options.read(true);
+/// Make an open refuse a path whose last component is a link, so that a file
+/// replaced by one after it was checked is not followed. The flag's value is
+/// the platform's own: O_NOFOLLOW is 0x20000 on x86-64 but 0x8000 on arm64,
+/// where 0x20000 means something else.
+pub fn no_follow(options: &mut OpenOptions) {
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
-        // FILE_FLAG_OPEN_REPARSE_POINT prevents following a replaced final link.
+        // FILE_FLAG_OPEN_REPARSE_POINT
         options.custom_flags(0x0020_0000);
     }
     #[cfg(any(target_os = "android", target_os = "linux"))]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        // Linux/Android O_NOFOLLOW prevents following a replaced final symlink.
-        options.custom_flags(0x0002_0000);
+        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
     }
+    #[cfg(not(any(windows, target_os = "android", target_os = "linux")))]
+    {
+        let _ = options;
+    }
+}
+
+pub(crate) fn open_regular_file(path: &Path) -> Result<File, StoreError> {
+    check_regular_metadata(&fs::symlink_metadata(path)?)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    no_follow(&mut options);
     let file = options.open(path)?;
     check_regular_metadata(&file.metadata()?)?;
     Ok(file)

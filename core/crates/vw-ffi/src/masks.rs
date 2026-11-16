@@ -123,7 +123,7 @@ impl ProjectSession {
                     if closed.load(Ordering::Acquire) {
                         return Err(SelectionError::Closed);
                     }
-                    canonical_workspace(state, MAX_MEMORY, false)?;
+                    borrowed_workspace(MAX_MEMORY)?;
                     document(state, &document_id)
                 })())
             })
@@ -149,7 +149,7 @@ impl ProjectSession {
                     if closed.load(Ordering::Acquire) {
                         return Err(SelectionError::Closed);
                     }
-                    let canonical = canonical_workspace(state, memory_budget_bytes, false)?;
+                    let canonical = borrowed_workspace(memory_budget_bytes)?;
                     let doc = check_binding(state, &binding)?;
                     let size = Size::new(doc.width, doc.height)?;
                     memory(mask_estimate(size, canonical)?, memory_budget_bytes)?;
@@ -188,7 +188,7 @@ impl ProjectSession {
                     if closed.load(Ordering::Acquire) {
                         return Err(SelectionError::Closed);
                     }
-                    let canonical = canonical_workspace(state, memory_budget_bytes, false)?;
+                    let canonical = borrowed_workspace(memory_budget_bytes)?;
                     let doc = check_binding(state, &binding)?;
                     let size = Size::new(doc.width, doc.height)?;
                     check_version(state.project()?, &binding, &selection, size)?;
@@ -319,8 +319,13 @@ fn memory(estimated: u64, budget: u64) -> SelectionResult<()> {
         Ok(())
     }
 }
-fn canonical_workspace(state: &ProjectState, budget: u64, mutation: bool) -> SelectionResult<u64> {
-    crate::workflow::canonical_workspace(state, budget, mutation).map_err(|error| match error {
+/// Selections read the project in place; a selection edit admits what
+/// deciding its transaction touches before it validates it.
+fn borrowed_workspace(budget: u64) -> SelectionResult<u64> {
+    selection_error(crate::workflow::borrowed_workspace(budget))
+}
+fn selection_error<T>(result: crate::WorkflowResult<T>) -> SelectionResult<T> {
+    result.map_err(|error| match error {
         crate::WorkflowError::Memory { estimated, budget } => {
             SelectionError::Memory { estimated, budget }
         }

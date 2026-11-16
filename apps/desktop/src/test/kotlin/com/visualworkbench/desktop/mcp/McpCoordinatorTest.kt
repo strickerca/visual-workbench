@@ -638,7 +638,7 @@ class McpCoordinatorTest {
         } finally {finish.complete(Unit);owner.close()}
     }
 
-    @Test fun aTimedOutUnboundFallbackAsksForAnOwnerBinding()=runBlocking {
+    @Test fun aTimedOutUnboundFallbackAsksForAnOwnerBinding():Unit=runBlocking {
         val catalog=Catalog();val capture=Capture();val route=CoordinatorRoute()
         val owner=DesktopMcpCoordinator(catalog,Inbox(),Connection(),capture,newId={receiptId()})
         val entered=CompletableDeferred<Unit>();val finish=CompletableDeferred<Unit>()

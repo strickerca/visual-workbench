@@ -154,8 +154,12 @@ kotlin {
                 useLegacyPackaging = false
                 // This app supports arm64 only. KMP device tests do not inherit
                 // the app module's ndk.abiFilters; exclude dependency ABIs here.
+                // -PvwEmulatorAbi=x86_64 (emulator tests only) keeps x86_64 instead.
+                val emulatorAbi = providers.gradleProperty("vwEmulatorAbi").orNull
+                check(emulatorAbi == null || emulatorAbi == "x86_64") { "vwEmulatorAbi must be absent or exactly x86_64" }
                 excludes += setOf("**/armeabi/**", "**/armeabi-v7a/**", "**/x86/**",
-                    "**/x86_64/**", "**/mips/**", "**/mips64/**", "**/riscv64/**")
+                    if (emulatorAbi == null) "**/x86_64/**" else "**/arm64-v8a/**",
+                    "**/mips/**", "**/mips64/**", "**/riscv64/**")
                 // Bind the final APK to the exact independently built core.
                 keepDebugSymbols += "**/libvw_core.so"
             }

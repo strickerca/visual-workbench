@@ -12,7 +12,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use vw_model::{DeviceId, Document, Id, Project};
 use vw_proto::v1 as pb;
-use vw_store::{CommitStage, ProjectStore, SNAPSHOT_INTERVAL_MS};
+use vw_store::{CommitStage, ProjectStore};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const CLOCK: i64 = 1_700_000_000_000;
@@ -44,6 +44,10 @@ fn device() -> DeviceId {
 }
 fn title(sequence: u64) -> String {
     format!("Synthetic crash title {sequence:08}")
+}
+/// The gesture a cancelling worker cancels before it commits `sequence`.
+fn gesture(sequence: u64) -> Id {
+    id(1_000_000 + sequence)
 }
 fn expected_project(sequence: u64) -> Project {
     let mut project = Project::new(id(1), "Crash recovery fixture".into(), device());
@@ -116,7 +120,7 @@ struct WriterChild {
     reaped: bool,
 }
 impl WriterChild {
-    fn spawn(path: &Path, stage: u8, ordinal: u64, snapshot: bool) -> TestResult<Self> {
+    fn spawn(path: &Path, stage: u8, ordinal: u64, cancel: bool) -> TestResult<Self> {
         let mut command = Command::new(std::env::current_exe()?);
         command
             .args([
@@ -129,7 +133,7 @@ impl WriterChild {
             .env("VW_STORE_CRASH_PATH", path)
             .env("VW_STORE_CRASH_STAGE", stage.to_string())
             .env("VW_STORE_CRASH_ORDINAL", ordinal.to_string())
-            .env("VW_STORE_CRASH_SNAPSHOT", if snapshot { "1" } else { "0" })
+            .env("VW_STORE_CRASH_CANCEL", if cancel { "1" } else { "0" })
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
@@ -244,7 +248,10 @@ impl Drop for WriterChild {
 }
 
 /// Only the owning test launches this worker. It continually commits genuine
-/// UpdateDocument operations until the parent terminates the OS process.
+/// UpdateDocument operations until the parent terminates the OS process. A
+/// cancelling worker first cancels a gesture before each commit, which
+/// rewrites the checkpoint the log replays from; its selected boundary is one
+/// of that rewrite.
 #[test]
 #[ignore = "private subprocess entry point for crash recovery"]
 fn crash_worker() -> TestResult {
@@ -252,7 +259,7 @@ fn crash_worker() -> TestResult {
         std::env::var_os("VW_STORE_CRASH_PATH").ok_or_else(|| failure("missing worker fixture"))?;
     let selected_stage: u8 = std::env::var("VW_STORE_CRASH_STAGE")?.parse()?;
     let ordinal: u64 = std::env::var("VW_STORE_CRASH_ORDINAL")?.parse()?;
-    let snapshot = std::env::var("VW_STORE_CRASH_SNAPSHOT")? == "1";
+    let cancel = std::env::var("VW_STORE_CRASH_CANCEL")? == "1";
     let mut store = ProjectStore::open(Path::new(&path))?;
     println!("{MARKER}READY");
     std::io::stdout().flush()?;
@@ -261,15 +268,8 @@ fn crash_worker() -> TestResult {
         if started.elapsed() > Duration::from_secs(30) {
             return Err(failure("worker lifetime exceeded"));
         }
-        let time = CLOCK
-            + sequence as i64
-                * if snapshot {
-                    SNAPSHOT_INTERVAL_MS + 1
-                } else {
-                    1
-                };
-        let txn = transaction(&store, sequence, time)?;
-        store.commit_observed(&txn, &device(), time, |stage| {
+        let time = CLOCK + sequence as i64;
+        let boundary = |stage: CommitStage| {
             let number = stage_number(stage);
             if sequence == ordinal
                 && (number == selected_stage || (selected_stage == 4 && number == 0))
@@ -282,7 +282,15 @@ fn crash_worker() -> TestResult {
                     thread::sleep(Duration::from_secs(2));
                 }
             }
-        })?;
+        };
+        if cancel {
+            store.cancel_gesture_observed(device(), gesture(sequence), time, boundary)?;
+            let txn = transaction(&store, sequence, time)?;
+            store.commit(&txn, &device(), time)?;
+        } else {
+            let txn = transaction(&store, sequence, time)?;
+            store.commit_observed(&txn, &device(), time, boundary)?;
+        }
     }
     Err(failure("worker unexpectedly exhausted commit loop"))
 }
@@ -368,7 +376,7 @@ fn random_process_kills_preserve_last_committed_state() -> TestResult {
     let mut interrupted = 0u64;
     let mut committed = 0u64;
     let mut interrupted_in_transaction = 0u64;
-    let mut snapshots_exercised = 0u64;
+    let mut cancellations_exercised = 0u64;
     let mut last_progress = Instant::now();
     println!("crash_recovery start iterations={iterations} seed={SEED:016x}");
     for iteration in 0..iterations {
@@ -385,8 +393,8 @@ fn random_process_kills_preserve_last_committed_state() -> TestResult {
         let stage = (next_random(&mut random) % 5) as u8;
         let ordinal = 2 + next_random(&mut random) % 5;
         let jitter_ms = next_random(&mut random) % if stage == 4 { 11 } else { 3 };
-        let snapshot = next_random(&mut random) & 1 == 0;
-        let mut writer = WriterChild::spawn(&path, stage, ordinal, snapshot)?;
+        let cancel = next_random(&mut random) & 1 == 0;
+        let mut writer = WriterChild::spawn(&path, stage, ordinal, cancel)?;
         writer.await_event(
             |event| matches!(event, WorkerEvent::Ready),
             "open readiness",
@@ -414,8 +422,31 @@ fn random_process_kills_preserve_last_committed_state() -> TestResult {
         } else {
             committed += 1;
         }
-        if snapshot {
-            snapshots_exercised += 1;
+        if cancel {
+            // Each cancellation precedes its commit and is durable exactly
+            // when its own transaction committed before the kill.
+            let opened = ProjectStore::open(&path)?;
+            for done in 1..=sequence {
+                assert!(opened.gesture_closed(&device(), &gesture(done)));
+            }
+            let next = opened.gesture_closed(&device(), &gesture(sequence + 1));
+            match stage {
+                0..=2 => assert!(!next, "an uncommitted cancellation survived"),
+                3 => assert!(next, "a committed cancellation was lost"),
+                _ => {}
+            }
+            assert!(!opened.gesture_closed(&device(), &gesture(sequence + 2)));
+            assert_eq!(
+                Connection::open(path.join("project.sqlite"))?.query_row(
+                    "SELECT count(*),max(host_seq) FROM snapshots",
+                    [],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+                )?,
+                (1, 0),
+                "the log replays from one checkpoint"
+            );
+            drop(opened);
+            cancellations_exercised += 1;
         }
         // This is an owned direct child of the fresh fixture root; no paths from
         // databases, environment content or archive entries determine deletion.
@@ -444,9 +475,9 @@ fn random_process_kills_preserve_last_committed_state() -> TestResult {
         attempted_stages.iter().all(|count| *count > 0),
         "all commit boundaries and natural windows exercised"
     );
-    assert!(snapshots_exercised > 0 && snapshots_exercised < iterations);
+    assert!(cancellations_exercised > 0 && cancellations_exercised < iterations);
     println!(
-        "crash_recovery complete iterations={iterations} stages={attempted_stages:?} interrupted={interrupted} committed={committed} in_transaction={interrupted_in_transaction} snapshot_runs={snapshots_exercised} elapsed_ms={} children_reaped={iterations}",
+        "crash_recovery complete iterations={iterations} stages={attempted_stages:?} interrupted={interrupted} committed={committed} in_transaction={interrupted_in_transaction} cancellation_runs={cancellations_exercised} elapsed_ms={} children_reaped={iterations}",
         started.elapsed().as_millis()
     );
     Ok(())

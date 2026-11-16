@@ -42,11 +42,14 @@ import com.visualworkbench.android.instructions.InstructionFocusModal
 import com.visualworkbench.shared.SelectionSaveTicket
 import com.visualworkbench.android.stream.AndroidStreamPanel
 import com.visualworkbench.android.stream.AndroidStreamSession
+import com.visualworkbench.ui.*
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     val context = LocalContext.current
+    // Pair once, then the open project connects to the computer by itself.
+    AutomaticConnectionEffect(editor)
     val documentState by editor.documents.state.collectAsState()
     var showExport by remember { mutableStateOf(false) }
     var showAirSettings by remember(editor) { mutableStateOf(false) }
@@ -230,9 +233,9 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
                             panel.render(editor.airSetup, editor.preferences.airActions, editor::airCommandEnabled,
                                 editor::configureAirSetup, editor::remapAirAction, editor::airControl)
                         }, modifier = Modifier.weight(1f).fillMaxWidth())
-                    } else Box(Modifier.weight(1f)) { SettingsScreen(editor.preferences, editor::settings, editor::returnFromSettings) }
+                    } else Box(Modifier.weight(1f)) { SettingsScreen(editor.preferences, editor::settings, editor::returnFromSettings, editor.diagnostics.pen) }
                 }
-                WorkbenchScreen.Diagnostics -> DiagnosticsScreen(editor.diagnostics) { editor.navigate(WorkbenchScreen.Projects) }
+                WorkbenchScreen.Diagnostics -> DiagnosticsScreen(editor.diagnostics, editor.preferences.penPath) { editor.navigate(WorkbenchScreen.Projects) }
                 WorkbenchScreen.Pairing -> PairingScreen(editor)
                 WorkbenchScreen.Instructions -> InstructionsScreen(editor.instructionEditor, editor.instructionFocus, editor.semanticEditor, editor.selected) { editor.navigate(WorkbenchScreen.Canvas) }
             }
@@ -255,7 +258,7 @@ internal fun WorkbenchApp(editor: EditorController, onCamera: () -> Unit = {}) {
     }
     if(editor.remoteOpen)editor.remoteCapability?.let { remote ->
         com.visualworkbench.android.remote.RemoteEditPanel(remote, onDismiss = editor::remoteClosed,
-            airActions = { palette, blocked -> AirActionDialogControls(editor, remote, palette, blocked) })
+            toggles = editor.preferences.penPath, metrics = editor.diagnostics.pen, airActions = { palette, blocked -> AirActionDialogControls(editor, remote, palette, blocked) })
     }
     AiEditorOverlay(editor)
     if (editor.showBrush) BrushDialog(editor.tool, editor.displayedBrush(), editor.brushPreview, editor::brush) { editor.brushDialog(false) }

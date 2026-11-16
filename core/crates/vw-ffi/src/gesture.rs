@@ -1,7 +1,7 @@
 use crate::{worker::Worker, *};
 use std::sync::{
     Arc, Mutex, Weak,
-    atomic::{AtomicU8, AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
 };
 use vw_model::{DeviceId, Id, OrderKey};
 use vw_proto::v1 as pb;
@@ -33,10 +33,43 @@ pub struct StrokeGesture {
     project: Weak<ProjectSession>,
     worker: Worker<InkState>,
     options: StrokeOptions,
-    base_revision: pb::Revision,
+    /// The project revision read when the stroke began. `None`: the stroke
+    /// began without waiting for the project (`begin_stroke_deferred`) and
+    /// `deferred` holds the project's answer.
+    base_revision: Option<pb::Revision>,
+    deferred: Option<Arc<DeferredAdmission>>,
     phase: Arc<AtomicU8>,
     receipt: Arc<Mutex<Option<ProjectInfo>>>,
     highlighter_layer: Option<pb::CreateLayer>,
+}
+/// The project's answer for a stroke that began without waiting for it: the
+/// checks `begin_stroke` makes and the revision it reads. They are asked for
+/// when the pen goes down and answered in the project's own order, so the
+/// stroke is admitted, and based, exactly as `begin_stroke` would have at that
+/// point; only the ink does not wait for the answer.
+#[derive(Default)]
+struct DeferredAdmission {
+    refused: AtomicBool,
+    answer: Mutex<Option<Result<pb::Revision>>>,
+}
+impl DeferredAdmission {
+    /// The revision to base the stroke on, or why the project refused it.
+    /// The answer was queued before any commit of this stroke, so it is there.
+    fn answer(&self) -> Result<pb::Revision> {
+        self.answer
+            .lock()
+            .map_err(|_| CoreError::Worker)?
+            .clone()
+            .ok_or(CoreError::Worker)?
+    }
+    /// A refusal that has already arrived ends the stroke's ink as well.
+    fn check(&self) -> Result<()> {
+        if self.refused.load(Ordering::Acquire) {
+            self.answer().map(|_| ())
+        } else {
+            Ok(())
+        }
+    }
 }
 impl StrokeGesture {
     pub(crate) fn session_preview_options(
@@ -178,12 +211,121 @@ impl ProjectSession {
             project: Arc::downgrade(&self),
             worker: Worker::new("vw-core-ink", state, 8)?,
             options,
-            base_revision,
+            base_revision: Some(base_revision),
+            deferred: None,
             highlighter_layer,
             phase: Arc::new(AtomicU8::new(ACTIVE)),
             receipt: Arc::new(Mutex::new(None)),
         }))
     }
+    /// Starts a stroke without waiting for the project: ink can be drawn while
+    /// the project is busy saving or writing a recovery checkpoint. What
+    /// `begin_stroke` asks of the project (the layer exists, belongs to the
+    /// document, is visible and unlocked; the device is this project's; the
+    /// object does not exist yet; the revision to base the stroke on) is
+    /// asked here too, at the same point in the project's order, but not
+    /// waited for. A stroke the project refuses takes no further ink once the
+    /// refusal has arrived and is refused when committed, with the error
+    /// `begin_stroke` would have returned; nothing of it is saved. A stroke it
+    /// admits is committed exactly like one begun with `begin_stroke`. A
+    /// highlighter stroke may need a layer chosen from the project before its
+    /// first ink, so it is refused here; use `begin_stroke` for it.
+    pub fn begin_stroke_deferred(
+        self: Arc<Self>,
+        options: StrokeOptions,
+    ) -> Result<Arc<StrokeGesture>> {
+        self.check_open()?;
+        for value in [
+            &options.gesture_id,
+            &options.transaction_id,
+            &options.object_id,
+            &options.document_id,
+            &options.layer_id,
+        ] {
+            Id::try_from(value.clone())?;
+        }
+        DeviceId::try_from(options.device_id.clone())?;
+        if options.created_at_ms < 0 || options.lamport == 0 {
+            return Err(CoreError::Invalid);
+        }
+        let family = vw_ink::BrushFamily::try_from(options.family.as_str())?;
+        if family == vw_ink::BrushFamily::Highlighter {
+            return Err(CoreError::Unsupported);
+        }
+        let mut brush = vw_ink::Brush::new(family, options.width)?;
+        if !options.pressure_curve.is_empty() {
+            brush.pressure_curve = vw_ink::PressureCurve::new(
+                options
+                    .pressure_curve
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| CoreError::Invalid)?,
+            )?;
+        }
+        brush.stabilization = options.stabilization;
+        brush.validate()?;
+        self.active_gestures
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+                (n < 4).then_some(n + 1)
+            })
+            .map_err(|_| CoreError::Backpressure)?;
+        let permit = GesturePermit(self.active_gestures.clone());
+        let state = InkState {
+            stroke: pb::Stroke {
+                brush: Some(brush.to_proto()),
+                ..Default::default()
+            },
+            builder: vw_ink::StrokeBuilder::begin(brush)?,
+            next_sequence: 1,
+            previous: None,
+            sealed: false,
+            _permit: permit,
+        };
+        // Ask the project now, in its own order, without waiting for it.
+        let deferred = Arc::new(DeferredAdmission::default());
+        let answer = deferred.clone();
+        let requested = options.clone();
+        self.worker.enqueue(Box::new(move |state| {
+            let result =
+                admit_deferred(state, &requested).and_then(|()| Ok(state.store()?.revision()?));
+            if result.is_err() {
+                answer.refused.store(true, Ordering::Release);
+            }
+            if let Ok(mut slot) = answer.answer.lock() {
+                *slot = Some(result);
+            }
+        }))?;
+        Ok(Arc::new(StrokeGesture {
+            project: Arc::downgrade(&self),
+            worker: Worker::new("vw-core-ink", state, 8)?,
+            options,
+            base_revision: None,
+            deferred: Some(deferred),
+            highlighter_layer: None,
+            phase: Arc::new(AtomicU8::new(ACTIVE)),
+            receipt: Arc::new(Mutex::new(None)),
+        }))
+    }
+}
+/// The checks `begin_stroke` makes against the project, for a stroke that
+/// began without waiting for them.
+fn admit_deferred(state: &crate::project::ProjectState, options: &StrokeOptions) -> Result<()> {
+    let project = state.project()?;
+    let layer = project
+        .layers
+        .get(&Id::try_from(options.layer_id.clone())?)
+        .ok_or(CoreError::Invalid)?;
+    if Id::from_proto(layer.definition.document_id.as_ref())?.as_str() != options.document_id
+        || layer.locked
+        || !layer.visible
+        || state.store()?.local_device()? != DeviceId::try_from(options.device_id.clone())?
+        || project
+            .objects
+            .contains_key(&Id::try_from(options.object_id.clone())?)
+    {
+        return Err(CoreError::Invalid);
+    }
+    Ok(())
 }
 
 #[uniffi::export]
@@ -208,6 +350,9 @@ impl StrokeGesture {
         if self.phase.load(Ordering::Acquire) != ACTIVE {
             return Err(CoreError::Closed);
         }
+        if let Some(deferred) = &self.deferred {
+            deferred.check()?;
+        }
         validate_batch(&batch)?;
         if batch.x.len() > 32 {
             return Err(CoreError::Invalid);
@@ -224,18 +369,6 @@ impl StrokeGesture {
                 if batch.sequence != state.next_sequence {
                     return Err(CoreError::Invalid);
                 }
-                if state
-                    .builder
-                    .geometry()
-                    .polygons()
-                    .iter()
-                    .map(|p| p.points.len())
-                    .sum::<usize>()
-                    > 131072
-                {
-                    return Err(CoreError::Backpressure);
-                }
-                let mut prediction = state.builder.clone();
                 let samples = (0..batch.x.len())
                     .map(|i| vw_ink::Sample {
                         x: batch.x[i],
@@ -246,12 +379,14 @@ impl StrokeGesture {
                         orientation: batch.orientation.get(i).map(|v| f64::from(*v)),
                     })
                     .collect::<Vec<_>>();
-                let range = prediction.append(&samples)?;
+                // The stroke is not copied: the predicted contours are built
+                // from its current end and never join it.
+                let predicted = state.builder.preview(&samples)?;
                 Ok(InkUpdate {
                     sequence: batch.sequence,
-                    first_polygon: range.start as u64,
+                    first_polygon: state.builder.geometry().polygons().len() as u64,
                     sample_count: state.stroke.x.len() as u64,
-                    contours: contours(&prediction.geometry().polygons()[range.start..range.end])?,
+                    contours: contours(&predicted)?,
                 })
             })
             .await
@@ -263,6 +398,9 @@ impl StrokeGesture {
             .check_open()?;
         if self.phase.load(Ordering::Acquire) != ACTIVE {
             return Err(CoreError::Closed);
+        }
+        if let Some(deferred) = &self.deferred {
+            deferred.check()?;
         }
         validate_batch(&batch)?;
         let phase = self.phase.clone();
@@ -388,6 +526,7 @@ impl StrokeGesture {
         cancellation.check()?;
         let options = self.options.clone();
         let base = self.base_revision.clone();
+        let deferred = self.deferred.clone();
         let highlighter_layer = self.highlighter_layer.clone();
         let phase = self.phase.clone();
         let receipt = self.receipt.clone();
@@ -399,12 +538,17 @@ impl StrokeGesture {
                 if closed.load(Ordering::Acquire) {
                     return Err(CoreError::Closed);
                 }
+                let base = match base {
+                    Some(base) => base,
+                    None => deferred.as_ref().ok_or(CoreError::Worker)?.answer()?,
+                };
                 let model = state.project()?;
                 let layer_id = Id::try_from(options.layer_id)?;
+                let layer_wire = layer_id.to_proto();
                 let left = model
                     .objects
                     .values()
-                    .filter(|o| o.state.layer_id.as_ref() == Some(&layer_id.to_proto()))
+                    .filter(|o| o.state.layer_id.as_ref() == Some(&layer_wire))
                     .map(|o| o.state.order_key.as_str())
                     .max()
                     .map(|key| OrderKey::try_from(key.to_owned()))

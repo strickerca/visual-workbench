@@ -9,6 +9,7 @@ pub mod editor_paint_package;
 pub use connection_assist::*;
 mod dib;
 mod drag;
+mod file_lock;
 mod operation;
 #[cfg(windows)]
 mod platform;

@@ -541,6 +541,8 @@ pub(super) fn observe(target: &Target, max_nodes: usize) -> Result<Observation> 
     if root_pid <= 0 || root_pid as u32 != target.process_id {
         return Err(Error::TargetChanged);
     }
+    // SAFETY: read-only property getter on the owned selected-root element,
+    // whose PID was confirmed just above; the HWND is returned by value.
     let root_native_window_matches = b
         .call(|| unsafe { root.CurrentNativeWindowHandle() })?
         .map(|hwnd| hwnd.0 as usize as u64 == target.window);
@@ -555,6 +557,9 @@ pub(super) fn observe(target: &Target, max_nodes: usize) -> Result<Observation> 
     // Query exactly one focused element, never its ancestors/children or the
     // desktop. A foreign PID exposes only a refusal marker; no names, values,
     // runtime IDs or other application properties are queried or serialized.
+    // SAFETY: automation is the owned interface created on this thread's MTA.
+    // GetFocusedElement takes no pointer arguments and yields an owned element;
+    // CurrentProcessId is a read-only getter on that owned element.
     let focused = match b.native(|| Ok(unsafe { automation.GetFocusedElement() }))? {
         Ok(element) => {
             let pid = b.call(|| unsafe { element.CurrentProcessId() })?;

@@ -7,12 +7,12 @@ license.workspace = true
 publish = false
 
 [dependencies]
-pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881"] }
-blake3 = { version = "=1.8.7", default-features = false, features = ["std", "pure"] }
-thiserror = "=2.0.21"
+pdfium-render = { workspace = true, features = ["pdfium_7881"] }
+blake3 = { workspace = true, features = ["std", "pure"] }
+thiserror.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_System_LibraryLoader"] }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_LibraryLoader"] }
 
 [lints]
 workspace = true

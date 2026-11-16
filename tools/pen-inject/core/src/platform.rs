@@ -288,6 +288,8 @@ impl Injector {
             ));
         }
         let submitted = std::time::Instant::now();
+        // SAFETY: as stated above, input is one fully initialized pen contact;
+        // self.device is the device this injector created and still owns.
         if let Err(e) = unsafe { InjectSyntheticPointerInput(self.device, &[input]) } {
             self.guard.suspend();
             return Err(error(e));

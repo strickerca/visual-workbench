@@ -10,248 +10,535 @@ impl Project {
         }
         text(&self.title, 4096)?;
         for (id, asset) in &self.assets {
-            if id.as_str() != asset.asset_id {
-                return Err(ModelError::Invalid("asset map key"));
-            }
-            validate_asset(asset)?;
+            check_asset(id, asset)?;
         }
         for (id, document) in &self.documents {
-            let definition = &document.definition;
-            same_id(id, definition.document_id.as_ref())?;
-            let kind = v1::DocumentKind::try_from(definition.kind)
-                .map_err(|_| ModelError::UnsupportedKind(definition.kind))?;
-            if matches!(
-                kind,
-                v1::DocumentKind::Unspecified | v1::DocumentKind::Timeline
-            ) {
-                return Err(ModelError::UnsupportedKind(definition.kind));
-            }
-            if definition.schema_version != 1 {
-                return Err(ModelError::UnsupportedSchema(definition.schema_version));
-            }
-            text(&definition.title, 4096)?;
-            self.asset_ref(&definition.primary_asset_id, true)?;
-            match (&definition.capture, kind) {
-                (Some(capture), v1::DocumentKind::Capture) => {
-                    validate_capture(capture)?;
-                    if capture
-                        .stream_save
-                        .as_ref()
-                        .is_some_and(|s| s.saved_asset_id != definition.primary_asset_id)
-                    {
-                        return Err(ModelError::Invalid("stream Save document asset"));
-                    }
-                }
-                (None, v1::DocumentKind::Capture) => {
-                    return Err(ModelError::Missing("capture info"));
-                }
-                (Some(_), _) => return Err(ModelError::Invalid("capture document kind")),
-                _ => {}
-            }
-            if kind != v1::DocumentKind::Pdf && !document.pages.is_empty() {
-                return Err(ModelError::Invalid("PDF pages"));
-            }
-            let mut pages = BTreeSet::new();
-            for page in &document.pages {
-                if !pages.insert(page.page_index) {
-                    return Err(ModelError::Invalid("duplicate PDF page"));
-                }
-                let crop = rectangle(&page.crop_box)?;
-                vw_geom::PdfPage::new(
-                    crop,
-                    vw_geom::QuarterTurn::from_degrees(page.rotation_degrees)?,
-                )?;
-            }
+            self.validate_document(id, document)?;
         }
         for (id, layer) in &self.layers {
-            same_id(id, layer.definition.layer_id.as_ref())?;
-            let doc = self.document(layer.definition.document_id.as_ref())?;
-            one_of(
-                &layer.definition.kind,
-                &[
-                    "annotation",
-                    "mask",
-                    "result",
-                    "adjustment",
-                    crate::IMAGE_OUTPUT_LAYER_KIND,
-                ],
-            )?;
-            OrderKey::try_from(layer.definition.order_key.clone())?;
-            text(&layer.definition.name, 4096)?;
-            range(layer.opacity, 0.0, 1.0)?;
-            one_of(&layer.blend, &["normal", "multiply"])?;
-            if layer.definition.page_index < -1
-                || (doc.definition.kind != v1::DocumentKind::Pdf as i32
-                    && layer.definition.page_index != -1)
-            {
-                return Err(ModelError::Invalid("layer page index"));
-            }
-            if layer.definition.page_index >= 0
-                && !doc
-                    .pages
-                    .iter()
-                    .any(|p| p.page_index == layer.definition.page_index as u32)
-            {
-                return Err(ModelError::Missing("layer PDF page"));
-            }
+            self.validate_layer(id, layer)?;
         }
         for (id, group) in &self.groups {
-            if id != &group.id || self.objects.contains_key(id) {
-                return Err(ModelError::Invalid("group identity"));
-            }
-            if !self.documents.contains_key(&group.document_id) {
-                return Err(ModelError::Missing("group document"));
-            }
-            let mut seen = BTreeSet::from([id.clone()]);
-            let mut parent = group.parent.as_ref();
-            while let Some(parent_id) = parent {
-                if !seen.insert(parent_id.clone()) {
-                    return Err(ModelError::Invalid("group cycle"));
-                }
-                let ancestor = self
-                    .groups
-                    .get(parent_id)
-                    .ok_or(ModelError::Missing("parent group"))?;
-                if ancestor.document_id != group.document_id {
-                    return Err(ModelError::Invalid("cross-document group"));
-                }
-                parent = ancestor.parent.as_ref();
-            }
+            self.validate_group(id, group)?;
         }
         for (id, object) in &self.objects {
-            same_id(id, object.state.object_id.as_ref())?;
-            validate_object_state(&object.state)?;
-            if !self.documents.contains_key(&object.document_id) {
-                return Err(ModelError::Missing("object document"));
-            }
-            let layer_id = Id::from_proto(object.state.layer_id.as_ref())?;
-            let layer = self
-                .layers
-                .get(&layer_id)
-                .ok_or(ModelError::Missing("object layer"))?;
-            if Id::from_proto(layer.definition.document_id.as_ref())? != object.document_id {
-                return Err(ModelError::Invalid("cross-document object layer"));
-            }
-            if let Some(group) = &object.state.group_id {
-                let group = self
-                    .groups
-                    .get(&Id::from_proto(Some(group))?)
-                    .ok_or(ModelError::Missing("object group"))?;
-                if group.document_id != object.document_id {
-                    return Err(ModelError::Invalid("cross-document object group"));
-                }
-            }
-            if let Some(v1::object_state::Shape::SelectionRaster(mask)) = &object.state.shape {
-                self.asset_ref(&mask.mask_asset_id, false)?;
-            }
-            if let Some(v1::object_state::Shape::ResultId(result)) = &object.state.shape {
-                let result = self
-                    .results
-                    .get(&Id::from_proto(Some(result))?)
-                    .ok_or(ModelError::Missing("object result"))?;
-                if Id::from_proto(result.definition.document_id.as_ref())? != object.document_id {
-                    return Err(ModelError::Invalid("cross-document result"));
-                }
-            }
+            self.validate_object(id, object)?;
         }
         for (id, instruction) in &self.instructions {
-            let value = &instruction.definition;
-            same_id(id, value.instruction_id.as_ref())?;
-            self.document(value.document_id.as_ref())?;
-            role(value.role)?;
-            one_of(
-                &value.entry_method,
-                &["pc_keyboard", "phone_keyboard", "voice", "handwriting"],
-            )?;
-            text(&value.text, 1_000_000)?;
-            text(&value.language, 128)?;
-            // Deleted targets remain historical references so undo can restore
-            // them; creation/update handlers reject never-existing target IDs.
-            for target in &value.target_object_ids {
-                Id::from_proto(Some(target))?;
-            }
+            self.validate_instruction(id, instruction)?;
         }
         for (id, snapshot) in &self.semantic_snapshots {
-            let value = &snapshot.definition;
-            same_id(id, value.snapshot_id.as_ref())?;
-            let document = self.document(value.document_id.as_ref())?;
-            one_of(&value.platform, &["uia", "android_ax", "chromium_uia"])?;
-            if value.elements_json_zstd.len() > 16 * 1024 * 1024 {
-                return Err(ModelError::Invalid("semantic payload size"));
-            }
-            let capture = document.definition.capture.as_ref();
-            let expected_session = capture
-                .map(|info| Id::from_proto(info.capture_session_id.as_ref()))
-                .transpose()?;
-            if snapshot.capture_session_id != expected_session
-                || snapshot.frame_id != capture.map(|info| info.frame_id)
-            {
-                return Err(ModelError::Invalid("semantic capture identity"));
-            }
+            self.validate_snapshot(id, snapshot)?;
         }
         for (id, result) in &self.results {
-            let value = &result.definition;
-            same_id(id, value.result_id.as_ref())?;
-            self.document(value.document_id.as_ref())?;
-            if let Some(package) = &value.package_id {
-                Id::from_proto(Some(package))?;
-            }
-            text(&value.provider, 256)?;
-            text(&value.model, 256)?;
-            if value.provider.is_empty() || value.model.is_empty() {
-                return Err(ModelError::Invalid("result provider"));
-            }
-            nonnegative(value.cost_estimate_usd)?;
-            json(&value.request_json, false)?;
-            json(&value.metrics_json, true)?;
-            let proof = json(&value.proof_json, true)?;
-            one_of(
-                &result.status,
-                &[
-                    "pending", "ready", "accepted", "rejected", "partial", "error",
-                ],
-            )?;
-            self.asset_ref(&value.output_asset_id, true)?;
-            self.asset_ref(&value.composite_asset_id, true)?;
-            if let Some(mask) = &result.acceptance_mask_asset_id {
-                self.asset_ref(mask.as_str(), false)?;
-            }
-            if matches!(result.status.as_str(), "ready" | "accepted" | "partial") {
-                let proof = proof.ok_or(ModelError::Missing("result proof"))?;
-                if proof
-                    .get("changed_outside")
-                    .and_then(serde_json::Value::as_u64)
-                    != Some(0)
-                {
-                    return Err(ModelError::Invalid("changed-outside proof"));
-                }
-                self.asset_ref(&value.output_asset_id, false)?;
-                self.asset_ref(&value.composite_asset_id, false)?;
-            }
+            self.validate_result(id, result)?;
         }
         for (output, versions) in &self.mask_versions {
-            // History may outlive the visible selection after deletion.
-            for version in versions {
-                same_id(output, version.output_object_id.as_ref())?;
-                one_of(
-                    &version.op,
-                    &[
-                        "add",
-                        "subtract",
-                        "intersect",
-                        "invert",
-                        "expand",
-                        "shrink",
-                        "feather",
-                    ],
-                )?;
-                nonnegative(version.amount)?;
-                for input in &version.input_object_ids {
-                    Id::from_proto(Some(input))?;
+            check_mask_versions(output, versions)?;
+        }
+        self.validate_image_outputs()?;
+        Ok(())
+    }
+
+    /// One document entry: its own definition and its primary asset.
+    fn validate_document(&self, id: &Id, document: &crate::Document) -> Result<(), ModelError> {
+        let definition = &document.definition;
+        same_id(id, definition.document_id.as_ref())?;
+        let kind = v1::DocumentKind::try_from(definition.kind)
+            .map_err(|_| ModelError::UnsupportedKind(definition.kind))?;
+        if matches!(
+            kind,
+            v1::DocumentKind::Unspecified | v1::DocumentKind::Timeline
+        ) {
+            return Err(ModelError::UnsupportedKind(definition.kind));
+        }
+        if definition.schema_version != 1 {
+            return Err(ModelError::UnsupportedSchema(definition.schema_version));
+        }
+        text(&definition.title, 4096)?;
+        self.asset_ref(&definition.primary_asset_id, true)?;
+        match (&definition.capture, kind) {
+            (Some(capture), v1::DocumentKind::Capture) => {
+                validate_capture(capture)?;
+                if capture
+                    .stream_save
+                    .as_ref()
+                    .is_some_and(|s| s.saved_asset_id != definition.primary_asset_id)
+                {
+                    return Err(ModelError::Invalid("stream Save document asset"));
+                }
+            }
+            (None, v1::DocumentKind::Capture) => {
+                return Err(ModelError::Missing("capture info"));
+            }
+            (Some(_), _) => return Err(ModelError::Invalid("capture document kind")),
+            _ => {}
+        }
+        if kind != v1::DocumentKind::Pdf && !document.pages.is_empty() {
+            return Err(ModelError::Invalid("PDF pages"));
+        }
+        let mut pages = BTreeSet::new();
+        for page in &document.pages {
+            if !pages.insert(page.page_index) {
+                return Err(ModelError::Invalid("duplicate PDF page"));
+            }
+            let crop = rectangle(&page.crop_box)?;
+            vw_geom::PdfPage::new(
+                crop,
+                vw_geom::QuarterTurn::from_degrees(page.rotation_degrees)?,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// One layer entry: its own fields and the document and page it is on.
+    fn validate_layer(&self, id: &Id, layer: &crate::Layer) -> Result<(), ModelError> {
+        same_id(id, layer.definition.layer_id.as_ref())?;
+        let doc = self.document(layer.definition.document_id.as_ref())?;
+        one_of(
+            &layer.definition.kind,
+            &[
+                "annotation",
+                "mask",
+                "result",
+                "adjustment",
+                crate::IMAGE_OUTPUT_LAYER_KIND,
+            ],
+        )?;
+        OrderKey::try_from(layer.definition.order_key.clone())?;
+        text(&layer.definition.name, 4096)?;
+        range(layer.opacity, 0.0, 1.0)?;
+        one_of(&layer.blend, &["normal", "multiply"])?;
+        if layer.definition.page_index < -1
+            || (doc.definition.kind != v1::DocumentKind::Pdf as i32
+                && layer.definition.page_index != -1)
+        {
+            return Err(ModelError::Invalid("layer page index"));
+        }
+        if layer.definition.page_index >= 0
+            && !doc
+                .pages
+                .iter()
+                .any(|p| p.page_index == layer.definition.page_index as u32)
+        {
+            return Err(ModelError::Missing("layer PDF page"));
+        }
+        Ok(())
+    }
+
+    /// One group entry: its identity, its document and its chain of parents.
+    fn validate_group(&self, id: &Id, group: &crate::Group) -> Result<(), ModelError> {
+        if id != &group.id || self.objects.contains_key(id) {
+            return Err(ModelError::Invalid("group identity"));
+        }
+        if !self.documents.contains_key(&group.document_id) {
+            return Err(ModelError::Missing("group document"));
+        }
+        let mut seen = BTreeSet::from([id.clone()]);
+        let mut parent = group.parent.as_ref();
+        while let Some(parent_id) = parent {
+            if !seen.insert(parent_id.clone()) {
+                return Err(ModelError::Invalid("group cycle"));
+            }
+            let ancestor = self
+                .groups
+                .get(parent_id)
+                .ok_or(ModelError::Missing("parent group"))?;
+            if ancestor.document_id != group.document_id {
+                return Err(ModelError::Invalid("cross-document group"));
+            }
+            parent = ancestor.parent.as_ref();
+        }
+        Ok(())
+    }
+
+    /// One instruction entry: its own fields and its document.
+    fn validate_instruction(
+        &self,
+        id: &Id,
+        instruction: &crate::Instruction,
+    ) -> Result<(), ModelError> {
+        let value = &instruction.definition;
+        same_id(id, value.instruction_id.as_ref())?;
+        self.document(value.document_id.as_ref())?;
+        role(value.role)?;
+        one_of(
+            &value.entry_method,
+            &["pc_keyboard", "phone_keyboard", "voice", "handwriting"],
+        )?;
+        text(&value.text, 1_000_000)?;
+        text(&value.language, 128)?;
+        // Deleted targets remain historical references so undo can restore
+        // them; creation/update handlers reject never-existing target IDs.
+        for target in &value.target_object_ids {
+            Id::from_proto(Some(target))?;
+        }
+        Ok(())
+    }
+
+    /// One semantic snapshot entry: its own fields and its document's capture.
+    fn validate_snapshot(
+        &self,
+        id: &Id,
+        snapshot: &crate::SemanticSnapshot,
+    ) -> Result<(), ModelError> {
+        let value = &snapshot.definition;
+        same_id(id, value.snapshot_id.as_ref())?;
+        let document = self.document(value.document_id.as_ref())?;
+        one_of(&value.platform, &["uia", "android_ax", "chromium_uia"])?;
+        if value.elements_json_zstd.len() > 16 * 1024 * 1024 {
+            return Err(ModelError::Invalid("semantic payload size"));
+        }
+        let capture = document.definition.capture.as_ref();
+        let expected_session = capture
+            .map(|info| Id::from_proto(info.capture_session_id.as_ref()))
+            .transpose()?;
+        if snapshot.capture_session_id != expected_session
+            || snapshot.frame_id != capture.map(|info| info.frame_id)
+        {
+            return Err(ModelError::Invalid("semantic capture identity"));
+        }
+        Ok(())
+    }
+
+    /// One result entry: its own fields, its document and the assets it names.
+    fn validate_result(&self, id: &Id, result: &crate::ResultCandidate) -> Result<(), ModelError> {
+        let value = &result.definition;
+        same_id(id, value.result_id.as_ref())?;
+        self.document(value.document_id.as_ref())?;
+        if let Some(package) = &value.package_id {
+            Id::from_proto(Some(package))?;
+        }
+        text(&value.provider, 256)?;
+        text(&value.model, 256)?;
+        if value.provider.is_empty() || value.model.is_empty() {
+            return Err(ModelError::Invalid("result provider"));
+        }
+        nonnegative(value.cost_estimate_usd)?;
+        json(&value.request_json, false)?;
+        json(&value.metrics_json, true)?;
+        let proof = json(&value.proof_json, true)?;
+        one_of(
+            &result.status,
+            &[
+                "pending", "ready", "accepted", "rejected", "partial", "error",
+            ],
+        )?;
+        self.asset_ref(&value.output_asset_id, true)?;
+        self.asset_ref(&value.composite_asset_id, true)?;
+        if let Some(mask) = &result.acceptance_mask_asset_id {
+            self.asset_ref(mask.as_str(), false)?;
+        }
+        if matches!(result.status.as_str(), "ready" | "accepted" | "partial") {
+            let proof = proof.ok_or(ModelError::Missing("result proof"))?;
+            if proof
+                .get("changed_outside")
+                .and_then(serde_json::Value::as_u64)
+                != Some(0)
+            {
+                return Err(ModelError::Invalid("changed-outside proof"));
+            }
+            self.asset_ref(&value.output_asset_id, false)?;
+            self.asset_ref(&value.composite_asset_id, false)?;
+        }
+        Ok(())
+    }
+
+    /// Everything `validate` requires of one object entry: its own state and
+    /// the document, layer, group, mask asset and result it refers to.
+    fn validate_object(&self, id: &Id, object: &crate::Object) -> Result<(), ModelError> {
+        same_id(id, object.state.object_id.as_ref())?;
+        validate_object_state(&object.state)?;
+        if !self.documents.contains_key(&object.document_id) {
+            return Err(ModelError::Missing("object document"));
+        }
+        let layer_id = Id::from_proto(object.state.layer_id.as_ref())?;
+        let layer = self
+            .layers
+            .get(&layer_id)
+            .ok_or(ModelError::Missing("object layer"))?;
+        if Id::from_proto(layer.definition.document_id.as_ref())? != object.document_id {
+            return Err(ModelError::Invalid("cross-document object layer"));
+        }
+        if let Some(group) = &object.state.group_id {
+            let group = self
+                .groups
+                .get(&Id::from_proto(Some(group))?)
+                .ok_or(ModelError::Missing("object group"))?;
+            if group.document_id != object.document_id {
+                return Err(ModelError::Invalid("cross-document object group"));
+            }
+        }
+        if let Some(v1::object_state::Shape::SelectionRaster(mask)) = &object.state.shape {
+            self.asset_ref(&mask.mask_asset_id, false)?;
+        }
+        if let Some(v1::object_state::Shape::ResultId(result)) = &object.state.shape {
+            let result = self
+                .results
+                .get(&Id::from_proto(Some(result))?)
+                .ok_or(ModelError::Missing("object result"))?;
+            if Id::from_proto(result.definition.document_id.as_ref())? != object.document_id {
+                return Err(ModelError::Invalid("cross-document result"));
+            }
+        }
+        Ok(())
+    }
+
+    /// The outcome `validate` would have, for a project that was valid before
+    /// and in which nothing but the listed objects has since been created,
+    /// changed or removed. `changed` gives each such object's ID with its
+    /// previous value (`None` when it did not exist), in ascending ID order.
+    ///
+    /// Only what those objects can affect is rechecked: their own entries, an
+    /// ID shared with a group, and the single-object rule of an image-output
+    /// layer. The checks run in `validate`'s order, so the first error is the
+    /// same one.
+    pub fn validate_changed_objects<'a>(
+        &self,
+        changed: impl IntoIterator<Item = (&'a Id, Option<&'a crate::Object>)> + Clone,
+    ) -> Result<(), ModelError> {
+        for (id, before) in changed.clone() {
+            if before.is_none() && self.objects.contains_key(id) && self.groups.contains_key(id) {
+                return Err(ModelError::Invalid("group identity"));
+            }
+        }
+        let mut output = false;
+        let in_output_layer = |object: &crate::Object| -> Result<bool, ModelError> {
+            Ok(self
+                .layers
+                .get(&Id::from_proto(object.state.layer_id.as_ref())?)
+                .is_some_and(|layer| layer.definition.kind == crate::IMAGE_OUTPUT_LAYER_KIND))
+        };
+        for (id, before) in changed {
+            if let Some(object) = self.objects.get(id) {
+                self.validate_object(id, object)?;
+                output |= in_output_layer(object)?;
+            }
+            if let Some(object) = before {
+                output |= in_output_layer(object)?;
+            }
+        }
+        if output {
+            self.validate_image_outputs()?;
+        }
+        Ok(())
+    }
+
+    /// The outcome `validate` would have, for a project that was valid
+    /// before a set of edits and in which nothing but the entities listed in
+    /// `replaced` has since been created, changed or removed.
+    ///
+    /// An entity that was not edited can only have become invalid through
+    /// something it refers to, so besides the edited entities this rechecks
+    /// what refers to an edited entity that such a check reads: the document
+    /// and page of a layer, the document and parents of a group, the
+    /// document, layer, group, mask asset and result of an object, and so
+    /// on. The checks run in `validate`'s order, so the first error is the
+    /// same one. The work follows what was edited, except that an edit which
+    /// removes a layer, group, result, document or asset, or moves one to
+    /// another document, looks at every object's references once (not at its
+    /// samples) to find the objects that referred to it.
+    pub fn validate_replaced(&self, replaced: &crate::Replaced) -> Result<(), ModelError> {
+        let assets_removed = replaced
+            .assets
+            .keys()
+            .any(|id| !self.assets.contains_key(id));
+        let documents_touched = !replaced.documents.is_empty();
+        let documents_removed = replaced
+            .documents
+            .keys()
+            .any(|id| !self.documents.contains_key(id));
+
+        for id in replaced.assets.keys() {
+            if let Some(asset) = self.assets.get(id) {
+                check_asset(id, asset)?;
+            }
+        }
+        // A document reads only whether its primary asset exists.
+        if assets_removed {
+            for (id, document) in &self.documents {
+                self.validate_document(id, document)?;
+            }
+        } else {
+            for id in replaced.documents.keys() {
+                if let Some(document) = self.documents.get(id) {
+                    self.validate_document(id, document)?;
                 }
             }
         }
-        self.validate_image_outputs()?;
+        // A layer reads its document's kind and pages.
+        if documents_touched {
+            for (id, layer) in &self.layers {
+                self.validate_layer(id, layer)?;
+            }
+        } else {
+            for id in replaced.layers.keys() {
+                if let Some(layer) = self.layers.get(id) {
+                    self.validate_layer(id, layer)?;
+                }
+            }
+        }
+        // A group reads its document and every group above it, and must not
+        // share its ID with an object.
+        if !replaced.groups.is_empty() || documents_removed {
+            for (id, group) in &self.groups {
+                self.validate_group(id, group)?;
+            }
+        } else {
+            for (id, before) in &replaced.objects {
+                if before.is_none() && self.objects.contains_key(id) && self.groups.contains_key(id)
+                {
+                    return Err(ModelError::Invalid("group identity"));
+                }
+            }
+        }
+        self.validate_replaced_objects(replaced, assets_removed, documents_removed)?;
+        // An instruction reads only whether its document exists.
+        if documents_removed {
+            for (id, instruction) in &self.instructions {
+                self.validate_instruction(id, instruction)?;
+            }
+        } else {
+            for id in replaced.instructions.keys() {
+                if let Some(instruction) = self.instructions.get(id) {
+                    self.validate_instruction(id, instruction)?;
+                }
+            }
+        }
+        // A semantic snapshot reads its document's capture.
+        if documents_touched {
+            for (id, snapshot) in &self.semantic_snapshots {
+                self.validate_snapshot(id, snapshot)?;
+            }
+        } else {
+            for id in replaced.semantic_snapshots.keys() {
+                if let Some(snapshot) = self.semantic_snapshots.get(id) {
+                    self.validate_snapshot(id, snapshot)?;
+                }
+            }
+        }
+        // A result reads whether its document and its assets exist.
+        if documents_removed || assets_removed {
+            for (id, result) in &self.results {
+                self.validate_result(id, result)?;
+            }
+        } else {
+            for id in replaced.results.keys() {
+                if let Some(result) = self.results.get(id) {
+                    self.validate_result(id, result)?;
+                }
+            }
+        }
+        for id in replaced.mask_versions.keys() {
+            if let Some(versions) = self.mask_versions.get(id) {
+                check_mask_versions(id, versions)?;
+            }
+        }
+        // The output rule reads output layers, their documents and sources,
+        // and the objects on them.
+        let is_output =
+            |layer: &crate::Layer| layer.definition.kind == crate::IMAGE_OUTPUT_LAYER_KIND;
+        let in_output_layer = |object: &crate::Object| -> Result<bool, ModelError> {
+            Ok(self
+                .layers
+                .get(&Id::from_proto(object.state.layer_id.as_ref())?)
+                .is_some_and(is_output))
+        };
+        let mut output = replaced.layers.iter().any(|(id, before)| {
+            before.as_ref().is_some_and(is_output) || self.layers.get(id).is_some_and(is_output)
+        }) || ((documents_touched || !replaced.assets.is_empty())
+            && self.layers.values().any(is_output));
+        for (id, before) in &replaced.objects {
+            if output {
+                break;
+            }
+            if let Some(object) = self.objects.get(id) {
+                output |= in_output_layer(object)?;
+            }
+            if let Some(object) = before {
+                output |= in_output_layer(object)?;
+            }
+        }
+        if output {
+            self.validate_image_outputs()?;
+        }
+        Ok(())
+    }
+
+    /// The object checks of `validate_replaced`: the edited objects, and the
+    /// objects that refer to something the edits removed or moved to another
+    /// document.
+    fn validate_replaced_objects(
+        &self,
+        replaced: &crate::Replaced,
+        assets_removed: bool,
+        documents_removed: bool,
+    ) -> Result<(), ModelError> {
+        // Layers, groups and results an object can no longer rely on.
+        let mut layers = Vec::new();
+        for (id, before) in &replaced.layers {
+            if before.as_ref().is_some_and(|before| {
+                self.layers.get(id).is_none_or(|layer| {
+                    layer.definition.document_id != before.definition.document_id
+                })
+            }) {
+                layers.push(id.to_proto());
+            }
+        }
+        let mut groups = Vec::new();
+        for (id, before) in &replaced.groups {
+            if before.as_ref().is_some_and(|before| {
+                self.groups
+                    .get(id)
+                    .is_none_or(|group| group.document_id != before.document_id)
+            }) {
+                groups.push(id.to_proto());
+            }
+        }
+        let mut results = Vec::new();
+        for (id, before) in &replaced.results {
+            if before.as_ref().is_some_and(|before| {
+                self.results.get(id).is_none_or(|result| {
+                    result.definition.document_id != before.definition.document_id
+                })
+            }) {
+                results.push(id.to_proto());
+            }
+        }
+        if layers.is_empty()
+            && groups.is_empty()
+            && results.is_empty()
+            && !assets_removed
+            && !documents_removed
+        {
+            for id in replaced.objects.keys() {
+                if let Some(object) = self.objects.get(id) {
+                    self.validate_object(id, object)?;
+                }
+            }
+            return Ok(());
+        }
+        for (id, object) in &self.objects {
+            let state = &object.state;
+            let affected = replaced.objects.contains_key(id)
+                || state
+                    .layer_id
+                    .as_ref()
+                    .is_some_and(|layer| layers.contains(layer))
+                || state
+                    .group_id
+                    .as_ref()
+                    .is_some_and(|group| groups.contains(group))
+                || (documents_removed && !self.documents.contains_key(&object.document_id))
+                || match &state.shape {
+                    Some(v1::object_state::Shape::SelectionRaster(_)) => assets_removed,
+                    Some(v1::object_state::Shape::ResultId(result)) => results.contains(result),
+                    _ => false,
+                };
+            if affected {
+                self.validate_object(id, object)?;
+            }
+        }
         Ok(())
     }
 
@@ -269,6 +556,39 @@ impl Project {
             .get(&Id::from_proto(id)?)
             .ok_or(ModelError::Missing("document reference"))
     }
+}
+
+/// One asset entry: its key and its metadata.
+fn check_asset(id: &AssetId, asset: &v1::AddAsset) -> Result<(), ModelError> {
+    if id.as_str() != asset.asset_id {
+        return Err(ModelError::Invalid("asset map key"));
+    }
+    validate_asset(asset)
+}
+
+/// The mask history of one output object.
+fn check_mask_versions(output: &Id, versions: &[v1::MaskOp]) -> Result<(), ModelError> {
+    // History may outlive the visible selection after deletion.
+    for version in versions {
+        same_id(output, version.output_object_id.as_ref())?;
+        one_of(
+            &version.op,
+            &[
+                "add",
+                "subtract",
+                "intersect",
+                "invert",
+                "expand",
+                "shrink",
+                "feather",
+            ],
+        )?;
+        nonnegative(version.amount)?;
+        for input in &version.input_object_ids {
+            Id::from_proto(Some(input))?;
+        }
+    }
+    Ok(())
 }
 
 /// Validate metadata; originals are addressed by hash, never overwritten here.

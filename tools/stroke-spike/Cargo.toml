@@ -12,6 +12,6 @@ workspace = true
 [dependencies]
 vw-ink = { path = "../../core/crates/vw-ink", version = "=0.1.0" }
 vw-proto = { path = "../../core/crates/vw-proto", version = "=0.1.0" }
-libm = { version = "=0.2.16", default-features = false }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
+libm.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["float_roundtrip"] }
