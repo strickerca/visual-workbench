@@ -46,16 +46,14 @@ internal enum class PlainPass {
  * request again when it ends. A failure for an unchanged request is shown,
  * and refreshes do not repeat it. */
 internal class PlainBackgroundLoads {
-    private var running: BackgroundPage? = null
+    /** Every page with a decode in flight; a decode for another page does not
+     * make the editor forget one still running. */
+    private val running = mutableSetOf<BackgroundPage>()
 
     /** Admits one decode for [page]; false while one for it is in flight. */
-    fun begin(page: BackgroundPage): Boolean {
-        if (running == page) return false
-        running = page
-        return true
-    }
+    fun begin(page: BackgroundPage): Boolean = running.add(page)
 
-    fun end(page: BackgroundPage) { if (running == page) running = null }
+    fun end(page: BackgroundPage) { running.remove(page) }
 
     /** [now] is the current page's request, or null once the editor shows
      * anything else. */

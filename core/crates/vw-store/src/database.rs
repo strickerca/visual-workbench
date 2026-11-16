@@ -2057,13 +2057,29 @@ fn private_compaction<F: FnMut(OpenStage)>(
     let copy = staging.path().join("project.sqlite");
     prepare_copy(&copy)?;
     observer(OpenStage::Vacuumed);
-    if data_version(connection)? != version {
-        return Err(Unreclaimed::Kept(StoreError::Busy));
-    }
+    // The write lock is held from this check into the close, which ends the
+    // transaction: no other connection can commit after the check and close
+    // before this one, which would leave no log to stop the swap and lose
+    // that commit. A writer let in by the close finds this connection still
+    // open, so the log is kept and the swap below is refused.
+    connection.execute_batch("BEGIN IMMEDIATE")?;
+    let placeholder = match data_version(connection) {
+        Ok(now) if now == version => Connection::open_in_memory().map_err(StoreError::from),
+        Ok(_) => Err(StoreError::Busy),
+        Err(error) => Err(error),
+    };
+    let placeholder = match placeholder {
+        Ok(placeholder) => placeholder,
+        Err(error) => {
+            let _ = connection.execute_batch("ROLLBACK");
+            return Err(Unreclaimed::Kept(error));
+        }
+    };
     // Closing moves the write-ahead log into the database file and removes
     // the log and its index, if no other connection has the file open.
-    let closing = std::mem::replace(connection, Connection::open_in_memory()?);
+    let closing = std::mem::replace(connection, placeholder);
     if let Err((kept, error)) = closing.close() {
+        let _ = kept.execute_batch("ROLLBACK");
         *connection = kept;
         return Err(Unreclaimed::Kept(error.into()));
     }
@@ -2162,11 +2178,11 @@ fn private_copy(root: &Path) -> Result<tempfile::TempDir, StoreError> {
 fn remove_private_copies(root: &Path) {
     let cache = root.join("cache");
     let directory = cache.join(RECLAIM_DIRECTORY);
-    let real = |path: &Path| {
-        fs::symlink_metadata(path)
-            .is_ok_and(|metadata| !blobs::is_link(&metadata) && metadata.is_dir())
-    };
-    if !real(root) || !real(&cache) || !real(&directory) {
+    // The same rule the copy step applies to these directories.
+    if [root, cache.as_path(), directory.as_path()]
+        .iter()
+        .any(|path| blobs::check_directory(path).is_err())
+    {
         return;
     }
     let Ok(entries) = fs::read_dir(&directory) else {

@@ -145,6 +145,17 @@ class PlainBackgroundLoadsTest {
         assertFalse(loads.begin(next)); loads.end(next); assertTrue(loads.begin(next))
     }
 
+    /** A decode for another page does not make the editor forget one still
+     * running: back on the first page, a second decode of it is refused. */
+    @Test fun aRoundTripToAnotherPageDoesNotAdmitASecondDecode() {
+        val loads = PlainBackgroundLoads()
+        val first = BackgroundPage(1, 1, "document", null); val other = BackgroundPage(1, 1, "other", null)
+        assertTrue(loads.begin(first)); assertTrue(loads.begin(other))
+        assertFalse(loads.begin(first))
+        loads.end(other); assertFalse(loads.begin(first))
+        loads.end(first); assertTrue(loads.begin(first))
+    }
+
     /** A blocking message or consent prompt: shown once, never re-decoded by refreshes. */
     @Test fun aFailureForTheShownRequestIsReportedAndNotRetried() = runBlocking {
         val editor = Editor()
