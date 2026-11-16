@@ -432,6 +432,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     // Native-operation admission must not wait for a Compose host or
     // global snapshot apply notifications. UI state remains observable.
     private val importReadiness = EditorReadiness()
+    private val backgroundSettle = BackgroundSettle(scope, ::settleIdle)
     private var busyState by mutableStateOf(true)
     var busy: Boolean
         get() = busyState
@@ -1360,6 +1361,35 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         cancelTool(); finishRemotePreview(sliderLink, sliderGesture, true)
         sliderGesture = null; sliderLink = null; sliderRevision = null; selectedStyleDraft = null; showBrush = false
         pairing.leave(); diagnostics.background(); hoverPoint = null; publish()
+    }
+    /** The activity is out of sight (onStop). The project stays open; after a
+     * grace period it writes the checkpoint closing would write. A stream
+     * draft editor only borrows its private draft. */
+    fun onHidden() { if (!streamDraftOnly) backgroundSettle.hidden(project) { project.takeIf { !disposing } } }
+    /** The activity is visible again (onStart). */
+    fun onShown() { backgroundSettle.shown() }
+    /** No native call of the editor's own is in flight: no stroke, save, edit,
+     * open or close (busy, pending), and no AI, workflow, instruction,
+     * semantic, image-frame, selection, eraser, rotation, document, transfer
+     * or capture work, whose next call would otherwise wait for the
+     * checkpoint. Open panels with nothing running do not count. */
+    private fun nativeQuiet(): Boolean = !disposing && !busy && pending == 0 && operationCount == 0 &&
+        gesture == null && strokes.isEmpty() && !captureStreamBlocksParent && captureOpenWork == null &&
+        assistedActions == null && ai.state.value.idle && !ai.state.value.loadingPixels &&
+        !workflows.controls.state.value.busy && !workflows.tones.state.value.busy && !workflows.review.state.value.busy &&
+        !instructionEditor.state.value.busy && !semanticEditor.state.value.busy && !imageFrames.state.value.busy &&
+        !selections.state.value.busy && !erasers.state.value.busy && !rotation.state.value.busy &&
+        !documents.state.value.busy && transferJob == null && incomingJob == null && incomingProducer == null &&
+        previewJob?.isActive != true && previewHandle == null
+    /** Waits, out of sight, until [nativeQuiet]. Only busy and pending can be
+     * awaited; the rest is looked at four times a second. False once the
+     * editor is being disposed. */
+    private suspend fun settleIdle(): Boolean {
+        while (true) {
+            if (!importReadiness.awaitReady() || disposing) return false
+            if (nativeQuiet()) return true
+            delay(250)
+        }
     }
 
     private suspend fun refreshProjects() {

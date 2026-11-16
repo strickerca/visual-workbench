@@ -115,7 +115,8 @@ const QUIET_LOOKS: u32 = 2;
 /// replay at about four times what opening the project takes anyway. Never
 /// while a stroke is being drawn, whose save would wait for it, and never
 /// for a history of strokes, which needs none. Closing writes one that is
-/// merely due.
+/// merely due, and so does `ProjectSession::settle`, which an application
+/// calls when it is put in the background.
 struct CheckpointUpkeep {
     drawing: Arc<AtomicUsize>,
     /// Set by `ProjectSession::hold_checkpoint_upkeep`: no look at all.
@@ -151,35 +152,37 @@ impl CheckpointUpkeep {
         } else {
             CheckpointNeed::Urgent
         };
-        if !write_checkpoint(store, need, "checkpoint while open") {
+        if write_checkpoint(store, need, "checkpoint while open").is_err() {
             self.failed = self.revision;
         }
     }
 }
 
 /// Write the checkpoint the store needs at least as much as `need` and
-/// record how long it took, or why it failed. False only for a failure.
-fn write_checkpoint(store: &mut ProjectStore, need: CheckpointNeed, name: &'static str) -> bool {
+/// record how long it took, or why it failed. Whether one was written; an
+/// error only for a failure, which is then on record.
+fn write_checkpoint(
+    store: &mut ProjectStore,
+    need: CheckpointNeed,
+    name: &'static str,
+) -> std::result::Result<bool, vw_store::StoreError> {
     if store.checkpoint_need() < need {
-        return true;
+        return Ok(false);
     }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()
         .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok());
     let Some(now) = now else {
-        return true;
+        return Ok(false);
     };
     let started = Instant::now();
     let written = store.checkpoint_if(need, now);
     crate::diagnostics::duration("project", name, started.elapsed());
-    match written {
-        Ok(_) => true,
-        Err(error) => {
-            crate::diagnostics::failure(name, crate::diagnostics::store_cause(&error));
-            false
-        }
+    if let Err(error) = &written {
+        crate::diagnostics::failure(name, crate::diagnostics::store_cause(error));
     }
+    written
 }
 
 /// Record what opening the store did besides loading the project. None of
@@ -291,6 +294,7 @@ impl ProjectSession {
     /// Hold, or let go of, the recovery checkpoint the project writes by
     /// itself between calls once it has been left alone, so that a test
     /// measuring a single call measures only that call. Not in the bindings.
+    /// Closing and `settle` are asked for and still write theirs.
     #[doc(hidden)]
     pub fn hold_checkpoint_upkeep(&self, held: bool) {
         self.upkeep_held.store(held, Ordering::Release);
@@ -460,7 +464,7 @@ impl ProjectSession {
                 // the next open writes the checkpoint instead. How long it
                 // took and why it failed are recorded.
                 if let Some(store) = state.store.as_mut() {
-                    write_checkpoint(store, CheckpointNeed::Due, "checkpoint on close");
+                    let _ = write_checkpoint(store, CheckpointNeed::Due, "checkpoint on close");
                 }
                 state.store.take();
                 // The permit and retained publication charge retire with the
@@ -470,6 +474,40 @@ impl ProjectSession {
                 }
                 state.events.stop();
                 info.map(|_| ())
+            })
+            .await
+    }
+    /// Write now the recovery checkpoint that closing would write, and keep
+    /// the project open: for an application that is put in the background,
+    /// where the system freezes its process within seconds and may end it
+    /// at will. The checkpoint the project writes by itself waits until it
+    /// has been left alone for ten seconds, and one that is merely due waits
+    /// for closing, so either may never be written and the next open would
+    /// replay more of the log. Nothing is lost without it: the log holds
+    /// every edit.
+    ///
+    /// A checkpoint takes as long as the history is large and nothing else
+    /// in the project runs meanwhile, so this runs after the work already
+    /// queued and is refused with `Backpressure`, writing nothing, while a
+    /// stroke is being drawn or saved. It runs whether or not the automatic
+    /// upkeep is held. Returns whether a checkpoint was written: false when
+    /// none is due. `Storage` when writing one failed; the cause is in the
+    /// diagnostics, and closing or the next open writes it instead.
+    pub async fn settle(&self) -> Result<bool> {
+        self.check_open()?;
+        let closed = self.closed.clone();
+        let drawing = self.active_gestures.clone();
+        self.worker
+            .call(move |state| {
+                if closed.load(Ordering::Acquire) {
+                    return Err(CoreError::Closed);
+                }
+                if drawing.load(Ordering::Acquire) != 0 {
+                    return Err(CoreError::Backpressure);
+                }
+                let store = state.store_mut()?;
+                write_checkpoint(store, CheckpointNeed::Due, "checkpoint on background")
+                    .map_err(|_| CoreError::Storage)
             })
             .await
     }
@@ -884,6 +922,203 @@ mod tests {
             ]
         );
         project.close().await.unwrap();
+    }
+
+    /// Settling runs after the work queued before it and decides when it
+    /// runs: a stroke being drawn by then refuses it. Nothing due writes
+    /// nothing, the automatic upkeep's hold does not stop it, and after
+    /// closing it is refused.
+    #[tokio::test]
+    async fn settling_waits_for_queued_work_and_writes_nothing_while_a_stroke_is_drawn() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("project");
+        let device = DeviceId::from_bytes([3; 16]);
+        let model = Project::new(
+            Id::from_parts(1700000000000, [4; 10]).unwrap(),
+            "settle fixture".into(),
+            device.clone(),
+        );
+        let store = ProjectStore::create(&path, model, device, 0).unwrap();
+        let blobs = BlobStore::new(&path).unwrap();
+        let project =
+            ProjectSession::from_store(store, blobs, SessionPermit::acquire().unwrap()).unwrap();
+        project.hold_checkpoint_upkeep(true);
+        // A save in flight: settling waits behind it.
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, wait) = std::sync::mpsc::channel::<()>();
+        project
+            .worker
+            .enqueue(Box::new(move |_| {
+                let _ = started.send(());
+                wait.recv().unwrap();
+            }))
+            .unwrap();
+        ready.await.unwrap();
+        let mut settle = Box::pin(project.settle());
+        assert!(poll_fn(|cx| Poll::Ready(settle.as_mut().poll(cx).is_pending())).await);
+        // A stroke begins meanwhile; by the time settling runs it is drawn.
+        project.active_gestures.store(1, Ordering::Release);
+        release.send(()).unwrap();
+        assert!(matches!(settle.await, Err(CoreError::Backpressure)));
+        project.active_gestures.store(0, Ordering::Release);
+        // Held or not, with nothing due it runs and writes nothing.
+        assert!(!project.settle().await.unwrap());
+        project.hold_checkpoint_upkeep(false);
+        assert!(!project.settle().await.unwrap());
+        project.close().await.unwrap();
+        assert!(matches!(project.settle().await, Err(CoreError::Closed)));
+    }
+
+    /// A store whose next open would gain from a checkpoint: a page of 900
+    /// rectangles made directly, then one of them moved until one is due.
+    fn store_needing_a_checkpoint(path: &Path) -> ProjectStore {
+        let device = DeviceId::from_bytes([3; 16]);
+        let id = |n: u32| {
+            let mut entropy = [5; 10];
+            entropy[6..].copy_from_slice(&n.to_be_bytes());
+            Id::from_parts(1700000000000, entropy).unwrap()
+        };
+        let (project_id, document, layer) = (id(1), id(2), id(3));
+        let mut model = Project::new(project_id.clone(), "settle fixture".into(), device.clone());
+        model.documents.insert(
+            document.clone(),
+            Document {
+                definition: pb::CreateDocument {
+                    document_id: Some(document.to_proto()),
+                    kind: pb::DocumentKind::Image as i32,
+                    schema_version: 1,
+                    title: "page".into(),
+                    ..Default::default()
+                },
+                pages: vec![],
+                created_at_ms: 0,
+            },
+        );
+        model.layers.insert(
+            layer.clone(),
+            Layer {
+                definition: pb::CreateLayer {
+                    layer_id: Some(layer.to_proto()),
+                    document_id: Some(document.to_proto()),
+                    page_index: -1,
+                    name: "Annotations".into(),
+                    kind: "annotation".into(),
+                    order_key: "V".into(),
+                },
+                visible: true,
+                locked: false,
+                opacity: 1.0,
+                blend: "normal".into(),
+            },
+        );
+        for n in 0..900 {
+            let state = pb::ObjectState {
+                object_id: Some(id(1000 + n).to_proto()),
+                layer_id: Some(layer.to_proto()),
+                order_key: "V".into(),
+                transform: Some(pb::Affine {
+                    a: 1.0,
+                    d: 1.0,
+                    ..Default::default()
+                }),
+                style: Some(pb::Style {
+                    stroke: Some(pb::Color { rgba: 0x112233ff }),
+                    width: 1.0,
+                    ..Default::default()
+                }),
+                role: pb::Role::None as i32,
+                created_by: device.to_string(),
+                created_at_ms: 1,
+                shape: Some(pb::object_state::Shape::Rect(pb::RectD {
+                    x: f64::from(n % 50),
+                    y: f64::from(n / 50),
+                    w: 4.0,
+                    h: 3.0,
+                })),
+                ..Default::default()
+            };
+            let object = vw_model::Object {
+                document_id: document.clone(),
+                state,
+            };
+            model.objects.insert(id(1000 + n), object);
+        }
+        let mut store = ProjectStore::create(path, model, device.clone(), 0).unwrap();
+        let mut moves = 0;
+        while store.checkpoint_need() < CheckpointNeed::Due {
+            moves += 1;
+            assert!(moves < 5000, "no checkpoint came due");
+            let txn = pb::Transaction {
+                txn_id: Some(id(100_000 + moves).to_proto()),
+                project_id: Some(project_id.to_proto()),
+                device_id: device.to_string(),
+                base_revision: Some(store.revision().unwrap()),
+                created_at_wall_ms: i64::from(moves),
+                ops: vec![pb::Op {
+                    op_id: Some(pb::OpId {
+                        device_id: device.to_string(),
+                        lamport: u64::from(moves),
+                    }),
+                    kind: Some(pb::op::Kind::SetProperty(pb::SetProperty {
+                        object_id: Some(id(1000).to_proto()),
+                        property: "transform".into(),
+                        value: Some(pb::PropertyValue {
+                            value: Some(pb::property_value::Value::Transform(pb::Affine {
+                                a: 1.0,
+                                d: 1.0,
+                                e: f64::from(moves),
+                                ..Default::default()
+                            })),
+                        }),
+                    })),
+                }],
+                ..Default::default()
+            };
+            store.commit(&txn, &device, i64::from(moves)).unwrap();
+        }
+        store
+    }
+
+    /// The application cancels a settle (it came back to the foreground)
+    /// while the settle still waits behind other work: it never runs, and
+    /// the checkpoint is still due. One that is not cancelled writes it.
+    #[tokio::test]
+    async fn a_settle_cancelled_before_it_starts_writes_nothing_and_one_that_runs_writes_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("project");
+        let store = store_needing_a_checkpoint(&path);
+        let blobs = BlobStore::new(&path).unwrap();
+        let project =
+            ProjectSession::from_store(store, blobs, SessionPermit::acquire().unwrap()).unwrap();
+        project.hold_checkpoint_upkeep(true);
+        let need = || {
+            project
+                .worker
+                .call(|state| Ok(state.store()?.checkpoint_need()))
+        };
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, wait) = std::sync::mpsc::channel::<()>();
+        project
+            .worker
+            .enqueue(Box::new(move |_| {
+                let _ = started.send(());
+                wait.recv().unwrap();
+            }))
+            .unwrap();
+        ready.await.unwrap();
+        let mut settle = Box::pin(project.settle());
+        assert!(poll_fn(|cx| Poll::Ready(settle.as_mut().poll(cx).is_pending())).await);
+        drop(settle);
+        release.send(()).unwrap();
+        assert!(need().await.unwrap() >= CheckpointNeed::Due);
+        assert!(project.settle().await.unwrap());
+        assert_eq!(need().await.unwrap(), CheckpointNeed::None);
+        project.close().await.unwrap();
+        // It is the checkpoint the next open starts from.
+        assert_eq!(
+            ProjectStore::open(&path).unwrap().replayed_transactions(),
+            0
+        );
     }
 }
 

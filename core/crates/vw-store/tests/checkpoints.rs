@@ -14,7 +14,10 @@ use tempfile::TempDir;
 use vw_model::{AssetId, DeviceId, Document, Id, Layer, Project};
 use vw_ops::HostSequencer;
 use vw_proto::{Message, v1 as pb};
-use vw_store::{CheckpointNeed, CommitStage, OpenStage, ProjectStore, Upkeeping};
+use vw_store::{
+    CheckpointNeed, CommitStage, Compaction, LargeCopy, OpenStage, ProjectStore, StoreError,
+    Upkeeping,
+};
 
 fn temporary() -> TempDir {
     let mut builder = tempfile::Builder::new();
@@ -826,6 +829,361 @@ fn a_clean_up_the_file_refuses_leaves_the_project_open_and_the_next_open_does_it
     drop(store);
     assert_eq!(checkpoints(&old.path), [0]);
     assert!(database_bytes(&old.path) * 4 < before);
+    temp.close().unwrap();
+}
+
+/// What an Android open does with a database whose live pages do not fit in
+/// memory, forced here at any size: Android gives SQLite no temporary
+/// directory, so the copy is made in the project's own storage and then
+/// replaces the database file.
+const PRIVATE: Compaction = Compaction {
+    in_memory_bytes: 0,
+    larger: LargeCopy::Private,
+};
+fn assert_opens_privately_as(path: &Path, host: &HostSequencer) -> ProjectStore {
+    let store = ProjectStore::open_compacting(path, |_| {}, PRIVATE).unwrap();
+    assert_eq!(store.revision().unwrap(), host.revision().unwrap());
+    assert_eq!(store.state_hash().unwrap(), host.state_hash().unwrap());
+    assert_eq!(store.project(), host.project());
+    assert_eq!(
+        store.checkpoint_bytes().unwrap(),
+        host.checkpoint_bytes().unwrap()
+    );
+    store.integrity_check().unwrap();
+    store
+}
+/// What the project's directory for private copies holds.
+fn private_copies(path: &Path) -> usize {
+    fs::read_dir(path.join("cache").join("compaction-v1")).map_or(0, |entries| entries.count())
+}
+fn compaction_note(path: &Path) -> Option<String> {
+    use rusqlite::OptionalExtension;
+    query(path)
+        .query_row(
+            "SELECT value FROM meta WHERE key='compaction_attempt'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .unwrap()
+}
+
+#[test]
+fn a_project_too_large_to_compact_in_memory_compacts_through_a_private_copy() {
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let before = database_bytes(&old.path);
+    let mut store = assert_opens_privately_as(&old.path, &old.host);
+    let report = store.open_report();
+    assert!(matches!(report.tidy, Upkeeping::Done(_)), "{report:?}");
+    assert!(
+        matches!(report.compaction, Upkeeping::Done(_)),
+        "{report:?}"
+    );
+    // The store works on the file that replaced the old one: compact, in
+    // write-ahead mode, without the note of the attempt or the copy.
+    let file = query(&old.path);
+    let pragma = |name: &str| -> String {
+        file.query_row(&format!("PRAGMA {name}"), [], |row| {
+            row.get::<_, rusqlite::types::Value>(0)
+        })
+        .map(|value| format!("{value:?}"))
+        .unwrap()
+    };
+    assert_eq!(pragma("freelist_count"), "Integer(0)");
+    assert_eq!(pragma("journal_mode"), "Text(\"wal\")");
+    drop(file);
+    assert_eq!(compaction_note(&old.path), None);
+    assert_eq!(private_copies(&old.path), 0);
+    assert!(store.gesture_closed(&device(2), &id(CANCELLED)));
+    // And it goes on saving.
+    let txn = title(store.revision().unwrap(), 900, 0);
+    store.commit(&txn, &device(1), 5000).unwrap();
+    let mut host = old.host.clone();
+    host.submit(txn, &device(1), 5000).unwrap();
+    drop(store);
+    assert_eq!(checkpoints(&old.path), [0]);
+    let after = database_bytes(&old.path);
+    assert!(after * 4 < before, "{before} bytes became {after}");
+    // It opens the same again, by either path, with nothing to compact, and
+    // in the older build.
+    let store = assert_opens_privately_as(&old.path, &host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::NotDue));
+    drop(store);
+    let store = assert_opens_as(&old.path, &host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::NotDue));
+    drop(store);
+    assert_eq!(
+        open_as_an_older_build(&old.path)
+            .checkpoint_bytes()
+            .unwrap(),
+        host.checkpoint_bytes().unwrap()
+    );
+    temp.close().unwrap();
+}
+
+#[test]
+fn process_exit_at_each_boundary_of_a_private_compaction_leaves_a_project_that_opens_the_same() {
+    for stage in [
+        // Noted but not started, inside the copy, the copy checked and on
+        // disk, the copy in place of the database file, and done.
+        OpenStage::Compacting,
+        OpenStage::Copying,
+        OpenStage::Vacuumed,
+        OpenStage::Transferred,
+        OpenStage::Compacted,
+    ] {
+        let temp = temporary();
+        let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+        let before = database_bytes(&old.path);
+        let status = run_worker(
+            "private_clean_up_exit_worker",
+            &old.path,
+            &format!("{stage:?}"),
+        );
+        assert_eq!(
+            status.code(),
+            Some(83),
+            "worker must exit without running Rust destructors at {stage:?}"
+        );
+        // The database file is the old one or the whole copy, never a part:
+        // the old one with the note of the attempt, the copy without it.
+        let replaced = matches!(stage, OpenStage::Transferred | OpenStage::Compacted);
+        let file = fs::metadata(old.path.join("project.sqlite")).unwrap().len();
+        assert_eq!(file * 4 < before, replaced, "{stage:?}: {file} bytes");
+        assert_eq!(compaction_note(&old.path).is_some(), !replaced, "{stage:?}");
+        let store = assert_opens_privately_as(&old.path, &old.host);
+        assert!(store.gesture_closed(&device(2), &id(CANCELLED)));
+        drop(store);
+        // That open finished the job and removed what the exit left.
+        assert_eq!(checkpoints(&old.path), [0], "{stage:?}");
+        assert!(database_bytes(&old.path) * 4 < before, "{stage:?}");
+        assert_eq!(private_copies(&old.path), 0, "{stage:?}");
+        assert_eq!(compaction_note(&old.path), None, "{stage:?}");
+        drop(assert_opens_as(&old.path, &old.host));
+        temp.close().unwrap();
+    }
+}
+
+#[test]
+#[ignore = "private owned subprocess for process exit inside a private compaction"]
+fn private_clean_up_exit_worker() {
+    let path = std::env::var_os("VW_CHECKPOINT_PROJECT").expect("owned project");
+    let stage = std::env::var("VW_CHECKPOINT_STAGE").expect("owned boundary");
+    let _store = ProjectStore::open_compacting(
+        Path::new(&path),
+        move |at| {
+            if format!("{at:?}") == stage {
+                std::process::exit(83);
+            }
+        },
+        PRIVATE,
+    )
+    .unwrap();
+    panic!("requested clean-up boundary was not reached");
+}
+
+#[test]
+fn a_private_compaction_that_ended_with_the_process_twice_is_not_started_at_every_open() {
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let before = database_bytes(&old.path);
+    for _ in 0..2 {
+        let status = run_worker("private_clean_up_exit_worker", &old.path, "Copying");
+        assert_eq!(status.code(), Some(83));
+        assert_eq!(private_copies(&old.path), 1);
+    }
+    // The third open leaves it alone, and still removes the copy left behind.
+    let store = assert_opens_privately_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::Skipped));
+    drop(store);
+    assert_eq!(private_copies(&old.path), 0);
+    assert!(database_bytes(&old.path) * 2 > before);
+    assert_eq!(
+        query(&old.path)
+            .execute("DELETE FROM meta WHERE key='compaction_attempt'", [])
+            .unwrap(),
+        1
+    );
+    let store = assert_opens_privately_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::Done(_)));
+    drop(store);
+    assert!(database_bytes(&old.path) * 4 < before);
+    temp.close().unwrap();
+}
+
+#[test]
+fn a_private_copy_never_replaces_a_database_another_connection_has_open() {
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let before = database_bytes(&old.path);
+    // A program that ignores the store's lock has read the database and
+    // keeps it open.
+    let other = query(&old.path);
+    let rows: i64 = other
+        .query_row("SELECT COUNT(*) FROM op_log", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 160);
+    let store = assert_opens_privately_as(&old.path, &old.host);
+    let report = store.open_report();
+    assert!(
+        matches!(report.compaction, Upkeeping::Failed(_, StoreError::Busy)),
+        "{report:?}"
+    );
+    assert_eq!(private_copies(&old.path), 0);
+    drop(store);
+    // The other connection reads the same database it opened.
+    let rows: i64 = other
+        .query_row("SELECT COUNT(*) FROM op_log", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 160);
+    drop(other);
+    assert!(database_bytes(&old.path) * 2 > before);
+    // On its own, the next open compacts.
+    let store = assert_opens_privately_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::Done(_)));
+    drop(store);
+    assert!(database_bytes(&old.path) * 4 < before);
+    assert_eq!(compaction_note(&old.path), None);
+    temp.close().unwrap();
+}
+
+#[test]
+fn a_private_copy_never_replaces_a_database_another_connection_wrote_since() {
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let before = database_bytes(&old.path);
+    // A program that ignores the store's lock writes once the copy is made,
+    // and goes: its write is not in the copy.
+    let path = old.path.clone();
+    let store = ProjectStore::open_compacting(
+        &old.path,
+        move |stage| {
+            if stage == OpenStage::Vacuumed {
+                query(&path)
+                    .execute(
+                        "INSERT INTO settings(key,value) VALUES('written meanwhile','kept')",
+                        [],
+                    )
+                    .unwrap();
+            }
+        },
+        PRIVATE,
+    )
+    .unwrap();
+    let report = store.open_report();
+    assert!(
+        matches!(report.compaction, Upkeeping::Failed(_, StoreError::Busy)),
+        "{report:?}"
+    );
+    assert_eq!(private_copies(&old.path), 0);
+    drop(store);
+    let written = |path: &Path| -> String {
+        query(path)
+            .query_row(
+                "SELECT value FROM settings WHERE key='written meanwhile'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    assert_eq!(written(&old.path), "kept");
+    assert!(database_bytes(&old.path) * 2 > before);
+    // The next open compacts and keeps it.
+    let store = assert_opens_privately_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::Done(_)));
+    drop(store);
+    assert!(database_bytes(&old.path) * 4 < before);
+    assert_eq!(written(&old.path), "kept");
+    temp.close().unwrap();
+}
+
+/// The desktop compacts in place. When SQLite refuses (here another
+/// connection holds the file for writing just as it starts; a full disk or
+/// too little memory end it the same way), the open's connection is left
+/// as it was: no progress callback from the open stays armed, and
+/// temporary storage is SQLite's default again.
+#[test]
+fn a_compaction_sqlite_refuses_leaves_the_connection_as_it_was() {
+    for in_memory_bytes in [256 * 1024 * 1024, 0] {
+        let temp = temporary();
+        let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+        let before = database_bytes(&old.path);
+        let alive = std::sync::Arc::new(());
+        let watched = std::sync::Arc::downgrade(&alive);
+        let other = query(&old.path);
+        let store = ProjectStore::open_compacting(
+            &old.path,
+            move |stage| {
+                let _alive = &alive;
+                if stage == OpenStage::Compacting {
+                    other.execute_batch("BEGIN IMMEDIATE").unwrap();
+                }
+            },
+            Compaction {
+                in_memory_bytes,
+                larger: LargeCopy::Temporary,
+            },
+        )
+        .unwrap();
+        let report = store.open_report();
+        assert!(
+            matches!(report.compaction, Upkeeping::Failed(..)),
+            "{in_memory_bytes}: {report:?}"
+        );
+        // Nothing of the open's observer is held by the connection (which
+        // also ended the other connection and its transaction).
+        assert!(watched.upgrade().is_none(), "{in_memory_bytes}");
+        assert_eq!(store.temp_store().unwrap(), 0, "{in_memory_bytes}");
+        drop(store);
+        assert!(database_bytes(&old.path) * 2 > before);
+        let store = assert_opens_as(&old.path, &old.host);
+        assert!(matches!(store.open_report().compaction, Upkeeping::Done(_)));
+        drop(store);
+        assert!(database_bytes(&old.path) * 4 < before);
+        temp.close().unwrap();
+    }
+}
+
+/// Removing what a killed compaction left is as far as it goes: what it
+/// cannot remove, or must not touch, neither fails the open nor stops the
+/// compaction, and nothing is removed through a link.
+#[cfg(unix)]
+#[test]
+fn leftovers_that_cannot_be_removed_stop_nothing_and_links_are_never_followed() {
+    use std::os::unix::fs::symlink;
+    let temp = temporary();
+    let old = old_project(temp.path(), 160, 20, 4000, Some(90));
+    let before = database_bytes(&old.path);
+    let elsewhere = temp.path().join("elsewhere");
+    fs::create_dir_all(elsewhere.join("compaction-v1").join("compact-other")).unwrap();
+    let directory = old.path.join("cache").join("compaction-v1");
+    fs::create_dir_all(&directory).unwrap();
+    symlink(&elsewhere, directory.join("compact-linked")).unwrap();
+    let store = assert_opens_privately_as(&old.path, &old.host);
+    assert!(matches!(store.open_report().compaction, Upkeeping::Done(_)));
+    drop(store);
+    assert!(database_bytes(&old.path) * 4 < before);
+    assert!(directory.join("compact-linked").exists());
+    // A cache that is a link: nothing is removed through it, and no copy is
+    // made there.
+    let second = temp.path().join("second");
+    fs::create_dir(&second).unwrap();
+    let other = old_project(&second, 160, 20, 4000, Some(90));
+    fs::remove_dir_all(other.path.join("cache")).unwrap();
+    symlink(&elsewhere, other.path.join("cache")).unwrap();
+    let store = assert_opens_privately_as(&other.path, &other.host);
+    assert!(matches!(
+        store.open_report().compaction,
+        Upkeeping::Failed(..)
+    ));
+    drop(store);
+    assert!(
+        elsewhere
+            .join("compaction-v1")
+            .join("compact-other")
+            .is_dir()
+    );
     temp.close().unwrap();
 }
 

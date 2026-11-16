@@ -110,6 +110,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (::editor.isInitialized) editor.onShown()
+    }
     override fun onResume() {
         super.onResume()
         if (::editor.isInitialized) {
@@ -124,6 +128,10 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         editor.airActivityResumed(airActivityOwner, false)
         editor.onBackground(); super.onPause()
+    }
+    override fun onStop() {
+        if (::editor.isInitialized) editor.onHidden()
+        super.onStop()
     }
     override fun onDestroy() {
         airWindowKeys?.close(); airWindowKeys = null

@@ -59,6 +59,23 @@ public interface WorkbenchDeferredStrokes {
      * result and must [WorkbenchStroke.dispose] it. */
     public fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke?
 }
+/** Optional project capability: write now the recovery checkpoint that
+ * [WorkbenchProject.close] would write, and keep the project open. For an
+ * app put in the background, whose process the system freezes within
+ * seconds and may end: the checkpoint the project writes by itself waits
+ * until it has been left alone for ten seconds, and one that is merely due
+ * waits for closing, so the next open would replay more of the log. Nothing
+ * is lost without it; the log holds every edit. */
+public interface WorkbenchSettling {
+    /** Runs after the work already queued in the project and takes as long
+     * as its history is large. Returns whether a checkpoint was written:
+     * false when none was due. Fails with [CoreFailureKind.Backpressure],
+     * writing nothing, while a stroke is being drawn or saved; with
+     * [CoreFailureKind.Closed] once the project is closed; with
+     * [CoreFailureKind.Storage] when writing it failed, and then closing or
+     * the next open writes it instead. */
+    public suspend fun settle(): Boolean
+}
 public interface WorkbenchStroke {
     /** Retain and retry this exact sequence only when CoreFailure.Backpressure is reported. */
     public suspend fun append(batch: SampleBatch): InkUpdate
