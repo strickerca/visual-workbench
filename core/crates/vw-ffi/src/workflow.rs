@@ -344,8 +344,9 @@ pub(crate) fn checkpoint_workspace(state: &ProjectState, budget: u64) -> Workflo
 }
 /// Deciding `transaction` in place, by validation or commit: sixteen
 /// borrowed representations of the transaction (its new content included),
-/// what deciding it holds of the entities it touches, and on a mirror the
-/// replay copy.
+/// what deciding it holds of the entities it touches, on a mirror the replay
+/// of its queue, and in a build of vw-ops that cross-checks its hashes the
+/// whole-project hash every decided edit then makes.
 pub(crate) fn commit_workspace(
     state: &ProjectState,
     transaction: &pb::Transaction,
@@ -356,7 +357,7 @@ pub(crate) fn commit_workspace(
 fn commit_parts(
     state: &ProjectState,
     transaction: &pb::Transaction,
-) -> WorkflowResult<[Option<u64>; 3]> {
+) -> WorkflowResult<[Option<u64>; 4]> {
     let single =
         vw_ops::HostSequencer::transaction_workspace_estimate_bytes(transaction, MAX_MEMORY / 16)
             .map_err(|_| WorkflowError::Invalid)?;
@@ -365,7 +366,41 @@ fn commit_parts(
         representations,
         touched_bytes(state.project()?, visible_cost(state)?, transaction)?,
         replay_bytes(state)?,
+        verification_bytes(state)?,
     ])
+}
+/// A build of vw-ops with `cross-check` (its own tests and the workspace's
+/// test build; never the apps) checks what it does incrementally against
+/// doing it whole. Every edit it decides, and the end of a mirror's replay,
+/// also hashes the whole visible project (one hashed cost) while what
+/// deciding holds is alive, and validates the whole project, which takes
+/// less: references per entity where the hash holds a value per scalar.
+/// Recording the edit for undo copies the undo history, which holds every
+/// transaction of this device as its bytes, and orders it again. Nothing in
+/// other builds, so this walk over the device's own history is made only
+/// where those checks walk it too.
+fn verification_bytes(state: &ProjectState) -> WorkflowResult<Option<u64>> {
+    use vw_proto::Message;
+    if !vw_ops::CROSS_CHECKED {
+        return Ok(Some(0));
+    }
+    let store = state.store()?;
+    let device = store.local_device()?;
+    let own = store
+        .accepted_transactions()
+        .map(|(transaction, _)| transaction)
+        .chain(
+            state
+                .replica
+                .iter()
+                .flat_map(|replica| replica.pending().iter().map(|pending| &pending.transaction)),
+        )
+        .filter(|transaction| transaction.device_id == device.as_str());
+    // An event keeps the bytes, its ID, kind and receipt, in a map node.
+    let undo = own.fold(0u64, |total, transaction| {
+        total.saturating_add(transaction.encoded_len() as u64 + 1024)
+    });
+    Ok(visible_hash_bytes(state)?.map(|hash| hash.saturating_add(undo)))
 }
 /// The entities `transaction` changes or removes, as deciding it holds them
 /// at once: the copy kept to restore each, the `Value`s before and after
@@ -573,14 +608,14 @@ pub(crate) fn admit_isolated_host(
     extra: u64,
 ) -> WorkflowResult<()> {
     admit_with(budget, extra, |left| {
-        let [representations, touched, _] = commit_parts(state, transaction)?;
+        let [representations, touched, _, verification] = commit_parts(state, transaction)?;
         let host = visible_cost(state)?.map(|counted| {
             counted
                 .copy
                 .saturating_add(counted.hasher())
                 .saturating_add(counted.tree)
         });
-        charge(left, &[representations, touched, host])
+        charge(left, &[representations, touched, host, verification])
     })
 }
 pub(crate) fn current(state: &ProjectState, document: &str) -> WorkflowResult<WorkflowBinding> {
@@ -766,6 +801,18 @@ impl WorkflowPlan {
         if let Ok(mut prepared) = self.prepared.lock() {
             *prepared = None;
         }
+    }
+}
+impl ProjectSession {
+    /// What every commit is charged now for the whole-project checks of a
+    /// build of vw-ops with `cross-check`; zero in other builds. For tests
+    /// that tell a refusal those checks cause from any other. Not part of
+    /// the bindings.
+    #[doc(hidden)]
+    pub async fn cross_check_charge(&self) -> WorkflowResult<u64> {
+        self.worker
+            .call(|state| Ok(verification_bytes(state).map(|bytes| bytes.unwrap_or(u64::MAX))))
+            .await?
     }
 }
 impl WorkflowPlan {
