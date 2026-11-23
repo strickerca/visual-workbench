@@ -54,14 +54,17 @@ internal fun ProjectsScreen(projects: List<ProjectCard>, busy: Boolean, onOpenIm
             }
         }
         if (projects.isEmpty()) {
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("A clear place to begin", style = MaterialTheme.typography.h6)
-                    com.visualworkbench.ui.GettingStartedGuide(onPhone = true)
-                    Text("Originals stay intact. Every mark can be edited or undone.", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.secondary)
+            // The guide scrolls in the space left, so the pairing and diagnostics
+            // row below stays on screen (the guide alone fills an S23 screen).
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("A clear place to begin", style = MaterialTheme.typography.h6)
+                        com.visualworkbench.ui.GettingStartedGuide(onPhone = true)
+                        Text("Originals stay intact. Every mark can be edited or undone.", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.secondary)
+                    }
                 }
             }
-            Spacer(Modifier.weight(1f))
         } else {
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
                 items(projects, key = { it.id }) { project ->
