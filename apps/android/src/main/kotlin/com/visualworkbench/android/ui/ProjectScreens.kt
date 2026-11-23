@@ -7,8 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import com.visualworkbench.android.editor.CameraCapture
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,55 +20,66 @@ internal fun ProjectsScreen(projects: List<ProjectCard>, busy: Boolean, onOpenIm
                             onOpen: (String) -> Unit, onSettings: () -> Unit, onDiagnostics: () -> Unit, onPairing: () -> Unit,
                             onFiles: () -> Unit, onCamera: () -> Unit, cameraCaptures: List<CameraCapture>,
                             onRetryCamera: (String) -> Unit, onDiscardCamera: (String) -> Unit, onSaveCamera: (String) -> Unit,onDocument:()->Unit = {}) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("VISUAL WORKBENCH", style = MaterialTheme.typography.overline, color = MaterialTheme.colors.primary)
-                Text("Your projects", style = MaterialTheme.typography.h4)
-            }
-            TextButton(onClick = onSettings, modifier = Modifier.heightIn(min = 48.dp)) { Text("Settings") }
-        }
-        Text("Images, ideas, and the marks that connect them. Everything here stays available offline.", style = MaterialTheme.typography.body1)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onOpenImage, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) { Text("Photos") }
-            OutlinedButton(onClick = onNewCanvas, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) { Text("New canvas") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onFiles, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Browse files") }
-            OutlinedButton(onClick = onCamera, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Take photo") }
-        }
-        OutlinedButton(onClick=onDocument,enabled=!busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("Open PDF or SVG")}
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (cameraCaptures.isNotEmpty()) Column(Modifier.fillMaxWidth().heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
-            Text("Retained camera originals", style = MaterialTheme.typography.subtitle1)
-            Text("An import did not finish. These full-resolution originals stay on this phone until imported or discarded.", style = MaterialTheme.typography.caption)
-            cameraCaptures.forEachIndexed { index, capture ->
-                Text("Camera original ${index + 1} · ${capture.bytes / (1024 * 1024)} MiB", style = MaterialTheme.typography.caption)
-                Row {
-                    TextButton(onClick = { onRetryCamera(capture.token) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Retry") }
-                    TextButton(onClick = { onSaveCamera(capture.token) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Save original") }
-                    TextButton(onClick = { onDiscardCamera(capture.token) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Discard") }
+    // Everything above the pairing and diagnostics row scrolls as one list, so
+    // that row and the projects stay reachable on a short screen (landscape, or
+    // the getting-started guide on a phone with no projects yet).
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(top = 20.dp, bottom = 16.dp)) {
+            item(key = "header") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("VISUAL WORKBENCH", style = MaterialTheme.typography.overline, color = MaterialTheme.colors.primary)
+                        Text("Your projects", style = MaterialTheme.typography.h4)
+                    }
+                    TextButton(onClick = onSettings, modifier = Modifier.heightIn(min = 48.dp)) { Text("Settings") }
                 }
             }
-        }
-        if (projects.isEmpty()) {
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("A clear place to begin", style = MaterialTheme.typography.h6)
-                    com.visualworkbench.ui.GettingStartedGuide(onPhone = true)
-                    Text("Originals stay intact. Every mark can be edited or undone.", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.secondary)
+            item(key = "intro") {
+                Text("Images, ideas, and the marks that connect them. Everything here stays available offline.", style = MaterialTheme.typography.body1)
+            }
+            item(key = "actions") {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = onOpenImage, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) { Text("Photos") }
+                        OutlinedButton(onClick = onNewCanvas, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(12.dp)) { Text("New canvas") }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = onFiles, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Browse files") }
+                        OutlinedButton(onClick = onCamera, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Take photo") }
+                    }
+                    OutlinedButton(onClick = onDocument, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Open PDF or SVG") }
+                    if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             }
-            Spacer(Modifier.weight(1f))
-        } else {
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
-                items(projects, key = { it.id }) { project ->
-                    Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpen(project.id) }) {
-                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(project.title, style = MaterialTheme.typography.h6, maxLines = 2)
-                            Text(project.detail, color = MaterialTheme.colors.secondary)
-                            Text(project.modified, style = MaterialTheme.typography.caption)
+            if (cameraCaptures.isNotEmpty()) item(key = "camera") {
+                Column(Modifier.fillMaxWidth()) {
+                    Text("Retained camera originals", style = MaterialTheme.typography.subtitle1)
+                    Text("An import did not finish. These full-resolution originals stay on this phone until imported or discarded.", style = MaterialTheme.typography.caption)
+                    cameraCaptures.forEachIndexed { index, capture ->
+                        Text("Camera original ${index + 1} · ${capture.bytes / (1024 * 1024)} MiB", style = MaterialTheme.typography.caption)
+                        Row {
+                            TextButton(onClick = { onRetryCamera(capture.token) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Retry") }
+                            TextButton(onClick = { onSaveCamera(capture.token) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Save original") }
+                            TextButton(onClick = { onDiscardCamera(capture.token) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Discard") }
                         }
+                    }
+                }
+            }
+            if (projects.isEmpty()) item(key = "guide") {
+                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("A clear place to begin", style = MaterialTheme.typography.h6)
+                        com.visualworkbench.ui.GettingStartedGuide(onPhone = true)
+                        Text("Originals stay intact. Every mark can be edited or undone.", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.secondary)
+                    }
+                }
+            } else items(projects, key = { it.id }) { project ->
+                Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpen(project.id) }) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(project.title, style = MaterialTheme.typography.h6, maxLines = 2)
+                        Text(project.detail, color = MaterialTheme.colors.secondary)
+                        Text(project.modified, style = MaterialTheme.typography.caption)
                     }
                 }
             }
