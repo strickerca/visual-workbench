@@ -17,6 +17,7 @@ ignore = [
   { id = "RUSTSEC-2026-0374", reason = "basic-toml is unmaintained; build-time only, through the UniFFI bindings generator's templates" },
   { id = "RUSTSEC-2026-0206", reason = "rustybuzz is unmaintained; vw-raster uses it directly for text shaping and usvg 0.47 pulls it too. Removed by moving text shaping to a maintained shaper" },
   { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained; it comes with rustybuzz and fontdb. Removed together with rustybuzz" },
+  { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained; it comes only with pdfium-render (vw-pdf and the document worker). Removed when pdfium-render drops it" },
 ]
 
 [licenses]
