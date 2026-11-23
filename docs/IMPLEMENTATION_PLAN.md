@@ -37,7 +37,7 @@ Stage 1 blockers:
 | B1 Windows release replays | Closed 2026-11-04 |
 | B2 model graphs and LiteRT scan | Graphs reproduced byte-identical ([ASSISTED_MODEL_REPRODUCTION.md](ASSISTED_MODEL_REPRODUCTION.md)); Android runtime admission open |
 | B3 WiX and scrcpy licences | Conditions met (D22); the tunnel catalog compile is T5.03 |
-| B4 black canvas | Fix verified on the S23 (226/226, no black frames) before its review fixes; merged 2026-11-13; device re-check pending |
+| B4 black canvas | Closed 2026-11-23: re-checked on the S23 with the merged code and the canvas log on: 6 rotations and 5 Home→return cycles, no black or stale frame in 35 screen samples, no `redraw_fallback`, no buffer timeout; each return presented 18–37 ms after its new surface |
 | B5 normal APK delivery | Accepted on the S23 ([ANDROID_DELIVERY.md](ANDROID_DELIVERY.md)) |
 | B6 visible phone→Paint run | Prepared, not run. Owner-attended, 10–15 minutes hands off, USB tethering on, Paint closed with Brush last used |
 | B7 Windows owned guard | Closed: 103 cases |
@@ -45,6 +45,17 @@ Stage 1 blockers:
 | B9 physical-gesture producer | Code merged 2026-11-13; needs an owner S Pen session (about 30 minutes). The S Pen source (0x5002) and `verifyInputEvent` signing are unconfirmed on the device |
 | B10 live GPT Image | Waits for an owner spend decision (about $1–5) |
 | LIC-003 generated notices | Complete (427 components, D23) |
+
+S23 session 2026-11-23 (main a824a9f plus this task branch; isolated `.hil` package, owner user 0; effort high):
+instrumented suite 228/228 after two project-screen fixes (with no projects the guide hid Pair a computer
+and Diagnostics; in landscape the project list and both actions were off screen and nothing scrolled).
+Injected stylus strokes (`input stylus swipe`) with every pen-path switch off: at a human pace (60–80 ms
+strokes, about 150–200 ms apart) all 500 landed on fresh pages and on a 1,009-stroke page, but 382 of
+1,100 were dropped while that page grew to 1,827 strokes; at a 50 ms gap 236 of 400 landed on a fresh
+page, 331 of 400 with "next stroke starts while the last one saves" on. The dropped pen-downs are
+what that switch addresses; switching it on by default waits for the owner's pen session. No
+"checkpoint on background" was due at 1,827 strokes (opening had already checkpointed); a project
+opens in 11–77 ms. Not covered: real S Pen, latency, PC pairing (B6, B9).
 
 Open code and admission gaps:
 
@@ -80,7 +91,7 @@ or behaviour-preserving until they are run on the laptop or the S23.
 | 10 Portability and installers | Paint catalog as data with re-measure; GPU capability probe; MSI and APK built automatically | Partly done 2026-11-15: the `build-apps` workflow builds both apps as downloads on request and whenever the packaging changes — the Android package (checked by `check_apk`; 50 MB download, development key) and the Windows app as a ready-to-run folder with optimised native libraries and the local agent server (135 MB download; no installer). Both jobs green on 0dbf830c. Neither package has been started on a device from this route. Still open: MSI (needs the WiX licence step), Paint catalog, GPU probe, release shrinking, a stable signing key (owner). Effort: high |
 
 Only the owner can: merge pull requests and protect main on `ci-required`; run
-the S23 sessions (B4 re-check, latency baseline, B6, B9, pen-path re-measure,
+the S23 sessions (latency baseline, B6, B9, pen-path re-measure,
 Jetpack Ink A/B); decide live AI spend; check Paint's version and auto-update.
 
 Kept in mind, not to be built until the owner asks (2026-11-15):
