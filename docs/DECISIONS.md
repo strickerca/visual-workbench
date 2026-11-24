@@ -397,3 +397,41 @@ collecting a baseline, not permission to relabel 30-second samples as 1 Hz data.
   behaviour-preserving until run on the laptop or the S23. The Windows and
   Kotlin jobs join `ci-required` once they are stable on hosted machines.
 - **Confidence:** 85% · **Status:** accepted (owner instruction).
+
+## D25 — Canvas drawn like a paint program; a better way outranks the specification — 2026-11-23
+
+- **Context:** on the S23 the app dropped pen strokes (718 of 1,100 saved at a
+  writing pace while a page grew from 1,100 to 1,800 strokes; 236 of 400 at a
+  50 ms gap). The save itself took about a millisecond. The strokes were lost
+  because a pen-down was refused while the stroke before it was saved, the
+  whole document was read back and every stroke rebuilt after each save, and
+  the faster paths sat behind developer switches that were off. The owner
+  asked for editing as direct as a simple paint program.
+- **Decision (owner instruction):**
+  - Where a better way reaches what the product is for, it is built, even
+    where `BUILD_SPECIFICATION.md` or an earlier rule says otherwise. The
+    departure is recorded here.
+  - The canvas is built as one path, not as switches: the screen shows a kept
+    picture that each finished stroke is drawn into once; marks stay objects
+    (so they can be moved, removed, tied to instructions and synced) and are
+    saved in the background; the original is never painted over. Four steps:
+    (1) ink is never refused for work on earlier strokes and an own stroke is
+    added to the held document without reading it back; (2) the kept picture;
+    (3) undo, erase, move and changes from the computer redraw only the area
+    they touch; (4) one picture per layer, and tiled zoom.
+  - A canvas pen-path change becomes the only behaviour once its on-device
+    stroke test passes; the old path and its switch are deleted. The owner's
+    real-pen session comes at the end and no longer gates each step. This
+    replaces, for the canvas, D24's "hardware-dependent changes land switched
+    off". The five remote-drawing switches stay as they are.
+- **Alternatives:** pixels as the only record, as in a paint program (marks
+  could no longer be moved, removed or tied to an instruction, and the
+  original would be painted over); keeping the switches until a pen session
+  (two code paths to keep correct, and the slow one is what the owner gets);
+  a new graphics engine in Rust for both apps (a rebuild of both renderers for
+  a small gain once the above is in).
+- **Consequences:** a stroke costs the same on a page with ten strokes or ten
+  thousand. `PenStrokeBurstInstrumentedTest` draws rapid strokes on a device
+  and fails if any is not saved. Real-pen feel, latency (PERF-001) and S23
+  timing still need the owner's session.
+- **Confidence:** 85% · **Status:** accepted (owner instruction).

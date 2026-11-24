@@ -165,9 +165,12 @@ battery_percent, charging, thermal_status, activity_marker, validity/reason.
 
 ## Pen-path switches — S23 measuring session
 
-Stage 7 added eight developer switches (phone: Settings → Developer options).
-All are off after install; with all off the app behaves as before. Each is
-switched on once, measured, and then left on or switched back off. Timings are
+Six developer switches remain (phone: Settings → Developer options): one for
+the canvas and five for remote drawing. All are off after install. Each is
+switched on once, measured, and then left on or switched back off. Two former
+canvas switches are now simply how the canvas works (D25): after a save only
+the new stroke is added, and the next stroke starts while the last one saves;
+steps 2 and 3 below are their hand checks. Timings are
 on the same screen and under Pen diagnostics → Pen path timings; each line
 reads "typical · slow end · worst" (typical is the median, slow end is p95).
 
@@ -188,8 +191,8 @@ granted.
 | Step | Switch on | Watch | Check by hand |
 | --- | --- | --- | --- |
 | 1 | none (canvas baseline) | every "Canvas:" line; take the PERF-001 camera measurement once | — |
-| 2 | Canvas: quick refresh after a save | "saved to canvas refreshed" falls | erase part of a stroke, undo, redo, move a selection, hide and show a layer, close and reopen: same picture |
-| 3 | Canvas: next stroke starts while the last one saves | "pen-down to stroke accepted", "pen-down to first ink" fall | count the strokes, undo ten (last first), reopen; on a page with no Highlighter layer make two quick highlighter strokes: one Highlighter layer, not two; draw a stroke and at once add a rectangle, then undo twice: the rectangle goes first |
+| 2 | none (always on since D25) | "saved to canvas refreshed" stays low on a full page | erase part of a stroke, undo, redo, move a selection, hide and show a layer, close and reopen: same picture |
+| 3 | none (always on since D25) | Diagnostics shows no refused pen-downs; "pen-down to stroke accepted", "pen-down to first ink" | count the strokes, undo ten (last first), reopen; on a page with no Highlighter layer make two quick highlighter strokes: one Highlighter layer, not two; draw a stroke and at once add a rectangle, then undo twice: the rectangle goes first |
 | 4 | Canvas: draw only the new stroke | "time to draw one ink frame", "ink drawn", "frame ready" fall | magnifier open and closed, after zoom and rotate, dark theme, a lower layer, highlighter; no flicker at pen-up |
 | 5 | — | PERF-001 camera measurement again with what stayed on | — |
 | 6 | none (remote baseline) | both "Remote:" lines; pauses in five minutes of drawing | — |
@@ -213,14 +216,13 @@ The ink timings ("ink drawn", "frame ready", "time to draw one ink frame",
 the first time.
 
 Optional hand check for step 3 with both devices: lock the active layer on the
-PC, then draw on the phone. Ink may appear briefly and then stop with the same
-message as with the switch off.
+PC, then draw on the phone. Ink may appear briefly and then stop with a
+message.
 
 Leave a switch on when the tool says `leave_on`, nothing else got worse and
 its hand check passed. Switch it back off when the tool says `switch_back_off`
 or a hand check fails even once (wrong picture, missing or misordered stroke,
-flicker, a new pause or disconnect, the remote picture not starting). A small
-rise in "saved to canvas refreshed" under step 3 is expected. The timings end
+flicker, a new pause or disconnect, the remote picture not starting). The timings end
 when a frame is handed to the display, so the camera measurement still decides
 PERF-001 (25 ms p95) and PERF-003 (80 ms p95).
 
