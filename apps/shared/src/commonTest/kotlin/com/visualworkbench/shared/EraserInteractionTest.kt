@@ -132,6 +132,25 @@ class EraserInteractionTest {
         f.ui.tool(EraserMode.Object); f.ui.begin(Point(10.0, 10.0), f.camera); f.ui.finish()
         assertTrue(f.port.deletes.isEmpty()); f.close()
     }
+    @Test fun objectEraserNeverOffersMarkersResultsOrAdjustmentsToTheHitTest() {
+        val f = EraseFixture()
+        val marker = f.item.copy(objectId = "00000000-0000-7000-8000-000000000020", shape = Shape.Marker(1u, Point(10.0, 10.0), null))
+        val result = f.item.copy(objectId = "00000000-0000-7000-8000-000000000021", shape = Shape.Result("asset"))
+        val adjustment = f.item.copy(objectId = "00000000-0000-7000-8000-000000000022", shape = Shape.Adjustment)
+        f.items = listOf(f.item, marker, result, adjustment); f.bind(2u)
+        f.ui.tool(EraserMode.Object); f.ui.begin(Point(10.0, 10.0), f.camera); f.ui.finish()
+        assertEquals(listOf(f.id), f.port.queries.single().document.render.items.map { it.objectId })
+        assertEquals(listOf(f.id), f.port.deletes.single().second)
+        f.close()
+    }
+    @Test fun platformCannotDeleteAMarkerResultOrAdjustment() {
+        for (shape in listOf(Shape.Marker(1u, Point(10.0, 10.0), null), Shape.Result("asset"), Shape.Adjustment)) {
+            val f = EraseFixture(); val other = f.item.copy(objectId = "00000000-0000-7000-8000-000000000020", shape = shape)
+            f.items = listOf(f.item, other); f.bind(2u); f.port.hits = listOf(other.objectId)
+            f.ui.tool(EraserMode.Object); f.ui.begin(Point(10.0, 10.0), f.camera); f.ui.finish()
+            assertTrue(f.port.deletes.isEmpty(), "$shape"); f.close()
+        }
+    }
     @Test fun selectedMaskLoadingBlocksBothNormalAndHardwareContacts() {
         val vector = EraserUiState(active = true, mode = EraserMode.Object, ready = true)
         val loading = SelectionUiState(active = true, tool = SelectionTool.MaskEraser, loading = true)
@@ -185,7 +204,9 @@ private class ErasePort(private val f: EraseFixture) : EraserBackend {
     var settlement: CompletableDeferred<Unit>? = null
     var wasCancelled = false
     var failure: Exception? = null
+    val queries = mutableListOf<EraserHitQuery>()
     override suspend fun objectHits(query: EraserHitQuery): List<String> {
+        queries += query
         try { hitGate?.await() }
         finally { if (!currentCoroutineContext().isActive) { wasCancelled = true; withContext(NonCancellable) { settlement?.await() } } }
         return hits

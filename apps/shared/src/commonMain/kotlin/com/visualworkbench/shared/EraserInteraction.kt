@@ -50,6 +50,15 @@ public fun projectEraserBackend(project: WorkbenchProject,
         project.edit(options, objectIds.map { EditCommand.Delete(it) })
 }
 
+/** Whether the whole-object eraser may take [item]. A numbered marker owns
+ * its linked instruction and numbering, and is removed with both through
+ * Delete marker in Instructions; an AI result and a tone adjustment are not
+ * marks drawn on the page. */
+public fun objectErasable(item: RenderItem): Boolean = when (item.shape) {
+    is Shape.Marker, is Shape.Result, Shape.Adjustment -> false
+    else -> true
+}
+
 /** Loading a selected mask never falls through to object/stroke deletion.
  * Hardware eraser is temporary: it uses the last explicit vector eraser mode,
  * unless the selected-mask tool is active, without changing the pen tool. */
@@ -199,13 +208,16 @@ public class EraserInteraction(
                         }
                     }
                     EraserMode.Object -> {
-                        val query = EraserHitQuery(run.document, run.camera.copy(scale=run.physicalScale), points, run.radius)
+                        // Only marks the eraser may take reach the platform hit test.
+                        val erasable = run.document.render.items.filter(::objectErasable)
+                        val document = run.document.copy(render = run.document.render.copy(items = erasable))
+                        val query = EraserHitQuery(document, run.camera.copy(scale=run.physicalScale), points, run.radius)
                         admitEraserHit(query)
                         val found = run.backend.objectHits(query)
                         if (found.size > 512) throw WorkflowFailure(WorkflowFailureKind.Limit)
                         val ids = found.toList()
                         if (ids.distinct().size != ids.size || ids.any { id ->
-                            run.document.render.items.none { it.objectId == id && !it.locked }
+                            erasable.none { it.objectId == id && !it.locked }
                         }) throw WorkflowFailure(WorkflowFailureKind.Limit)
                         currentCoroutineContext().ensureActive()
                         if (!current(run)) throw WorkflowFailure(WorkflowFailureKind.Stale)
