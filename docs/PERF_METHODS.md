@@ -165,12 +165,13 @@ battery_percent, charging, thermal_status, activity_marker, validity/reason.
 
 ## Pen-path switches — S23 measuring session
 
-Six developer switches remain (phone: Settings → Developer options): one for
-the canvas and five for remote drawing. All are off after install. Each is
-switched on once, measured, and then left on or switched back off. Two former
-canvas switches are now simply how the canvas works (D25): after a save only
-the new stroke is added, and the next stroke starts while the last one saves;
-steps 2 and 3 below are their hand checks. Timings are
+Five developer switches remain (phone: Settings → Developer options), all for
+remote drawing. All are off after install. Each is switched on once, measured,
+and then left on or switched back off. The three former canvas switches are
+now simply how the canvas works (D25): after a save only the new stroke is
+added, the next stroke starts while the last one saves, and frames draw a kept
+picture of the saved page into which each finished stroke is drawn once;
+steps 2, 3 and 4 below are their hand checks. Timings are
 on the same screen and under Pen diagnostics → Pen path timings; each line
 reads "typical · slow end · worst" (typical is the median, slow end is p95).
 
@@ -193,7 +194,7 @@ granted.
 | 1 | none (canvas baseline) | every "Canvas:" line; take the PERF-001 camera measurement once | — |
 | 2 | none (always on since D25) | "saved to canvas refreshed" stays low on a full page | erase part of a stroke, undo, redo, move a selection, hide and show a layer, close and reopen: same picture |
 | 3 | none (always on since D25) | Diagnostics shows no refused pen-downs; "pen-down to stroke accepted", "pen-down to first ink" | count the strokes, undo ten (last first), reopen; on a page with no Highlighter layer make two quick highlighter strokes: one Highlighter layer, not two; draw a stroke and at once add a rectangle, then undo twice: the rectangle goes first |
-| 4 | Canvas: draw only the new stroke | "time to draw one ink frame", "ink drawn", "frame ready" fall | magnifier open and closed, after zoom and rotate, dark theme, a lower layer, highlighter; no flicker at pen-up |
+| 4 | none (always on since D25) | "time to draw one ink frame" stays under 1 ms on a full page; "ink drawn", "frame ready" | magnifier open and closed, after zoom and rotate, dark theme, a lower layer, highlighter; no flicker at pen-up |
 | 5 | — | PERF-001 camera measurement again with what stayed on | — |
 | 6 | none (remote baseline) | both "Remote:" lines; pauses in five minutes of drawing | — |
 | 7 | Remote pen: samples at the pen's own rate | "pen sample to sent" falls by several ms | if input pauses more often, decide together with step 9 |

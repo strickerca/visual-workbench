@@ -597,6 +597,9 @@ class ArtifactCases(unittest.TestCase):
                 'failedCloseRetainsOwnerForASecondRealRetirement',
                 'failedLateDeliveryRetirementRemainsOwnedUntilCloseRetries',
             ),
+            'CanvasCostInstrumentedTest': (
+                'aStrokeCostsTheSameOnAPageOfTwoHundredStrokesAndOnOneOfFiveThousand',
+            ),
             'EditorSurfaceInstrumentedTest': (
                 'eraserResizeAndRecreationPresentCanvasPixels',
                 'eraserResizeAndRecreationPresentCanvasPixelsWithLifecycleLog',
@@ -606,10 +609,18 @@ class ArtifactCases(unittest.TestCase):
                 'aSaveAnnouncedAfterItsStrokeIsShownReadsNothingAndBindsTheControlsAgain',
                 'oldPageRefreshCannotAdoptOrRebindAfterSameRevisionNavigation',
             ),
+            'KeptPictureInstrumentedTest': (
+                'strokesDrawnWithThePenAreAddedToThePictureOnceAndTheFrameStaysTheWholeScene',
+                'thePictureIsMadeAgainAfterRecreationRotationLeavingAndAMemoryWarning',
+                'whateverChangesThePageOrTheViewMakesThePictureAgain',
+            ),
             'PenStrokeBurstInstrumentedTest': (
                 'fourHundredRapidStrokesOnAFreshPageAreAllSaved',
                 'noPenDownForInkIsRefusedWhileEarlierStrokesAreBeingSaved',
                 'strokesAtAWritingPaceOnAPageOfTwelveHundredStrokesAreAllSaved',
+            ),
+            'PictureSurfaceInstrumentedTest': (
+                'everyPictureShowsWhatWasDrawnForItAlsoWhenTheRendererSkipsAFrame',
             ),
             'PolygonEditorInstrumentedTest': (
                 'canceledContactAndChangedViewportCannotReuseEarlierPolygonVertices',
@@ -673,16 +684,16 @@ class ArtifactCases(unittest.TestCase):
         remote = [case for case in declared if ".remote." in case]
         surviving_baseline = [case for case in declared if case not in additions and ".remote." not in case]
         baseline = sorted(surviving_baseline + retired)
-        self.assertEqual(len(declared), 232)
+        self.assertEqual(len(declared), 237)
         self.assertEqual(remote, reviewed_remote)
-        self.assertEqual(len(additions), 67)
+        self.assertEqual(len(additions), 72)
         self.assertTrue(set(additions).issubset(declared))
         self.assertTrue(set(retired).isdisjoint(declared))
         self.assertEqual(len(surviving_baseline), 153)
         self.assertEqual(len(baseline), 154)
         self.assertEqual(hashlib.sha256(json.dumps(baseline, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest(), 'ece5b64a5fb3d6ef2abe01944fed1a19771acf479ff852a5843aa7ded2b75e72')
         self.assertEqual(reports.cases(root), declared)
-        self.assertEqual(reports.instrumentation(passed(tuple(declared)), declared)["actual_passed_tests"], 232)
+        self.assertEqual(reports.instrumentation(passed(tuple(declared)), declared)["actual_passed_tests"], 237)
 
     def test_discovery_refuses_normal_output_and_split_metadata(self):
         with tempfile.TemporaryDirectory() as directory:

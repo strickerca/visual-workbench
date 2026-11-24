@@ -14,6 +14,8 @@ internal enum class PenTiming(val key: String, val label: String) {
     CanvasStrokeStart("canvas_stroke_start", "Canvas: pen-down to stroke accepted"),
     CanvasSave("canvas_save", "Canvas: pen-up to saved"),
     CanvasRefresh("canvas_refresh", "Canvas: saved to canvas refreshed"),
+    CanvasSavedDraw("canvas_saved_draw", "Canvas: time to draw one saved frame"),
+    CanvasSavedReady("canvas_saved_ready", "Canvas: saved frame drawn to frame ready"),
     RemoteSent("remote_sent", "Remote: pen sample to sent"),
     RemoteEcho("remote_echo", "Remote: pen sample to frame that shows it"),
 }

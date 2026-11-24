@@ -102,9 +102,11 @@ class PenTraces(unittest.TestCase):
              'canvas_ink_drawn n=700 p50_ms=6.0 p95_ms=12.0 max_ms=21.0\n'
              'canvas_first_ink n=42 p50_ms=13.0 p95_ms=21.5 max_ms=29.0\n'
              'canvas_refresh n=130 p50_ms=4.0 p95_ms=9.0 max_ms=15.0\n'
+             'canvas_saved_draw n=130 p50_ms=0.3 p95_ms=0.8 max_ms=6.1\n'
+             'canvas_saved_ready n=130 p50_ms=2.1 p95_ms=4.0 max_ms=9.5\n'
              'remote_sent n=3 p50_ms=0.4 p95_ms=0.9 max_ms=0.9\n'
              'pen_downs accepted=42 refused=0\n'
-             'switches=canvasInkOnly\n')
+             'switches=remoteExactTimes\n')
 
     def test_copied_timings_are_read_and_judged_against_the_targets(self):
         one = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE))
@@ -115,7 +117,7 @@ class PenTraces(unittest.TestCase):
 
     def test_two_captures_give_the_change_and_what_to_do_with_the_switch(self):
         result = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE), trace_tool.parse_timings(self.AFTER))
-        self.assertEqual(result['switches_changed'], ['canvasInkOnly'])
+        self.assertEqual(result['switches_changed'], ['remoteExactTimes'])
         # Pen-downs that asked for ink are carried through as counted.
         self.assertNotIn('pen_downs', result['before'])
         self.assertEqual(result['after']['pen_downs'], {'accepted': 42, 'refused': 0, 'reasons': {}})
@@ -126,6 +128,9 @@ class PenTraces(unittest.TestCase):
         # Half a millisecond on 22 ms is within the noise.
         self.assertEqual(result['changes']['canvas_first_ink']['verdict'], 'same')
         self.assertNotIn('remote_sent', result['changes'])
+        # The saved-frame timings are read like the others.
+        self.assertEqual(result['after']['timings']['canvas_saved_ready']['p50_ms'], 2.1)
+        self.assertNotIn('canvas_saved_draw', result['changes'])
         few = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE.replace('n=640', 'n=64').replace('n=40', 'n=12')),
                                          trace_tool.parse_timings(self.AFTER))
         self.assertEqual(few['changes']['canvas_ink_drawn']['verdict'], 'too_few_samples')

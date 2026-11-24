@@ -570,8 +570,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     /** Diagnostics only: the newest pen sample that has ink, and the pen-down of its stroke. */
     private var inkSampleMs = 0L
     private var inkStartMs = 0L
+    /** The ids of [objects], kept for as long as that list is the one shown,
+     * so that a pen sample does not go through every saved object. */
     private var savedIdsOf: List<DrawObject>? = null
-    private var savedIdsKept: Set<String> = emptySet()
+    private var savedIdsKept = HashSet<String>()
     private var camera = Camera(Point(800.0, 600.0), 1.0, 0.0, 1.0, 1.0)
         set(value) { if (field != value) interruptAirInput(clearView = !applyingAirView); field = value }
     private var cameraFitted = false
@@ -1693,7 +1695,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         try { closing.step(EditorCloseStage.ProjectStorage) { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() } }
                         finally {
                             document = null; info = null
-                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); shownStroke = null; savedIdsOf = null; savedIdsKept = emptySet(); selected = null; transientShape = null
+                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); shownStroke = null; savedIdsOf = null; savedIdsKept = HashSet(); selected = null; transientShape = null
                             transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
                         }
                     }
@@ -2108,17 +2110,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         aiResults.request()
         val resultFrame=aiFrame()
-        // Developer switch: the saved objects change only on a refresh, so their
-        // id set is kept between samples and, with no peer preview replacing any
-        // of them, the list itself is published instead of an equal copy.
-        val keepDry = preferences.penPath[PenPathToggle.CanvasInkOnly]
-        val savedIds = if (keepDry && savedIdsOf === objects) savedIdsKept
-            else objects.mapTo(HashSet<String>()) { it.item.objectId }.also { if (keepDry) { savedIdsOf = objects; savedIdsKept = it } }
+        // The saved objects change only when a document is adopted, so their id
+        // set is kept between samples and, with no peer preview replacing any
+        // of them, the list itself is published instead of an equal copy: the
+        // canvas keeps its picture for as long as it is handed the same list.
+        val savedIds = if (savedIdsOf === objects) savedIdsKept
+            else objects.mapTo(HashSet<String>()) { it.item.objectId }.also { savedIdsOf = objects; savedIdsKept = it }
         val admittedPeers=peerObjects.filter{aiAdmitResultPreview(doc,it.item)}
         val peerById = admittedPeers.associateBy { it.item.objectId }
         // Existing objects keep their canonical stacking position. Local
         // transforms and erasures below still override the remote replacement.
-        val visibleObjects = if (keepDry && admittedPeers.isEmpty()) objects else objects.map { peerById[it.item.objectId] ?: it }
+        val visibleObjects = if (admittedPeers.isEmpty()) objects else objects.map { peerById[it.item.objectId] ?: it }
         val localProvisional = (strokes.mapNotNull { it.drawing } + pendingPreviews.values).filter { it.item.objectId !in savedIds } + listOfNotNull(transientShape)
         val localIds = localProvisional.mapTo(HashSet()) { it.item.objectId }
         val provisional = localProvisional + admittedPeers.filter { it.item.objectId !in savedIds && it.item.objectId !in localIds }
@@ -2139,7 +2141,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
             aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle(),
-            wetSampleMs=inkSampleMs,wetStartMs=inkStartMs,keepDryPicture=keepDry)
+            wetSampleMs=inkSampleMs,wetStartMs=inkStartMs)
         scene = next
         if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
@@ -2646,6 +2648,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val next = (current as? WorkbenchAddedStrokes)?.withAddedStroke(held, saved) ?: return false
         val drawing = ArrayList<DrawObject>(objects.size + 1)
         drawing.addAll(objects); drawing.add(at, drawn)
+        // The ids held for the list shown stand for this one with the stroke's own.
+        if (savedIdsOf === objects) { savedIdsKept.add(drawn.item.objectId); savedIdsOf = drawing }
         val before = held.render.revision
         adoptDocument(current, next, drawing, strokeAfter = WorkflowBinding(before.projectId, held.documentId, before.hostSeq, before.stateHash))
         shownStroke = next
@@ -2790,8 +2794,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
      * binding, plus one ink stroke this editor saved ([showSavedStroke]).
      * What a new ink stroke cannot change is then carried over to the new
      * revision instead of being read again: whether the document has pages,
-     * the information about its original, and the instruction and marker
-     * lists. */
+     * the information about its original, the instruction and marker lists,
+     * and the pixels of its AI results. A composed background (a page with
+     * tone adjustments) is not carried over: it has the annotations in it,
+     * so the stroke changes it. Nor is a tiled giant original, whose reader
+     * is opened for one revision. */
     private suspend fun adoptDocument(current: WorkbenchProject, next: DocumentSnapshot, drawing: List<DrawObject>, strokeAfter: WorkflowBinding? = null) {
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
@@ -2804,6 +2811,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         info = next.render.revision
         if(giantMode||giantOwner.retaining)giantOwner.invalidate()
         document = next; objects = drawing; shownStroke = null
+        // A stroke changes no AI result: the pixels shown stay, for the new revision.
+        if (strokeAfter != null) aiAttachment()?.let { aiResults.strokeAdded(strokeAfter, it) }
         if (strokeAfter == null || documents.state.value.descriptor != null) documentOwner.bind(current,next)
         bindWorkflows()
         if(priorComposition || next.hasToneAdjustments)publish()
@@ -2817,7 +2826,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) {
             exportPreflight = null; checkedExport = null; checkedExportIntent = null
         }
-        if (objects.none { it.item.objectId == selected }) selected = null
+        if (selected != null && objects.none { it.item.objectId == selected }) selected = null
         publish()
     }
     fun saveText(text: String, font: String, size: Double) {

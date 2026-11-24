@@ -1,6 +1,8 @@
 package com.visualworkbench.android.editor
 
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.PorterDuff
@@ -17,6 +19,7 @@ import android.view.ViewConfiguration
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
 import androidx.graphics.surface.SurfaceControlCompat
 import androidx.input.motionprediction.MotionEventPredictor
+import com.visualworkbench.android.diagnostics.PenTiming
 import com.visualworkbench.android.input.CanvasGestureRouter
 import com.visualworkbench.android.input.PointerTool
 import com.visualworkbench.android.input.StylusInput
@@ -85,11 +88,16 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         /** An AndroidX in-place resize is pending: its redraw lands on a new layer (under [lock]). */
         var awaitingResizeRedraw = false
         var resizeFrom: SurfaceControlCompat? = null
-        /** Diagnostics only: the pen sample time of the last drawn ink frame. */
+        /** Diagnostics only: the pen sample time of the last drawn ink frame, and
+         * when the saved frame now being made ready began to be drawn (0: none). */
         @Volatile var frontSampleMs = 0L
-        /** Developer switch only: the kept picture an ink frame draws over. Made and
-         * used on the drawing thread; discarded on Main once that thread has stopped. */
-        @Volatile var wetInk: WetInkLayer? = null
+        @Volatile var savedDrawStartedNs = 0L
+        /** The kept picture of the saved page that this generation's frames are
+         * drawn from. Made and used on the drawing thread; discarded on Main once
+         * that thread has stopped. */
+        @Volatile var picture: KeptPicture? = null
+        /** On-device tests only (under [lock]): takes the comparison of the next saved frame. */
+        var compare: ((PictureComparison?) -> Unit)? = null
         /** Lifecycle diagnostics only, under [lock] and only while switched on: saved
          * frames started and completed, which frames are recorded, and the
          * viewport size of the scene last drawn into a saved frame. */
@@ -141,6 +149,14 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     /** Main, lifecycle diagnostics: this canvas keeps the log's writer running, from
      * its attach until its retirement after detach is confirmed. */
     private var lifeOpened = false
+    /** On-device tests only: what this canvas's kept pictures did. */
+    internal val pictureCounts = PictureCounts()
+    /** The system asks for memory: the kept pictures go and are made again when next needed. */
+    private val memory = object : ComponentCallbacks2 {
+        override fun onTrimMemory(level: Int) = dropPictures()
+        @Deprecated("Deprecated in Java") override fun onLowMemory() = dropPictures()
+        override fun onConfigurationChanged(newConfig: Configuration) {}
+    }
 
     init {
         contentDescription = "Document canvas. Pen draws; one finger pans; two fingers zoom and rotate."
@@ -190,6 +206,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow(); attached = true
+        context.applicationContext.registerComponentCallbacks(memory)
         if (lifeOn) { lifeOpen(); life(CanvasLifeEvent.Attach) }
         controller.attachCanvas(::publish,retirementHook,::ensureRenderer,{retirementProgress.current})
         ensureRenderer()
@@ -197,6 +214,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     override fun onDetachedFromWindow() {
         if (lifeOn) life(CanvasLifeEvent.Detach, lifeCurrent(), lifeKept(), generations.releaseCount.toLong())
         attached = false; cancelInput(); controller.detachCanvas(retirementHook)
+        context.applicationContext.unregisterComponentCallbacks(memory)
         // A retirement can complete exceptionally only after AndroidX released the
         // renderer pipeline (its document reader close failed, and that frame keeps
         // its own quarantine). Confirm either way: an unconfirmed hook gates every
@@ -389,10 +407,9 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     if (currentSession.closed || param.session !== currentSession) null else currentSession.latest?.also { currentSession.frontDrawn = it.revision;currentSession.giantFrontDrawn=it.giantFrame }
                 } ?: return
                 val drawStarted = System.nanoTime()
-                // Developer switch: draw the kept picture and only the stroke in
-                // progress. Any scene it cannot draw exactly falls through.
-                if (wholeSceneNeeded(snapshot.keepDryPicture) { (currentSession.wetInk ?: WetInkLayer().also { currentSession.wetInk = it }).draw(canvas, snapshot) })
-                    drawOwned(canvas,snapshot,currentSession)
+                // The kept picture with the stroke in progress over it. A scene
+                // that cannot be drawn exactly that way is drawn whole.
+                if (!drawKept(canvas, snapshot, currentSession)) drawOwned(canvas,snapshot,currentSession)
                 // Timing only: two clock reads and a bounded array write.
                 currentSession.frontSampleMs = snapshot.wetSampleMs
                 controller.diagnostics.pen.inkDrawn(snapshot.wetSampleMs, snapshot.wetStartMs, SystemClock.uptimeMillis(), System.nanoTime() - drawStarted)
@@ -407,10 +424,20 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     if (lifeOn) lifeDrawStarted(currentSession, scene, bufferWidth, bufferHeight, lifeRequests(params))
                     scene
                 }
-                // Developer switch only: the kept picture is held while ink is wet, never between strokes.
-                currentSession.wetInk?.forget()
-                if (snapshot == null) canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                else drawOwned(canvas,snapshot,currentSession)
+                if (snapshot == null) { canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR); return }
+                val drawStarted = System.nanoTime()
+                // The kept picture, with a stroke finished since drawn into it
+                // once. A scene that cannot be drawn exactly that way is drawn whole.
+                val kept = drawKept(canvas, snapshot, currentSession)
+                if (!kept) drawOwned(canvas,snapshot,currentSession)
+                // Timing only: two clock reads and a bounded array write.
+                controller.diagnostics.pen.recordNanos(PenTiming.CanvasSavedDraw, System.nanoTime() - drawStarted)
+                currentSession.savedDrawStartedNs = drawStarted
+                val compare = synchronized(lock) { currentSession.compare.also { currentSession.compare = null } }
+                if (compare != null) {
+                    val compared = if (kept) currentSession.picture?.compare(snapshot) else null
+                    main.post { compare(compared) }
+                }
             }
             override fun onFrontBufferedLayerRenderComplete(frontBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
@@ -427,6 +454,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                                                             multiBufferedLayerSurfaceControl: SurfaceControlCompat,
                                                             transaction: SurfaceControlCompat.Transaction) {
                 var redrawnAfterResize = false
+                val savedDrawStarted = currentSession.savedDrawStartedNs
+                if (savedDrawStarted != 0L) {
+                    currentSession.savedDrawStartedNs = 0L
+                    controller.diagnostics.pen.recordNanos(PenTiming.CanvasSavedReady, System.nanoTime() - savedDrawStarted)
+                }
                 val visible = synchronized(lock) {
                     if (!currentSession.closed) currentSession.dryFrames.drawCompleted()
                     currentSession.frontDrawn = minOf(currentSession.frontDrawn, currentSession.drawn)
@@ -511,12 +543,42 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         if (state != null) enqueue(target, state, "newer_scene")
     }
 
-    private fun wet(scene: CanvasScene): Boolean {
+    private fun wet(scene: CanvasScene): Boolean =
+        scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() || erasing(scene) || scene.documentDraft != null
+
+    /** Whether saved objects are hidden for now only: an erasure in progress.
+     * Objects a composed background already shows stay hidden for good. */
+    private fun erasing(scene: CanvasScene): Boolean {
+        if (scene.hidden.isEmpty()) return false
         val composed = (scene.document.hasToneAdjustments && scene.background != null) ||
             scene.giantFrame?.content == com.visualworkbench.shared.GiantTileContent.Composed
-        val baked = bakedCanonicalIds(scene.document, composed)
-        return scene.provisional.isNotEmpty() || scene.transformed.isNotEmpty() ||
-            transientHiddenIds(scene.hidden, baked).isNotEmpty() || scene.documentDraft != null
+        return transientHiddenIds(scene.hidden, bakedCanonicalIds(scene.document, composed)).isNotEmpty()
+    }
+
+    /** Drawing thread: one frame from [target]'s kept picture, when [scene] can
+     * be drawn exactly that way. False: nothing was drawn. */
+    private fun drawKept(canvas: Canvas, scene: CanvasScene, target: RenderSession): Boolean {
+        // A generation that owes the redraw of an in-place resize may be about
+        // to leave, and is short of buffers while it does: it keeps no picture.
+        val resizing = synchronized(lock) { target.awaitingResizeRedraw }
+        val picture = target.picture ?: KeptPicture(pictureCounts).also { target.picture = it }
+        return picture.draw(canvas, scene, steady = !erasing(scene), resizing = resizing, first = !target.presented)
+    }
+
+    /** Main: every kept picture is given up; the next frame makes it again. */
+    private fun dropPictures() {
+        session?.picture?.requestDrop(); replacement.kept?.session?.picture?.requestDrop()
+    }
+
+    /** On-device tests only, Main: the next saved frame of the current
+     * generation is also drawn whole, and [result] gets both as plain pixels;
+     * null when that frame was not drawn from the kept picture. False: there
+     * is no generation to ask. */
+    internal fun comparePicture(result: (PictureComparison?) -> Unit): Boolean {
+        val target = session ?: return false
+        synchronized(lock) { if (target.closed) return false; target.compare = result }
+        enqueue(target, true, "publish")
+        return true
     }
 
     private fun drawOwned(canvas:Canvas,snapshot:CanvasScene,target:RenderSession) {
@@ -571,7 +633,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
                     var readerClosed=false
                     try{
                         release.reached(CanvasRetirementMilestone.ReaderCloseRunning)
-                        owned.wetInk?.discard();owned.wetInk=null
+                        owned.picture?.discard();owned.picture=null
                         owned.documentReader?.close();owned.documentReader=null
                         readerClosed=true
                         release.reached(CanvasRetirementMilestone.ReaderClosed)

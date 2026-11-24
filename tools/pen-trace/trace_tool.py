@@ -230,7 +230,8 @@ def acceptance(traces):
 
 
 TIMING_KEYS = ('canvas_ink_drawn', 'canvas_frame_ready', 'canvas_draw_time', 'canvas_first_ink',
-               'canvas_stroke_start', 'canvas_save', 'canvas_refresh', 'remote_sent', 'remote_echo')
+               'canvas_stroke_start', 'canvas_save', 'canvas_refresh', 'canvas_saved_draw', 'canvas_saved_ready',
+               'remote_sent', 'remote_echo')
 TIMING_ROW = re.compile(r'([a-z_]+) n=([0-9]{1,9}) p50_ms=([0-9]{1,6}\.[0-9]) p95_ms=([0-9]{1,6}\.[0-9]) max_ms=([0-9]{1,6}\.[0-9])')
 SWITCHES_ROW = re.compile(r'switches=(none|[A-Za-z]{3,40}(,[A-Za-z]{3,40}){0,31})')
 # Pen-downs that asked for ink: how many were drawn, how many were refused, and
