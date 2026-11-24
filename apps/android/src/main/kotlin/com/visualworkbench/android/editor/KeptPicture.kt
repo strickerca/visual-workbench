@@ -82,18 +82,78 @@ internal fun sameDrawing(a: RenderItem, b: RenderItem): Boolean = a === b || (a.
  * first-use order, as the whole scene draws them; and the box around all of
  * them ([bounds], document space; null when one cannot be judged). Worked out
  * once per list. */
-internal class LayerLists<T>(val order: List<String>, private val lists: Map<String, List<T>>, val bounds: Rect? = null) {
+internal class LayerLists<T>(val order: List<String>, private val lists: Map<String, List<T>>, val bounds: Rect? = null,
+                             /** When each layer's objects lie together in the list: the runs, in list order. */
+                             val runs: List<LayerRun>? = null) {
     fun of(layer: String): List<T> = lists[layer] ?: emptyList()
     val layers: Set<String> get() = lists.keys
+}
+
+/** The objects of [layer] lie at [start] until [end] of a list of saved objects. */
+internal data class LayerRun(val layer: String, val start: Int, val end: Int)
+
+/** The layers drawn in order, from where their objects lie: the document's
+ * layers in its order, then any other in first-use order. */
+private fun layerOrder(layerIds: List<String>, runs: List<LayerRun>): List<String> {
+    val present = HashSet<String>(); for (run in runs) present.add(run.layer)
+    val order = ArrayList<String>(runs.size)
+    for (id in layerIds) if (id in present) order.add(id)
+    if (order.size < runs.size) { val listed = layerIds.toHashSet(); for (run in runs) if (run.layer !in listed) order.add(run.layer) }
+    return order
+}
+
+/** Adds the run [layer] at [start] until [end] to [runs], joined with the one before when they meet in one layer. */
+private fun pushRun(runs: ArrayList<LayerRun>, layer: String, start: Int, end: Int) {
+    if (start >= end) return
+    val last = runs.lastOrNull()
+    if (last != null && last.end == start && last.layer == layer) runs[runs.size - 1] = LayerRun(layer, last.start, end) else runs.add(LayerRun(layer, start, end))
+}
+
+/** [held]'s lists, of [old], brought to [new], which differs from it in a
+ * middle part: the runs of the common start and end are taken as they were,
+ * and only the middle is looked at. Each layer's list is then a view of its
+ * run of [new]. Null when [held] has no runs, when more than [limit] objects
+ * changed, or when a layer's objects no longer lie together. */
+internal fun <T> followLayerLists(held: LayerLists<T>, old: List<T>, new: List<T>, layerIds: List<String>, limit: Int, item: (T) -> RenderItem): LayerLists<T>? {
+    val runs = held.runs ?: return null
+    val shorter = minOf(old.size, new.size)
+    var start = 0
+    while (start < shorter && old[start] === new[start]) start++
+    var oldEnd = old.size; var newEnd = new.size
+    while (oldEnd > start && newEnd > start && old[oldEnd - 1] === new[newEnd - 1]) { oldEnd--; newEnd-- }
+    if (newEnd - start > limit || oldEnd - start > limit) return null
+    val shift = newEnd - oldEnd
+    val next = ArrayList<LayerRun>(runs.size + 1)
+    for (run in runs) if (run.start < start) pushRun(next, run.layer, run.start, minOf(run.end, start))
+    var bounds = held.bounds
+    for (at in start until newEnd) {
+        val shown = item(new[at])
+        pushRun(next, shown.layerId, at, at + 1)
+        val box = shown.bounds
+        val known = bounds
+        bounds = if (known == null || !(box.x.isFinite() && box.y.isFinite() && box.width.isFinite() && box.height.isFinite()) || box.width < 0 || box.height < 0) null
+            else { val left = minOf(known.x, box.x); val top = minOf(known.y, box.y)
+                Rect(left, top, maxOf(known.x + known.width, box.x + box.width) - left, maxOf(known.y + known.height, box.y + box.height) - top) }
+    }
+    for (run in runs) if (run.end > oldEnd) pushRun(next, run.layer, maxOf(run.start, oldEnd) + shift, run.end + shift)
+    val lists = HashMap<String, List<T>>(next.size * 2)
+    for (run in next) if (lists.put(run.layer, new.subList(run.start, run.end)) != null) return null
+    // The box may only grow: a box too large says less often that a moved picture is exact, never wrongly.
+    return LayerLists(layerOrder(layerIds, next), lists, bounds, next)
 }
 
 internal fun <T> layerLists(layerIds: List<String>, objects: List<T>, item: (T) -> RenderItem): LayerLists<T> {
     val lists = LinkedHashMap<String, ArrayList<T>>()
     var left = Double.POSITIVE_INFINITY; var top = Double.POSITIVE_INFINITY; var right = Double.NEGATIVE_INFINITY; var bottom = Double.NEGATIVE_INFINITY
     var judged = true
+    // Objects of one layer come together: the list of the one before is tried first, without hashing its id.
+    var lastId: String? = null; var lastList: ArrayList<T>? = null
     for (index in objects.indices) {
         val one = objects[index]; val shown = item(one)
-        lists.getOrPut(shown.layerId) { ArrayList() }.add(one)
+        val id = shown.layerId
+        val list = if (lastList != null && (id === lastId || id == lastId)) lastList
+            else lists.getOrPut(id) { ArrayList() }.also { lastId = id; lastList = it }
+        list.add(one)
         val box = shown.bounds
         if (!(box.x.isFinite() && box.y.isFinite() && box.width.isFinite() && box.height.isFinite()) || box.width < 0 || box.height < 0) judged = false
         else { left = minOf(left, box.x); top = minOf(top, box.y); right = maxOf(right, box.x + box.width); bottom = maxOf(bottom, box.y + box.height) }
@@ -102,7 +162,13 @@ internal fun <T> layerLists(layerIds: List<String>, objects: List<T>, item: (T) 
     for (id in layerIds) if (lists.containsKey(id)) order.add(id)
     if (order.size < lists.size) { val listed = layerIds.toHashSet(); for (id in lists.keys) if (id !in listed) order.add(id) }
     val bounds = if (!judged) null else if (objects.isEmpty()) Rect(0.0, 0.0, 0.0, 0.0) else Rect(left, top, right - left, bottom - top)
-    return LayerLists(order, lists, bounds)
+    // Where each layer's objects lie together, the runs are kept, and the next list is followed from them.
+    val runs = ArrayList<LayerRun>(lists.size)
+    var runStart = 0
+    for (index in 1..objects.size) {
+        if (index == objects.size || item(objects[index]).layerId != item(objects[runStart]).layerId) { pushRun(runs, item(objects[runStart]).layerId, runStart, index); runStart = index }
+    }
+    return LayerLists(order, lists, bounds, if (runs.size == lists.size) runs else null)
 }
 
 /** The first object of [list] that is drawn (not in [hidden]): it says how its layer is composited. */
@@ -486,30 +552,15 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
     private var listsAnswer: LayerLists<DrawObject>? = null
     private fun listsOf(objects: List<DrawObject>, ids: List<String>): LayerLists<DrawObject> {
         held?.let { if (it.basis.objects === objects && it.basis.layerIds == ids) return it.lists }
-        if (objects !== listsFrom || ids != listsIds) { listsAnswer = followedLists(objects, ids) ?: layerLists(ids, objects) { it.item }; listsFrom = objects; listsIds = ids }
+        if (objects !== listsFrom || ids != listsIds) {
+            val now = held
+            listsAnswer = (if (now != null && now.basis.layerIds == ids) followLayerLists(now.lists, now.basis.objects, objects, ids, MAX_CHANGED) { it.item } else null)
+                ?: layerLists(ids, objects) { it.item }
+            listsFrom = objects; listsIds = ids
+        }
         return checkNotNull(listsAnswer)
     }
 
-    /** The lists of a page whose saved objects all lie in one layer, from the
-     * pictures' own by what changed, with no pass over every object: still
-     * one layer, its list the page's list. Null when that is not so. */
-    private fun followedLists(objects: List<DrawObject>, ids: List<String>): LayerLists<DrawObject>? {
-        val now = held ?: return null
-        val layer = now.lists.order.singleOrNull() ?: return null
-        if (now.basis.layerIds != ids || objects.isEmpty() || now.lists.bounds == null) return null
-        val change = diffOf(now.basis.objects, objects) ?: return null
-        var bounds: Rect = now.lists.bounds
-        for (at in change.added) {
-            val item = objects[at].item
-            if (item.layerId != layer) return null
-            val box = item.bounds
-            if (!(box.x.isFinite() && box.y.isFinite() && box.width.isFinite() && box.height.isFinite()) || box.width < 0 || box.height < 0) return null
-            val left = minOf(bounds.x, box.x); val top = minOf(bounds.y, box.y)
-            bounds = Rect(left, top, maxOf(bounds.x + bounds.width, box.x + box.width) - left, maxOf(bounds.y + bounds.height, box.y + box.height) - top)
-        }
-        // The box may only have grown: a box too large says less often that a picture moved is exact, never wrongly.
-        return LayerLists(now.lists.order, mapOf(layer to objects), bounds)
-    }
     /** The last plan, for the same held pictures and scene. */
     private var planHeld: Held? = null
     private var planScene: CanvasScene? = null
@@ -614,9 +665,11 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
         val soft = softView(plan.move)
         if (!gesture && !soft) {
             // Pictures that have to be drawn whole are drawn first; while the
-            // scene changes from frame to frame, the frame is drawn whole.
+            // scene changes from frame to frame, the frame is drawn whole. A
+            // small layer (one shown, a highlighter's) is drawn into the frame
+            // from its objects instead, and its picture made right after.
             val renders = plan.work.filterValues { it == SlotWork.Render }.keys
-            if (renders.isNotEmpty() || plan.why != null) {
+            if (renders.any { !smallLayer(it, plan) }) {
                 val why = plan.why ?: PictureChange.Layers
                 if (!madeNow(next, uptime, why)) return wholeUntilSettled(post, scene, next, first = false, gesture = false)
                 post.removeCallbacks(settle); wanted = null; wantedScene = null
@@ -847,9 +900,10 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
             when {
                 picture == null || work == SlotWork.Render -> {
                     // Not drawn yet at all: its objects are drawn here, all of them that can reach the screen.
-                    if (!soft) return null
+                    if (!soft && !smallLayer(key, plan)) return null
                     drawnPicture = null
-                    extra.addAll(visibleOf(scene, index, setOf(layer)))
+                    val own = plan.lists.of(layer)
+                    extra.addAll(if (own.size <= SMALL_LAYER) visibleOfList(scene, own) else visibleOf(scene, index, setOf(layer)))
                 }
                 work == SlotWork.Append -> {
                     val step = plan.steps[layer]
@@ -885,6 +939,9 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
             scene.selected?.let(index::find))
     }
 
+    /** Whether the picture [key] holds one layer of at most [SMALL_LAYER] objects. */
+    private fun smallLayer(key: SlotKey, plan: Plan): Boolean = !key.prefix && plan.lists.of(key.layers.single()).size <= SMALL_LAYER
+
     /** What fills the page where moved pictures do not reach: the overview
      * when it shows the scene's saved objects as they are, else the objects. */
     private fun fillFor(scene: CanvasScene, index: SavedIndex<DrawObject>, plan: Plan): FrameFill {
@@ -901,6 +958,13 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
     /** How each layer that draws is composited, in order: what the overview depends on besides the objects. */
     private fun paintKeys(lists: LayerLists<DrawObject>, paints: Map<String, RenderItem>): List<Any> =
         lists.order.mapNotNull { layer -> paints[layer]?.let { listOf(layer, layerAlpha(it), it.layerBlend == "multiply") } }
+
+    /** Of [list] (one layer's saved objects in drawing order), those that can reach the screen, hidden ones left out. */
+    private fun visibleOfList(scene: CanvasScene, list: List<DrawObject>): List<DrawObject> {
+        val visible = visibleDocumentRect(scene.matrix, Rect(0.0, 0.0, scene.camera.viewportWidth, scene.camera.viewportHeight))
+        val shown = list.filter { it.item.objectId !in scene.hidden }
+        return if (visible == null) shown else EditorDrawing.touching(scene, shown, visible)
+    }
 
     /** The saved objects of [layers] (all, when null) that can reach the screen, in drawing order, hidden ones left out. */
     private fun visibleOf(scene: CanvasScene, index: SavedIndex<DrawObject>, layers: Set<String>?): List<DrawObject> {
@@ -1013,7 +1077,9 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
     }
 
     private fun renderSlot(target: PictureSurface, scene: CanvasScene, index: SavedIndex<DrawObject>, key: SlotKey, paints: Map<String, RenderItem>): PictureSurface.Picture? {
-        val objects = visibleOf(scene, index, key.layers.toHashSet())
+        // A small layer is looked through itself, not through everything the page shows.
+        val own = if (key.prefix) null else listsOf(scene.objects, layerIds).of(key.layers.single()).takeIf { it.size <= SMALL_LAYER }
+        val objects = if (own != null) visibleOfList(scene, own) else visibleOf(scene, index, key.layers.toHashSet())
         return render(target) { EditorDrawing.drawSlot(it, scene, key.prefix, objects, paints) }
     }
 
@@ -1199,5 +1265,7 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
         /** Pictures drawn softer reach this much further on the screen; the overview's edges are this much softer. */
         const val SOFT_MARGIN_PX = 3.0
         const val OVERVIEW_MARGIN_PX = 2.0
+        /** A layer of at most this many objects is drawn from its own list, not through the index. */
+        const val SMALL_LAYER = 512
     }
 }

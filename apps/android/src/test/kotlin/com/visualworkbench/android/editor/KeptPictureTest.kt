@@ -35,6 +35,34 @@ class KeptPictureTest {
         assertNull(firstDrawn(lists.of("notes"), setOf("a", "c")) { it })
     }
 
+    @Test fun each_layer_s_list_follows_the_page_s_list_by_what_changed() {
+        val ids = listOf("base", "faint", "high")
+        val base = (0 until 6).map { item("b$it", "base") }; val faint = (0 until 3).map { item("f$it", "faint") }; val high = (0 until 2).map { item("h$it", "high") }
+        val page = base + faint + high
+        val lists = layerLists(ids, page) { it }
+        assertEquals(listOf(LayerRun("base", 0, 6), LayerRun("faint", 6, 9), LayerRun("high", 9, 11)), lists.runs)
+        fun same(a: LayerLists<RenderItem>, b: LayerLists<RenderItem>) {
+            assertEquals(b.order, a.order); assertEquals(b.layers, a.layers); assertEquals(b.runs, a.runs)
+            for (layer in b.layers) assertEquals(b.of(layer), a.of(layer))
+        }
+        // A stroke added to the lowest layer, one taken from the middle one, a layer hidden, a layer's objects read again.
+        for (next in listOf(base + item("n", "base") + faint + high, base + faint.drop(1) + high, base + faint, base + faint + high.map { it.copy(layerOpacity = 0.5) },
+                            base + faint + high + item("u", "unlisted"))) {
+            val followed = requireNotNull(followLayerLists(lists, page, next, ids, 1_024) { it })
+            same(followed, layerLists(ids, next) { it })
+            // A list followed again is followed from what it now holds.
+            val again = base + item("z", "base") + faint + high
+            followLayerLists(followed, next, again, ids, 1_024) { it }?.let { same(it, layerLists(ids, again) { it }) }
+        }
+        // A layer's objects no longer together, or more changed than is followed: worked out again from every object.
+        assertNull(followLayerLists(lists, page, base + faint + high + item("b9", "base"), ids, 1_024) { it })
+        assertNull(followLayerLists(lists, page, page.map { it.copy(layerOpacity = 0.9) }, ids, 4) { it })
+        assertNull(layerLists(ids, listOf(item("a", "base"), item("b", "high"), item("c", "base"))) { it }.runs)
+        // The box around the objects only grows.
+        val grown = requireNotNull(followLayerLists(lists, page, page + item("far", "high").copy(bounds = Rect(500.0, 500.0, 10.0, 10.0)), ids, 1_024) { it })
+        assertEquals(Rect(0.0, 0.0, 510.0, 510.0), grown.bounds)
+    }
+
     @Test fun every_layer_that_draws_has_its_own_picture_up_to_four_then_the_lowest_share_one_with_the_source() {
         assertEquals(emptyList<SlotKey>(), slotLayout(emptyList(), 4))
         assertEquals(listOf(SlotKey(listOf("a"), false)), slotLayout(listOf("a"), 4))

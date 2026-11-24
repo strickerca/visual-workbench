@@ -935,13 +935,13 @@ class CanvasCostInstrumentedTest {
         assertEquals("Not every stroke was saved on the page of $BUSY.$numbers", STROKES, busy.strokes)
         assertTrue("Too few strokes were seen to settle to compare the pages.$numbers", light.shownMs.size >= STROKES * 3 / 4 && busy.shownMs.size >= STROKES * 3 / 4)
 
-        /** The page of five thousand may take [FACTOR] times the page of two hundred, plus [allowance] ms. */
-        fun within(what: String, lightMs: Double?, busyMs: Double?, allowance: Double, required: Boolean = true) {
+        /** The busier page ([busyPage] strokes) may take [FACTOR] times the page of two hundred, plus [allowance] ms. */
+        fun within(what: String, lightMs: Double?, busyMs: Double?, allowance: Double, required: Boolean = true, busyPage: Int = BUSY) {
             if (lightMs == null || busyMs == null || lightMs.isNaN() || busyMs.isNaN()) {
                 if (required) fail("This build did not measure: $what.$numbers")
                 return
             }
-            assertTrue("$what grows with the page: $busyMs ms with $BUSY strokes on it, $lightMs ms with $LIGHT " +
+            assertTrue("$what grows with the page: $busyMs ms with $busyPage strokes on it, $lightMs ms with $LIGHT " +
                 "(allowed: $FACTOR times as long plus $allowance ms).$numbers", busyMs <= lightMs * FACTOR + allowance)
         }
         within("The time to draw one ink frame (canvas_draw_time, median)", light.p50("canvas_draw_time"), busy.p50("canvas_draw_time"), 0.3)
@@ -977,19 +977,19 @@ class CanvasCostInstrumentedTest {
         // of 200 and of 4,000 strokes (the most the layers panel takes).
         val few = requireNotNull(light.layered); val many = requireNotNull(layered.layered)
         within("Beneath a layer: one ink frame drawn (canvas_draw_time, median)", few.lowerTimings["canvas_draw_time"]?.p50,
-            many.lowerTimings["canvas_draw_time"]?.p50, 0.3)
+            many.lowerTimings["canvas_draw_time"]?.p50, 0.3, busyPage = LAYERED_BUSY)
         within("Beneath a layer: from the pen lifting to the saved scene drawn (median)", median(few.lowerShown.map { it.toDouble() }),
-            median(many.lowerShown.map { it.toDouble() }), 5.0)
+            median(many.lowerShown.map { it.toDouble() }), 5.0, busyPage = LAYERED_BUSY)
         within("Highlighter: one ink frame drawn (canvas_draw_time, median)", few.highTimings["canvas_draw_time"]?.p50,
-            many.highTimings["canvas_draw_time"]?.p50, 0.3, required = false)
+            many.highTimings["canvas_draw_time"]?.p50, 0.3, required = false, busyPage = LAYERED_BUSY)
         for (where in listOf("beneath", "highlighter")) {
             within("Ink in progress $where: one frame, drawn and finished (probe, median)", few.inkFrames[where]?.let(::median),
-                many.inkFrames[where]?.let(::median), 1.0)
+                many.inkFrames[where]?.let(::median), 1.0, busyPage = LAYERED_BUSY)
         }
         within("Highlighter: from the pen lifting to the saved scene drawn (median)", median(few.highShown.map { it.toDouble() }),
-            median(many.highShown.map { it.toDouble() }), 5.0)
+            median(many.highShown.map { it.toDouble() }), 5.0, busyPage = LAYERED_BUSY)
         for (key in listOf("LayerHidden", "LayerShown", "LayerOpacity")) {
-            within("$key: the saved frame that shows it (longest canvas_saved_draw, median)", few.changes[key]?.frame, many.changes[key]?.frame, 1.0)
+            within("$key: the saved frame that shows it (longest canvas_saved_draw, median)", few.changes[key]?.frame, many.changes[key]?.frame, 1.0, busyPage = LAYERED_BUSY)
         }
     }
 
