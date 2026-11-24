@@ -48,6 +48,45 @@ class SemanticEditorTest {
     @Test fun nonCaptureDisablesDefaultSnappingAndExplicitOffNeedsNoProvider() = runBlocking {
         val f=Fixture();try{f.capture=false;f.editor.refresh();f.idle();assertFalse(f.editor.state.value.snapping);f.editor.place(Point(1.0,2.0),ObjectStyle(0xffu,2.0),Transform());f.idle();assertNull(f.placements.single().snapshotId);assertTrue(f.placements.single().elementEids.isEmpty());assertNull(f.matrix)}finally{f.close()}
     }
+    /** A document without capture provenance has none after a new ink stroke:
+     * its state moves to the new revision without a read. */
+    @Test fun aSavedStrokeMovesANonCaptureDocumentToTheNewRevisionWithoutReadingItsCatalog() = runBlocking {
+        val f = Fixture()
+        try {
+            f.capture = false; f.editor.refresh(); f.idle()
+            val before = f.attachment!!.binding; val calls = f.catalogCalls
+            val settled = f.editor.state.value
+            assertEquals(before, settled.binding); assertFalse(settled.catalog!!.isCapture)
+            f.info = f.info.copy(hostSeq = f.info.hostSeq + 1uL, stateHash = "stroke-1"); f.publish()
+            f.editor.strokeAdded(before)
+            assertEquals(calls, f.catalogCalls); assertFalse(f.editor.state.value.busy)
+            val moved = f.editor.state.value
+            assertEquals(f.attachment!!.binding, moved.binding); assertEquals(moved.binding, moved.catalog!!.binding)
+            // Exactly the state a refresh reads for the new revision.
+            f.editor.refresh(); f.idle()
+            assertEquals(moved, f.editor.state.value)
+            assertEquals(settled.copy(binding = moved.binding, catalog = settled.catalog!!.copy(binding = moved.binding!!)), moved)
+        } finally { f.close() }
+    }
+    @Test fun aSavedStrokeOnACaptureDocumentOrAnUnsettledStateIsAnOrdinaryRefresh() = runBlocking {
+        val f = Fixture()
+        try {
+            // A capture document shows stored snapshots that are bound to the revision: read.
+            f.editor.refresh(); f.idle()
+            var before = f.attachment!!.binding; var calls = f.catalogCalls
+            f.info = f.info.copy(hostSeq = 1uL, stateHash = "stroke-1"); f.publish()
+            f.editor.strokeAdded(before); f.idle()
+            assertEquals(calls + 1, f.catalogCalls); assertEquals(f.attachment!!.binding, f.editor.state.value.binding)
+            // State held for another revision than the one the stroke followed: read.
+            f.capture = false; f.editor.refresh(); f.idle()
+            f.info = f.info.copy(hostSeq = 2uL, stateHash = "edit"); f.publish()
+            before = f.attachment!!.binding; calls = f.catalogCalls
+            f.info = f.info.copy(hostSeq = 3uL, stateHash = "stroke-2"); f.publish()
+            f.editor.strokeAdded(before); f.idle()
+            assertEquals(calls + 1, f.catalogCalls); assertEquals(f.attachment!!.binding, f.editor.state.value.binding)
+            assertEquals(f.attachment!!.binding, f.editor.state.value.catalog!!.binding)
+        } finally { f.close() }
+    }
     @Test fun capturedModifierTemporarilyInvertsWithoutChangingSavedChoice() = runBlocking {
         val f=Fixture();try{f.editor.refresh();f.idle();assertTrue(f.editor.state.value.snapping)
             f.editor.place(Point(1.0,2.0),ObjectStyle(0xffu,2.0),Transform(),invertSnapping=true);f.idle()

@@ -100,10 +100,26 @@ public class SemanticEditor(
             admit(a, ticket)
             if (catalog.binding != a.binding) throw WorkflowFailure(WorkflowFailureKind.Stale)
             mutable.value = mutable.value.copy(binding = a.binding, catalog = catalog, snapping = if (catalog.isCapture) state.value.snapping else false,
-                message = if (!catalog.isCapture) "This document has no capture provenance. Capture a window or use the accessibility capture action; no semantic data was invented."
+                message = if (!catalog.isCapture) NO_CAPTURE
                     else if (catalog.snapshots.isEmpty()) "No stored semantic snapshot is available. Capture with the semantic provider enabled, or turn snapping off." else null)
             state.value.snapshotId?.let { chosen -> load(a, ticket, chosen) }
         }
+    }
+    /** [refresh] for a revision that differs from [previous] only by a new
+     * ink stroke. A document without capture provenance has none after the
+     * stroke either, and nothing else is shown for it, so its state moves to
+     * the new revision without a read. A capture document, or any state that
+     * is not the settled one of [previous], is refreshed as usual. */
+    public fun strokeAdded(previous: WorkflowBinding): Unit {
+        if (detached) return
+        val binding = context()?.binding ?: return
+        val held = state.value
+        val catalog = held.catalog
+        if (work != null || reload || held.busy || held.binding != previous || catalog == null || catalog.binding != previous ||
+            catalog.isCapture || catalog.snapshots.isNotEmpty() || catalog.next != null || held.snapshotId != null ||
+            binding.projectId != previous.projectId || binding.documentId != previous.documentId) { refresh(); return }
+        changed()
+        mutable.value = SemanticEditorState(binding = binding, catalog = catalog.copy(binding = binding), snapping = false, message = NO_CAPTURE)
     }
     public fun nextPage(): Unit {
         val cursor = state.value.catalog?.next ?: return
@@ -183,6 +199,7 @@ public class SemanticEditor(
         withContext(NonCancellable) { work?.cancelAndJoin(); work = null; mutable.value = SemanticEditorState(); interactionChanged() }
     }
 }
+private const val NO_CAPTURE = "This document has no capture provenance. Capture a window or use the accessibility capture action; no semantic data was invented."
 public fun semanticFailureMessage(error: Exception): String = when ((error as? WorkflowFailure)?.kind) {
     WorkflowFailureKind.Stale -> "The document, capture or revision changed. Refresh and explicitly select the snapshot again."
     WorkflowFailureKind.Missing -> "The stored snapshot or element is missing. No replacement was synthesized."

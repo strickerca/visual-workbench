@@ -201,6 +201,57 @@ class InstructionEditorTest {
         } finally { if (f.gate.isLocked) f.gate.unlock(); f.close() }
     }
 
+    /** A new ink stroke changes no instruction row: the rows held move to the
+     * new revision without a read, and an open field goes stale as on refresh. */
+    @Test fun aSavedStrokeMovesTheHeldRowsToTheNewRevisionWithoutReadingThem() = runBlocking {
+        val f = Fixture(existing = true)
+        try {
+            f.editor.refresh(); f.idle()
+            val before = f.attachment!!.binding
+            val rows = f.editor.state.value.document!!
+            assertEquals(before, rows.binding); val reads = f.documentReads
+            f.editor.focusInstruction("existing"); f.idle()
+            assertEquals(before, f.editor.state.value.field!!.binding); assertFalse(f.editor.state.value.field!!.stale)
+            val readsWithField = f.documentReads
+            f.info = f.info.copy(hostSeq = f.info.hostSeq + 1uL, stateHash = "stroke-1"); f.publish()
+            f.editor.strokeAdded(before)
+            // Nothing was read and nothing is busy: the pen is not held up.
+            assertEquals(readsWithField, f.documentReads); assertFalse(f.editor.state.value.busy)
+            val moved = f.editor.state.value.document!!
+            assertEquals(f.attachment!!.binding, moved.binding)
+            assertEquals(rows.copy(binding = moved.binding), moved)
+            assertTrue(f.editor.state.value.field!!.stale); assertEquals(1, f.draftsClosed)
+            // What a read returns now is exactly what is held.
+            f.editor.refresh(); f.idle()
+            assertEquals(moved, f.editor.state.value.document); assertTrue(f.documentReads > reads)
+        } finally { f.close() }
+    }
+    @Test fun aSavedStrokeIsAnOrdinaryRefreshUnlessTheSettledRowsOfTheRevisionBeforeItAreHeld() = runBlocking {
+        val f = Fixture(existing = true)
+        try {
+            // No rows held yet: they are read.
+            val first = f.attachment!!.binding
+            f.info = f.info.copy(hostSeq = 1uL, stateHash = "stroke-1"); f.publish()
+            f.editor.strokeAdded(first); f.idle()
+            assertEquals(1, f.documentReads); assertEquals(f.attachment!!.binding, f.editor.state.value.document!!.binding)
+            // Rows held for another revision than the one the stroke followed: read.
+            val second = f.attachment!!.binding
+            f.info = f.info.copy(hostSeq = 2uL, stateHash = "edit"); f.publish()
+            f.info = f.info.copy(hostSeq = 3uL, stateHash = "stroke-2"); val skipped = f.attachment!!.binding; f.publish()
+            assertNotEquals(second, skipped)
+            f.editor.strokeAdded(skipped); f.idle()
+            assertEquals(2, f.documentReads); assertEquals(f.attachment!!.binding, f.editor.state.value.document!!.binding)
+            // A read still in flight: the stroke asks for another one after it.
+            val third = f.attachment!!.binding
+            val gate = CompletableDeferred<Unit>()
+            f.beforeDocument = { gate.await() }
+            f.editor.refresh(); assertTrue(f.editor.state.value.busy)
+            f.info = f.info.copy(hostSeq = 4uL, stateHash = "stroke-3"); f.publish()
+            f.editor.strokeAdded(third)
+            f.beforeDocument = {}; gate.complete(Unit); f.idle()
+            assertEquals(4, f.documentReads); assertEquals(f.attachment!!.binding, f.editor.state.value.document!!.binding)
+        } finally { f.close() }
+    }
     private class Fixture(existing: Boolean = false, dispatcher: CoroutineDispatcher = Dispatchers.Unconfined) {
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val gate = Mutex(); var ids = 0

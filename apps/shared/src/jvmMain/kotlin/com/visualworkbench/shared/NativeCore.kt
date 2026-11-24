@@ -67,7 +67,7 @@ private class NativeCore : WorkbenchCore, WorkbenchStreamingCore, WorkbenchDocum
         TextLayout(value.algorithmVersion,value.glyphs.map { GlyphOutline(it.glyphId,it.cluster,it.font,it.x,it.y,it.advance,it.outline.map { p -> p.common() }) },value.width,value.height,value.lineHeight)
     }
 }
-private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchDeferredStrokes, WorkbenchSettling {
+private class NativeProject(val handle: ProjectSession, private val giantOwner: GiantImportOwner<ProjectSession>? = null) : WorkbenchProject, WorkbenchStreamingProject, WorkbenchFileTransfers, WorkbenchOriginalFormats, WorkbenchDocumentsProject, WorkbenchGiantImagesProject, WorkbenchDocumentChanges, WorkbenchAddedStrokes, WorkbenchDeferredStrokes, WorkbenchSettling {
     override suspend fun settle(): Boolean = call { handle.settle() }
     override fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke? {
         if(closed.get())throw CoreFailure(CoreFailureKind.Closed)
@@ -79,21 +79,25 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
             catch(_:CoreException.Backpressure) { null }
             catch(error:CoreException) { throw mapFailure(error) }
     }
-    /** The strokes of the snapshot last returned by [documentChanges], each with
-     * the digest the core gave for it. Only an instance still held by the
-     * caller's snapshot is ever named to the core as known. */
+    /** The snapshot last returned by [documentChanges] or [withAddedStroke]:
+     * its strokes, each with the digest the core gave for it, and what the
+     * whole of it counts toward the size limit of a read. Only an instance
+     * still held by the caller's snapshot is ever named to the core as known. */
     private class HeldStroke(val item: RenderItem, val digest: ByteArray, val cost: ULong)
-    private class HeldStrokes(val documentId: String, val strokes: Map<String, HeldStroke>)
-    private val heldStrokes = java.util.concurrent.atomic.AtomicReference<HeldStrokes?>(null)
+    private class HeldStrokes(val documentId: String, var snapshot: DocumentSnapshot, val strokes: HashMap<String, HeldStroke>, var cost: Long)
+    private val heldLock = Any()
+    private var heldStrokes: HeldStrokes? = null
     override suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot? {
         if (documentDescriptor(documentId) != null) return null
         return try { call { cancel ->
             // Off the caller's thread: one pass over the strokes it still holds.
-            val held = heldStrokes.get()?.takeIf { it.documentId == documentId }?.strokes.orEmpty()
-            val known = if (previous == null || previous.documentId != documentId) emptyMap()
-                else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
+            val known = if (previous == null || previous.documentId != documentId) emptyMap() else synchronized(heldLock) {
+                val held = heldStrokes?.takeIf { it.documentId == documentId }?.strokes
+                if (held == null) emptyMap() else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
+            }
             val d = handle.documentSnapshotChangesPacked(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest, it.cost) }, cancel)
             val next = HashMap<String, HeldStroke>(d.items.size)
+            var counted = 0L
             val items = d.items.map { change ->
                 val sent = change.item
                 val item = if (sent != null) nativePackedItem(sent) else {
@@ -104,17 +108,44 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
                     else old.copy(layerOpacity = change.layerOpacity, layerBlend = change.layerBlend, locked = change.locked)
                 }
                 change.digest?.let { next[change.objectId] = HeldStroke(item, it, change.cost) }
+                counted += change.cost.toLong()
                 item
             }
-            heldStrokes.set(HeldStrokes(documentId, next))
-            DocumentSnapshot(d.documentId, d.title, d.width, d.height, d.bitDepth,
+            val snapshot = DocumentSnapshot(d.documentId, d.title, d.width, d.height, d.bitDepth,
                 d.layers.map { LayerInfo(it.id, it.name, it.visible, it.locked, it.opacity, it.blend) },
                 RenderList(d.revision.common(), items), hasToneAdjustments = d.hasToneAdjustments)
+            synchronized(heldLock) { heldStrokes = HeldStrokes(documentId, snapshot, next, counted) }
+            snapshot
         } } catch (error: CoreFailure) {
             // The document, kept strokes included, is at the size limit of a
             // complete read. That read decides, exactly as without this call.
             if (error.kind != CoreFailureKind.Backpressure) throw error
             null
+        }
+    }
+    override fun withAddedStroke(held: DocumentSnapshot, saved: StrokeSave): DocumentSnapshot? {
+        val added = saved.added ?: return null
+        val item = added.item
+        if (closed.get() || held.page != null || item.shape !is Shape.Stroke || added.digest.size != 32 || added.cost > Long.MAX_VALUE.toULong()) return null
+        return synchronized(heldLock) {
+            val book = heldStrokes ?: return@synchronized null
+            // Nothing is taken on trust: the caller holds the snapshot returned
+            // last, the save directly followed it, and the stroke is new to it.
+            if (book.snapshot !== held || book.documentId != held.documentId || held.render.revision != added.previous ||
+                saved.revision.projectId != added.previous.projectId || item.objectId in book.strokes) return@synchronized null
+            // A read refuses a document past its limits. Well short of them
+            // this call can tell; nearer, the read decides, as it always did.
+            val cost = book.cost + added.cost.toLong()
+            if (held.render.items.size >= ADDED_STROKE_ITEMS || cost > ADDED_STROKE_BYTES) return@synchronized null
+            val at = addedStrokeIndex(held.layers, held.render.items, item.layerId) { it.layerId } ?: return@synchronized null
+            val layer = held.layers.first { it.id == item.layerId }
+            if (layer.opacity != item.layerOpacity || layer.blend != item.layerBlend || layer.locked != item.locked) return@synchronized null
+            val items = ArrayList<RenderItem>(held.render.items.size + 1)
+            items.addAll(held.render.items); items.add(at, item)
+            val next = held.copy(render = RenderList(saved.revision, items))
+            book.strokes[item.objectId] = HeldStroke(item, added.digest, added.cost)
+            book.cost = cost; book.snapshot = next
+            next
         }
     }
     suspend fun <T> withGiantProject(block: suspend (ProjectSession) -> T): T = closeMutex.withLock {
@@ -250,7 +281,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
             try { handle.closeSession() }
             catch(error:CoreException) { failure = mapFailure(error) }
             catch(error:Throwable) { failure = error }
-            closed.set(true);documentPasswords.clear();documentPages.clear();heldStrokes.set(null)
+            closed.set(true);documentPasswords.clear();documentPages.clear();synchronized(heldLock) { heldStrokes = null }
             try { handle.destroy() }
             catch(error:Throwable) {
                 val prior = failure
@@ -260,7 +291,7 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
         }
     }
 }
-private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
+private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke, WorkbenchStrokeSaves {
     private val closed = java.util.concurrent.atomic.AtomicBoolean(false)
     private val closeMutex = Mutex()
     private suspend fun <T> call(block: suspend (Cancellation) -> T): T = native {
@@ -270,6 +301,10 @@ private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
     override suspend fun append(batch: SampleBatch): InkUpdate = call { handle.appendSamples(batch.native()).common() }
     override suspend fun predict(batch: SampleBatch): InkUpdate = call { handle.previewSamples(batch.native()).common() }
     override suspend fun commit(): ProjectInfo = call { handle.commit(it).common() }
+    override suspend fun save(): StrokeSave = call { cancel ->
+        val saved = handle.commitAdded(cancel)
+        StrokeSave(saved.revision.common(), saved.added?.let { AddedStroke(it.previous.common(), nativePackedItem(it.item), it.digest, it.cost) })
+    }
     override fun cancel() { if(!closed.get()) try { handle.cancel() } catch(error:CoreException) { throw mapFailure(error) } }
     override suspend fun dispose(): Unit = releaseNative {
         closeMutex.withLock { if(!closed.getAndSet(true)) {
@@ -278,6 +313,12 @@ private class NativeStroke(val handle: StrokeGesture) : WorkbenchStroke {
         } }
     }
 }
+/** How far [NativeProject.withAddedStroke] lets a held document grow before a
+ * read has to decide: the core refuses a read past 10,000 items or 64 MiB of
+ * counted cost, where a read also counts the document's frame, a few hundred
+ * bytes an entry and, for a moment, the stroke it is building. */
+private const val ADDED_STROKE_ITEMS = 10_000
+private const val ADDED_STROKE_BYTES = 48L * 1024 * 1024
 private fun StrokeOptions.native(): NStrokeOptions = NStrokeOptions(gestureId,transactionId,objectId,documentId,layerId,deviceId,lamport,createdAtMs,family,width,rgba,stabilization,pressureCurve)
 private fun Camera.native(): NCamera = NCamera(center.native(),scale,rotation,viewportWidth,viewportHeight)
 private fun Point.native(): NPoint = NPoint(x,y)

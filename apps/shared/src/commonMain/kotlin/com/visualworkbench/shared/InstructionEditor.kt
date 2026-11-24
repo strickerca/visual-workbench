@@ -114,6 +114,28 @@ public class InstructionEditor(
         if (work?.isCompleted == false) { reload = true; return }
         launch { load(it) }
     }
+    /** [refresh] for a revision that differs from [previous] only by a new
+     * ink stroke, called after publication of that snapshot. No instruction
+     * names a stroke that did not exist and a stroke is not a marker, so the
+     * rows a read would return are the rows already held; only their binding
+     * moves to the new revision, and nothing is read. A field open on the
+     * earlier revision goes stale exactly as [refresh] makes it. Whenever the
+     * rows held are not the complete, settled rows of [previous] this is
+     * [refresh]. */
+    public fun strokeAdded(previous: WorkflowBinding): Unit {
+        if (detaching) return
+        val attachment = context() ?: return
+        val next = attachment.binding
+        val rows = mutable.value.document
+        if (rows == null || rows.binding != previous || work?.isCompleted == false || reload ||
+            next.projectId != previous.projectId || next.documentId != previous.documentId) { refresh(); return }
+        val current = mutable.value.field
+        if (current != null && current.binding != next) {
+            releaseDraft()
+            field(current.copy(stale = true))
+        }
+        mutable.value = mutable.value.copy(document = rows.copy(binding = next), message = null)
+    }
     private suspend fun load(attachment: InstructionAttachment): InstructionDocument {
         val rows = workflows(attachment.project).document(attachment.binding.documentId)
         if (!same(attachment) || rows.binding != attachment.binding) throw WorkflowFailure(WorkflowFailureKind.Stale)
