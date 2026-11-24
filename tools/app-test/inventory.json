@@ -142,6 +142,7 @@
     "com.visualworkbench.android.PenStrokeBurstInstrumentedTest#fourHundredRapidStrokesOnAFreshPageAreAllSaved",
     "com.visualworkbench.android.PenStrokeBurstInstrumentedTest#noPenDownForInkIsRefusedWhileEarlierStrokesAreBeingSaved",
     "com.visualworkbench.android.PenStrokeBurstInstrumentedTest#strokesAtAWritingPaceOnAPageOfTwelveHundredStrokesAreAllSaved",
+    "com.visualworkbench.android.PictureSurfaceInstrumentedTest#everyPictureShowsWhatWasDrawnForItAlsoWhenTheRendererSkipsAFrame",
     "com.visualworkbench.android.PolygonEditorInstrumentedTest#canceledContactAndChangedViewportCannotReuseEarlierPolygonVertices",
     "com.visualworkbench.android.PolygonEditorInstrumentedTest#separateDownUpContactsKeepVerticesAndFinishPublishesOneUndoableTransaction",
     "com.visualworkbench.android.PrecisionInstrumentedTest#acceptedAndPredictedRoutingPreservesEveryNonCoordinateField",
