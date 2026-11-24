@@ -50,9 +50,6 @@ internal data class CanvasScene(
      * wet ink of this scene and of that stroke's pen-down; 0 without wet ink. */
     val wetSampleMs: Long = 0,
     val wetStartMs: Long = 0,
-    /** Developer switch, fixed when the scene is published: an ink frame may
-     * keep the picture of everything but the wet ink instead of redrawing it. */
-    val keepDryPicture: Boolean = false,
 )
 
 /** The path commands of a stroke's contours, in f32 coordinates around an f64
@@ -241,19 +238,23 @@ internal object EditorDrawing {
         if (drawDocument(canvas, scene, scene.provisional, visible)) drawOverlays(canvas, scene)
     }
 
-    /** Everything except the wet ink and the overlays: the picture an ink frame
-     * keeps and reuses while only the stroke in progress changes. */
-    fun drawDry(canvas: Canvas, scene: CanvasScene) { drawDocument(canvas, scene, emptyList(), null) }
+    /** The surround and the white page under the document. The page is
+     * presentation only: the source and every object layer go into one
+     * transparent stack over it, so that a Result replacement keeps the
+     * source's alpha. */
+    private fun drawPage(canvas: Canvas, scene: CanvasScene) {
+        canvas.drawColor(surroundArgb(scene.dark))
+        val pageSave = canvas.save()
+        canvas.concat(matrix(scene.matrix))
+        canvas.clipRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat())
+        canvas.drawColor(android.graphics.Color.WHITE)
+        canvas.restoreToCount(pageSave)
+    }
 
-    /** The wet ink alone, clipped to the page like the document, for a frame
-     * whose kept picture already holds everything beneath it. Only valid when
-     * [wetInkOnTop] holds for the scene. */
-    fun drawWetOnTop(canvas: Canvas, scene: CanvasScene) {
-        val clipSave = canvas.save()
+    /** Clips to the page as it lies on the screen. */
+    private fun clipToPage(canvas: Canvas, scene: CanvasScene) {
         val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
         page.transform(matrix(scene.matrix)); canvas.clipPath(page)
-        scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
-        canvas.restoreToCount(clipSave)
     }
 
     /** Surround, page, source pixels and every object layer. False: results are
@@ -261,19 +262,63 @@ internal object EditorDrawing {
      * saved objects whose bounds lie wholly outside it are skipped; they would
      * be clipped away entirely, so the pixels are the same. */
     private fun drawDocument(canvas: Canvas, scene: CanvasScene, provisional: List<DrawObject>, visible: Rect?): Boolean {
-        canvas.drawColor(surroundArgb(scene.dark))
-        val pageSave = canvas.save()
-        canvas.concat(matrix(scene.matrix))
-        canvas.clipRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat())
-        canvas.drawColor(android.graphics.Color.WHITE)
-        // The page is presentation only. Put source and all object layers in
-        // one transparent stack so Result replacement preserves source alpha.
-        canvas.restoreToCount(pageSave)
+        drawPage(canvas, scene)
         val clipSave = canvas.save()
-        val page = Path().apply { addRect(0f, 0f, scene.document.width.toFloat(), scene.document.height.toFloat(), Path.Direction.CW) }
-        page.transform(matrix(scene.matrix)); canvas.clipPath(page)
+        clipToPage(canvas, scene)
         if(!scene.resultDisplayReady){canvas.restoreToCount(clipSave);return false}
         val documentLayer=canvas.saveLayer(null,null)
+        drawStack(canvas, scene, provisional, visible)
+        canvas.restoreToCount(documentLayer)
+        canvas.restoreToCount(clipSave)
+        return true
+    }
+
+    // The kept picture. It holds exactly what [drawDocument] puts into its
+    // document layer for the saved objects, so a frame drawn from it goes
+    // through the same steps as a whole scene: surround, page, the stack laid
+    // on through the page's edge, overlays.
+
+    /** A kept picture from nothing: the saved document stack on a transparent
+     * ground, for a scene [pictureRefusal] lets through. */
+    fun drawStack(canvas: Canvas, scene: CanvasScene) = drawStack(canvas, scene, emptyList(), null)
+
+    /** A kept picture from the one [before], which lacks only [added]: the
+     * same pixels, and those objects drawn over them. Only valid when they
+     * are drawn after everything else in a plainly composited layer
+     * ([DryLayers.inkOnTop]). What is drawn is the added objects alone,
+     * whatever the document holds. */
+    fun drawAdded(canvas: Canvas, scene: CanvasScene, before: Bitmap, added: List<DrawObject>) {
+        canvas.drawBitmap(before, 0f, 0f, PICTURE_COPY)
+        added.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+    }
+
+    /** One frame from the kept picture [kept] of [scene]'s saved objects.
+     * Ink in progress is drawn into the stack before the stack goes through
+     * the page's edge, as it is in a whole scene; that too needs
+     * [DryLayers.inkOnTop]. */
+    fun drawKept(canvas: Canvas, scene: CanvasScene, kept: Bitmap) {
+        drawPage(canvas, scene)
+        val clipSave = canvas.save()
+        clipToPage(canvas, scene)
+        if (scene.provisional.none { it.item.objectId !in scene.hidden }) canvas.drawBitmap(kept, 0f, 0f, PICTURE_OVER)
+        else {
+            val documentLayer = canvas.saveLayer(null, null)
+            canvas.drawBitmap(kept, 0f, 0f, PICTURE_COPY)
+            scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+            canvas.restoreToCount(documentLayer)
+        }
+        canvas.restoreToCount(clipSave)
+        drawOverlays(canvas, scene)
+    }
+
+    /** A picture is drawn pixel for pixel, never smoothed. Made at first use:
+     * the unit tests use this object without a graphics framework. */
+    private val PICTURE_OVER by lazy { Paint().apply { isFilterBitmap = false; isAntiAlias = false; isDither = false } }
+    private val PICTURE_COPY by lazy { Paint(PICTURE_OVER).apply { blendMode = BlendMode.SRC } }
+
+    /** The document as it is stacked, on whatever is beneath: the source
+     * pixels, then every object layer in order, each composited as a whole. */
+    private fun drawStack(canvas: Canvas, scene: CanvasScene, provisional: List<DrawObject>, visible: Rect?) {
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
         scene.giantFrame?.let{drawGiantAndroidTiles(canvas,it)}
@@ -303,18 +348,15 @@ internal object EditorDrawing {
             objects.forEach { drawObject(canvas, scene, it) }
             canvas.restoreToCount(save)
         }
-        canvas.restoreToCount(documentLayer)
-        canvas.restoreToCount(clipSave)
-        return true
     }
 
-    /** Whether a saved object could put a pixel inside [visible]. Only objects
-     * whose native bounds are known to contain everything drawn for them are
-     * ever skipped: markers, results, screen-constant outlines and objects
-     * under a preview transform are always drawn. */
+    /** Whether a saved object could put a pixel inside [visible]. Only pen
+     * strokes are ever skipped: a stroke is a filled outline, and its native
+     * bounds contain that outline whole. Shapes, text, markers, results and
+     * anything under a preview transform are always drawn. */
     private fun mayTouch(scene: CanvasScene, obj: DrawObject, visible: Rect): Boolean {
         val item = obj.item
-        if (obj.marker != null || item.shape is Shape.Result || item.style.screenConstantWidth || item.objectId in scene.transformed) return true
+        if (item.shape !is Shape.Stroke || obj.marker != null || item.style.screenConstantWidth || item.objectId in scene.transformed) return true
         return boundsMayTouch(item.bounds, visible, 4.0 / scene.camera.scale)
     }
 
