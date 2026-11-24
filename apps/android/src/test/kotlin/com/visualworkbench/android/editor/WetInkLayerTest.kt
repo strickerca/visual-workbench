@@ -94,4 +94,15 @@ class WetInkLayerTest {
         assertNull(visibleDocumentRect(Transform(a = 0.0, d = 0.0), Rect(0.0, 0.0, 10.0, 10.0)))
         assertNull(visibleDocumentRect(Transform(a = Double.NaN), Rect(0.0, 0.0, 10.0, 10.0)))
     }
+
+    @Test fun draw_only_the_new_stroke_switched_off_draws_the_whole_scene_without_asking() {
+        assertTrue(wholeSceneNeeded(keepDryPicture = false) { fail("the ink-only drawing must not be tried"); true })
+    }
+
+    @Test fun draw_only_the_new_stroke_switched_on_draws_the_whole_scene_only_when_ink_only_cannot() {
+        var asked = 0
+        assertFalse(wholeSceneNeeded(keepDryPicture = true) { asked++; true })
+        assertTrue(wholeSceneNeeded(keepDryPicture = true) { asked++; false })
+        assertEquals(2, asked)
+    }
 }

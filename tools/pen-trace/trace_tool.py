@@ -233,6 +233,10 @@ TIMING_KEYS = ('canvas_ink_drawn', 'canvas_frame_ready', 'canvas_draw_time', 'ca
                'canvas_stroke_start', 'canvas_save', 'canvas_refresh', 'remote_sent', 'remote_echo')
 TIMING_ROW = re.compile(r'([a-z_]+) n=([0-9]{1,9}) p50_ms=([0-9]{1,6}\.[0-9]) p95_ms=([0-9]{1,6}\.[0-9]) max_ms=([0-9]{1,6}\.[0-9])')
 SWITCHES_ROW = re.compile(r'switches=(none|[A-Za-z]{3,40}(,[A-Za-z]{3,40}){0,31})')
+# Pen-downs that asked for ink: how many were drawn, how many were refused, and
+# each refusal reason that occurred with its count.
+PEN_DOWN_REASONS = ('backlog', 'busy', 'modal', 'loading', 'stream', 'lists', 'failed')
+PEN_DOWNS_ROW = re.compile(r'pen_downs accepted=([0-9]{1,9}) refused=([0-9]{1,9})((?: [a-z_]{3,16}=[0-9]{1,9}){0,7})')
 # Targets from the product's performance table. The app's timings end when the
 # frame is handed to the display, so staying under a target here is necessary,
 # not sufficient: the camera or input-to-present measurement decides.
@@ -254,7 +258,18 @@ def parse_timings(text):
     if not switches:
         raise ValueError('Missing or malformed switches line')
     rows = {}
+    pen_downs = None
     for line in lines[1:-1]:
+        downs = PEN_DOWNS_ROW.fullmatch(line)
+        if downs:
+            reasons = dict(pair.split('=') for pair in downs.group(3).split())
+            if pen_downs is not None or len(reasons) != len(downs.group(3).split()) or any(key not in PEN_DOWN_REASONS for key in reasons):
+                raise ValueError('Unexpected pen-down line; only the fixed reasons are accepted, once each')
+            reasons = {key: int(value) for key, value in reasons.items()}
+            if any(value < 1 for value in reasons.values()) or sum(reasons.values()) != int(downs.group(2)):
+                raise ValueError('Inconsistent pen-down line')
+            pen_downs = {'accepted': int(downs.group(1)), 'refused': int(downs.group(2)), 'reasons': reasons}
+            continue
         match = TIMING_ROW.fullmatch(line)
         if not match or match.group(1) not in TIMING_KEYS or match.group(1) in rows:
             raise ValueError('Unexpected timing line; only the fixed timing names are accepted')
@@ -265,7 +280,10 @@ def parse_timings(text):
     on = [] if switches.group(1) == 'none' else switches.group(1).split(',')
     if len(set(on)) != len(on):
         raise ValueError('Duplicate switch name')
-    return {'timings': rows, 'switches': sorted(on)}
+    result = {'timings': rows, 'switches': sorted(on)}
+    if pen_downs is not None:
+        result['pen_downs'] = pen_downs
+    return result
 
 
 def compare_timings(before, after=None):
@@ -274,10 +292,15 @@ def compare_timings(before, after=None):
     def judged(key, row):
         target = TIMING_TARGETS_P95_MS.get(key)
         return dict(row, target_p95_ms=target, within_target=None if target is None else row['p95_ms'] <= target)
-    result = {'before': {'switches': before['switches'], 'timings': {k: judged(k, v) for k, v in before['timings'].items()}}}
+    def capture(value):
+        shown = {'switches': value['switches'], 'timings': {k: judged(k, v) for k, v in value['timings'].items()}}
+        if 'pen_downs' in value:
+            shown['pen_downs'] = value['pen_downs']
+        return shown
+    result = {'before': capture(before)}
     if after is None:
         return result
-    result['after'] = {'switches': after['switches'], 'timings': {k: judged(k, v) for k, v in after['timings'].items()}}
+    result['after'] = capture(after)
     changes = {}
     worse = better = False
     for key in TIMING_KEYS:

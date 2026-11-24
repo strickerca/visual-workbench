@@ -8,6 +8,12 @@ import com.visualworkbench.shared.RenderItem
 import com.visualworkbench.shared.Shape
 import com.visualworkbench.shared.Transform
 
+/** One ink frame: true when the whole scene has to be drawn. [inkOnly] draws
+ * the kept picture with only the new stroke over it and says whether it could;
+ * it is asked only when the scene carries the developer switch. */
+internal inline fun wholeSceneNeeded(keepDryPicture: Boolean, inkOnly: () -> Boolean): Boolean =
+    !(keepDryPicture && inkOnly())
+
 /** Whether [bounds] (a native conservative box, document space) could reach
  * into [visible] grown by [margin] on every side. Touching edges count, and a
  * box that cannot be judged is treated as reaching in. */

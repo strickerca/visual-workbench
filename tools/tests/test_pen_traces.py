@@ -103,7 +103,8 @@ class PenTraces(unittest.TestCase):
              'canvas_first_ink n=42 p50_ms=13.0 p95_ms=21.5 max_ms=29.0\n'
              'canvas_refresh n=130 p50_ms=4.0 p95_ms=9.0 max_ms=15.0\n'
              'remote_sent n=3 p50_ms=0.4 p95_ms=0.9 max_ms=0.9\n'
-             'switches=canvasQuickRefresh\n')
+             'pen_downs accepted=42 refused=0\n'
+             'switches=canvasInkOnly\n')
 
     def test_copied_timings_are_read_and_judged_against_the_targets(self):
         one = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE))
@@ -114,7 +115,12 @@ class PenTraces(unittest.TestCase):
 
     def test_two_captures_give_the_change_and_what_to_do_with_the_switch(self):
         result = trace_tool.compare_timings(trace_tool.parse_timings(self.BEFORE), trace_tool.parse_timings(self.AFTER))
-        self.assertEqual(result['switches_changed'], ['canvasQuickRefresh'])
+        self.assertEqual(result['switches_changed'], ['canvasInkOnly'])
+        # Pen-downs that asked for ink are carried through as counted.
+        self.assertNotIn('pen_downs', result['before'])
+        self.assertEqual(result['after']['pen_downs'], {'accepted': 42, 'refused': 0, 'reasons': {}})
+        refused = trace_tool.parse_timings(self.AFTER.replace('refused=0', 'refused=3 backlog=1 modal=2'))['pen_downs']
+        self.assertEqual(refused, {'accepted': 42, 'refused': 3, 'reasons': {'backlog': 1, 'modal': 2}})
         self.assertEqual(result['changes']['canvas_ink_drawn'], {'p50_change_ms': -3.0, 'p95_change_ms': -19.0, 'verdict': 'better'})
         self.assertEqual(result['changes']['canvas_refresh']['verdict'], 'better')
         # Half a millisecond on 22 ms is within the noise.
@@ -137,6 +143,12 @@ class PenTraces(unittest.TestCase):
                     self.BEFORE.replace('p95_ms=31.0', 'p95_ms=3.0'),
                     self.BEFORE.replace('switches=none', 'switches=a b'),
                     self.BEFORE.replace('canvas_first_ink n=40', 'canvas_ink_drawn n=40'),
+                    # A pen-down line names only the fixed reasons, once each, and adds up.
+                    self.AFTER.replace('refused=0', 'refused=1 my_reason=1'),
+                    self.AFTER.replace('refused=0', 'refused=2 modal=1 modal=1'),
+                    self.AFTER.replace('refused=0', 'refused=3 modal=1'),
+                    self.AFTER.replace('refused=0', 'refused=0 modal=0'),
+                    self.AFTER.replace('pen_downs accepted=42 refused=0\n', 'pen_downs accepted=42 refused=0\npen_downs accepted=1 refused=0\n'),
                     self.BEFORE + 'x' * 20000):
             with self.assertRaises(ValueError): trace_tool.parse_timings(bad)
 
