@@ -678,7 +678,10 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
                 plan = planFor(now, scene, next, index) ?: return wholeFrame()
             }
         }
-        val frame = framePlan(now, scene, plan, index, gesture, soft) ?: return refused(if (scene.provisional.isNotEmpty()) PictureRefusal.Ink else PictureRefusal.Gesture)
+        val frame = framePlan(now, scene, plan, index, gesture, soft) ?: return if (gesture || scene.provisional.isNotEmpty())
+            refused(if (scene.provisional.isNotEmpty()) PictureRefusal.Ink else PictureRefusal.Gesture)
+            // A scene at rest that cannot be drawn over the pictures: drawn whole, and the pictures brought to it once it rests.
+            else wholeUntilSettled(post, scene, next, first = false, gesture = false)
         EditorDrawing.drawFrame(canvas, scene, frame)
         lastPlan = frame
         val moving = movingObjects(scene, index)
@@ -845,7 +848,8 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts(), private 
         val area = TouchedArea(width, height)
         val margin = if (soft) SOFT_MARGIN_PX else 0.0
         plan.area?.let { for (box in it.boxes) area.add(box.left.toDouble(), box.top.toDouble(), box.right.toDouble(), box.bottom.toDouble()) }
-        if (plan.area == null && plan.work.values.any { it == SlotWork.Patch || it == SlotWork.Render } && !soft) return null
+        // A picture drawn by parts needs its part; one drawn whole is drawn here from its objects, or was drawn first.
+        if (plan.area == null && plan.work.values.any { it == SlotWork.Patch }) return null
         if (gesture) {
             for ((id, preview) in scene.transformed) {
                 val moved = index.find(id)?.item ?: continue
