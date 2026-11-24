@@ -423,96 +423,231 @@ fn render_entries(
                 }
                 digest = Some(value);
             }
-            let shape = draw_shape(&object.state, project)?;
-            let (local, geometry) = local_bounds(&object.state, project, page, &shape)?;
-            let a = object.state.transform.as_ref().ok_or(CoreError::Invalid)?;
-            let mut bounds = from_bounds(
-                corners(local).map(|(x, y)| (a.a * x + a.c * y + a.e, a.b * x + a.d * y + a.f)),
-            )?;
-            let style = object.state.style.as_ref().ok_or(CoreError::Invalid)?;
-            if style.screen_constant_width {
-                bounds = rect(inflate(bounds, style.width * 2.0))?;
-            }
-            if query.is_some_and(|q| !overlaps(q, bounds)) {
+            let Some(item) = display_item(
+                project,
+                page,
+                Shown {
+                    layer_id,
+                    layer,
+                    id,
+                    object,
+                },
+                query,
+                form,
+                encoded,
+                Counted {
+                    bytes: bytes_total,
+                    full: items.len() >= 10_000,
+                },
+            )?
+            else {
                 continue;
-            }
-            if items.len() >= 10_000 {
-                return Err(CoreError::Backpressure);
-            }
-            let outline = geometry.as_ref().map_or(&[][..], |g| g.polygons());
-            let transform = Transform {
-                a: a.a,
-                b: a.b,
-                c: a.c,
-                d: a.d,
-                e: a.e,
-                f: a.f,
             };
-            let style = ObjectStyle {
-                rgba: style.stroke.as_ref().map_or(0, |c| c.rgba),
-                width: style.width,
-                screen_constant_width: style.screen_constant_width,
-                fill: style
-                    .has_fill
-                    .then(|| style.fill.as_ref().map_or(0, |c| c.rgba)),
-            };
-            let locked = object.state.locked || layer.locked;
-            let item = match form {
-                OutlineForm::Lists => DisplayItem::Lists(RenderItem {
-                    object_id: id.to_string(),
-                    layer_id: layer_id.to_string(),
-                    layer_opacity: layer.opacity,
-                    layer_blend: layer.blend.clone(),
-                    bounds,
-                    object_protobuf: match encoded {
-                        Some(bytes) => bytes,
-                        None => object.state.encode_to_vec(),
-                    },
-                    stroke_contours: crate::gesture::contours(outline)?,
-                    transform,
-                    style,
-                    shape,
-                    locked,
-                }),
-                OutlineForm::Packed => {
-                    // The stroke's geometry is alive now and its packed bytes
-                    // are about to be made: what that holds counts once, on
-                    // top of everything counted so far, before the bytes are
-                    // allocated. The lists form keeps its 96 bytes a vertex,
-                    // well above this build peak with its lists beside it.
-                    let contours = crate::packed_contours::pack(outline, |length| {
-                        let (Some(geometry), Some(Shape::Stroke(stroke))) =
-                            (&geometry, &object.state.shape)
-                        else {
-                            return Ok(());
-                        };
-                        crate::payload::admits(
-                            bytes_total,
-                            crate::payload::packed_build_bytes(stroke.x.len(), geometry, length)?,
-                        )
-                    })?;
-                    DisplayItem::Packed(PackedRenderItem {
-                        object_id: id.to_string(),
-                        layer_id: layer_id.to_string(),
-                        layer_opacity: layer.opacity,
-                        layer_blend: layer.blend.clone(),
-                        bounds,
-                        contours,
-                        transform,
-                        style,
-                        shape,
-                        locked,
-                    })
-                }
-            };
-            // The working geometry is not kept once its outline is built.
-            drop(geometry);
             let cost = item.cost()?;
             crate::payload::accumulate(&mut bytes_total, cost)?;
             items.push(RenderEntry::Item { item, digest, cost });
         }
     }
     Ok((revision, items))
+}
+/// One object of a layer that is drawn.
+#[derive(Clone, Copy)]
+struct Shown<'a> {
+    layer_id: &'a Id,
+    layer: &'a vw_model::Layer,
+    id: &'a Id,
+    object: &'a vw_model::Object,
+}
+/// What a display list holds before the item being built.
+#[derive(Clone, Copy)]
+struct Counted {
+    /// What it counts toward the response size limit so far.
+    bytes: usize,
+    /// It already holds as many items as a list may.
+    full: bool,
+}
+/// The display item of one object, in `form`: the one place an object becomes
+/// an item, so a complete read and a single added stroke cannot differ. None:
+/// the object lies outside `query`. `encoded` is the object's stored bytes
+/// when the caller already has them (the lists form sends them).
+fn display_item(
+    project: &Project,
+    page: QueryRect,
+    shown: Shown<'_>,
+    query: Option<QueryRect>,
+    form: OutlineForm,
+    encoded: Option<Vec<u8>>,
+    counted: Counted,
+) -> Result<Option<DisplayItem>> {
+    let Shown {
+        layer_id,
+        layer,
+        id,
+        object,
+    } = shown;
+    let shape = draw_shape(&object.state, project)?;
+    let (local, geometry) = local_bounds(&object.state, project, page, &shape)?;
+    let a = object.state.transform.as_ref().ok_or(CoreError::Invalid)?;
+    let mut bounds = from_bounds(
+        corners(local).map(|(x, y)| (a.a * x + a.c * y + a.e, a.b * x + a.d * y + a.f)),
+    )?;
+    let style = object.state.style.as_ref().ok_or(CoreError::Invalid)?;
+    if style.screen_constant_width {
+        bounds = rect(inflate(bounds, style.width * 2.0))?;
+    }
+    if query.is_some_and(|q| !overlaps(q, bounds)) {
+        return Ok(None);
+    }
+    if counted.full {
+        return Err(CoreError::Backpressure);
+    }
+    let outline = geometry.as_ref().map_or(&[][..], |g| g.polygons());
+    let transform = Transform {
+        a: a.a,
+        b: a.b,
+        c: a.c,
+        d: a.d,
+        e: a.e,
+        f: a.f,
+    };
+    let style = ObjectStyle {
+        rgba: style.stroke.as_ref().map_or(0, |c| c.rgba),
+        width: style.width,
+        screen_constant_width: style.screen_constant_width,
+        fill: style
+            .has_fill
+            .then(|| style.fill.as_ref().map_or(0, |c| c.rgba)),
+    };
+    let locked = object.state.locked || layer.locked;
+    // The working geometry is not kept once its outline is built.
+    Ok(Some(match form {
+        OutlineForm::Lists => DisplayItem::Lists(RenderItem {
+            object_id: id.to_string(),
+            layer_id: layer_id.to_string(),
+            layer_opacity: layer.opacity,
+            layer_blend: layer.blend.clone(),
+            bounds,
+            object_protobuf: match encoded {
+                Some(bytes) => bytes,
+                None => object.state.encode_to_vec(),
+            },
+            stroke_contours: crate::gesture::contours(outline)?,
+            transform,
+            style,
+            shape,
+            locked,
+        }),
+        OutlineForm::Packed => {
+            // The stroke's geometry is alive now and its packed bytes are
+            // about to be made: what that holds counts once, on top of
+            // everything counted so far, before the bytes are allocated. The
+            // lists form keeps its 96 bytes a vertex, well above this build
+            // peak with its lists beside it.
+            let contours = crate::packed_contours::pack(outline, |length| {
+                let (Some(geometry), Some(Shape::Stroke(stroke))) =
+                    (&geometry, &object.state.shape)
+                else {
+                    return Ok(());
+                };
+                crate::payload::admits(
+                    counted.bytes,
+                    crate::payload::packed_build_bytes(stroke.x.len(), geometry, length)?,
+                )
+            })?;
+            DisplayItem::Packed(PackedRenderItem {
+                object_id: id.to_string(),
+                layer_id: layer_id.to_string(),
+                layer_opacity: layer.opacity,
+                layer_blend: layer.blend.clone(),
+                bounds,
+                contours,
+                transform,
+                style,
+                shape,
+                locked,
+            })
+        }
+    }))
+}
+/// One stroke that a save has just added to an image document, as a complete
+/// packed read of that document lists it now: the item, the digest
+/// `document_snapshot_changes_packed` gives for it, and what it counts. The
+/// save gave the stroke the highest order in its layer, so a read lists it
+/// after every other object of that layer. None when a read does not list it
+/// (its layer is not drawn) or the document is read page by page.
+pub(crate) fn added_stroke(
+    state: &ProjectState,
+    document: &str,
+    object_id: &str,
+) -> Result<Option<(PackedRenderItem, StrokeDigest, usize)>> {
+    let project = state.project()?;
+    let document = Id::try_from(document.to_owned())?;
+    let id = Id::try_from(object_id.to_owned())?;
+    let definition = &project
+        .documents
+        .get(&document)
+        .ok_or(CoreError::Invalid)?
+        .definition;
+    if !matches!(
+        pb::DocumentKind::try_from(definition.kind),
+        Ok(kind) if kind != pb::DocumentKind::Pdf && kind != pb::DocumentKind::Svg
+    ) {
+        return Ok(None);
+    }
+    let object = project.objects.get(&id).ok_or(CoreError::Invalid)?;
+    let layer_id = Id::from_proto(object.state.layer_id.as_ref())?;
+    let layer = project.layers.get(&layer_id).ok_or(CoreError::Invalid)?;
+    // Exactly what `render_entries` asks of a layer and of an object in it.
+    if object.document_id != document
+        || layer.definition.document_id.as_ref() != Some(&document.to_proto())
+        || !layer.visible
+        || layer.opacity <= 0.0
+        || object.state.hidden
+        || !matches!(object.state.shape, Some(Shape::Stroke(_)))
+        || crate::tone_controls::is_editing_metadata(project, &document, &id)
+        || crate::image_frames::is_editing_metadata(project, &document, &id)
+    {
+        return Ok(None);
+    }
+    let source = project
+        .assets
+        .get(&AssetId::try_from(definition.primary_asset_id.clone())?)
+        .ok_or(CoreError::Invalid)?;
+    let (w, h) = if source.orientation >= 5 {
+        (source.height, source.width)
+    } else {
+        (source.width, source.height)
+    };
+    let digest: StrokeDigest = *blake3::hash(&object.state.encode_to_vec()).as_bytes();
+    let Some(DisplayItem::Packed(item)) = display_item(
+        project,
+        QueryRect {
+            x: 0.0,
+            y: 0.0,
+            width: f64::from(w),
+            height: f64::from(h),
+        },
+        Shown {
+            layer_id: &layer_id,
+            layer,
+            id: &id,
+            object,
+        },
+        None,
+        OutlineForm::Packed,
+        None,
+        // Whether the document may still grow by this item is for the caller,
+        // which holds the rest of the list, to decide.
+        Counted {
+            bytes: 0,
+            full: false,
+        },
+    )?
+    else {
+        return Err(CoreError::Worker);
+    };
+    let cost = crate::payload::packed_item_bytes(&item)?;
+    Ok(Some((item, digest, cost)))
 }
 /// The local bounds, and for a stroke the geometry its outline is built from.
 fn local_bounds(

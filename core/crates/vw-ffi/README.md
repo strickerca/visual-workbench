@@ -9,9 +9,11 @@ The protocol is never reimplemented or parsed in Kotlin editor code.
 
 Each open project owns one bounded storage worker (16 queued calls); each live
 stroke owns an independent ink worker (8 queued batches). At most eight projects,
-four gestures per project, four startup jobs, and four subscriptions per project
-may exist. Queue exhaustion is an explicit error, never a discarded reliable
-operation. The UI must retain and retry an identical sample batch on Backpressure.
+64 gestures per project (strokes begun and not yet shut down: drawn, waiting to
+be saved, or saved and not yet disposed), four startup jobs, and four
+subscriptions per project may exist. Queue exhaustion is an explicit error,
+never a discarded reliable operation. The UI must retain and retry an identical
+sample batch on Backpressure.
 One input batch holds 1–512 samples. A gesture has a 100,000-sample boundary.
 Exact retry of its most recent batch is idempotent; altered/stale retries fail.
 
