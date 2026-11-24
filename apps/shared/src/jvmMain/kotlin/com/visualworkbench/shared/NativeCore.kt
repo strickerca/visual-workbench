@@ -95,12 +95,16 @@ private class NativeProject(val handle: ProjectSession, private val giantOwner: 
                 val held = heldStrokes?.takeIf { it.documentId == documentId }?.strokes
                 if (held == null) emptyMap() else previous.render.items.mapNotNull { item -> held[item.objectId]?.takeIf { it.item === item } }.associateBy { it.item.objectId }
             }
+            // Every other object comes whole at every read; one that equals the
+            // caller's, field for field, is handed back as that very instance.
+            val earlier: Map<String, RenderItem> = if (previous == null || previous.documentId != documentId) emptyMap()
+                else HashMap<String, RenderItem>().also { map -> for (item in previous.render.items) if (item.shape !is Shape.Stroke) map[item.objectId] = item }
             val d = handle.documentSnapshotChangesPacked(documentId, known.values.map { KnownStroke(it.item.objectId, it.digest, it.cost) }, cancel)
             val next = HashMap<String, HeldStroke>(d.items.size)
             var counted = 0L
             val items = d.items.map { change ->
                 val sent = change.item
-                val item = if (sent != null) nativePackedItem(sent) else {
+                val item = if (sent != null) nativePackedItem(sent).let { read -> earlier[read.objectId]?.takeIf { unchangedObject(it, read) } ?: read } else {
                     // Kept: the core vouches for exactly the bytes named to it.
                     val kept = known[change.objectId]?.takeIf { it.digest.contentEquals(change.digest) } ?: throw CoreFailure(CoreFailureKind.Worker)
                     val old = kept.item

@@ -37,7 +37,10 @@ public interface WorkbenchDocumentChanges {
      * moment. A stroke that is unchanged since [previous] is the very same
      * [RenderItem] instance as in [previous] (or a copy sharing its contours
      * when only its layer's opacity, blend or lock changed), so a caller can
-     * keep whatever it derived from it. [previous] must be the snapshot this
+     * keep whatever it derived from it. Every other object is sent whole and
+     * is, too, the instance in [previous] when it is unchanged
+     * ([unchangedObject]): a caller tells every object that changed by
+     * identity. [previous] must be the snapshot this
      * project returned last for the document, from this call or from
      * [WorkbenchAddedStrokes.withAddedStroke], or null for a first read.
      * Null result: this document has no such path (paged documents); use
@@ -108,6 +111,19 @@ public fun <T> addedStrokeIndex(layers: List<LayerInfo>, items: List<T>, layerId
     while (index > 0 && layerOf(items[index - 1]) in above) index--
     return index
 }
+/** Whether [earlier] and [read], two reads of one saved object that is not a
+ * pen stroke, are the same object as drawn and edited: every field equal.
+ * Such objects carry no contours, and one that does is never taken for
+ * unchanged here; a stroke is told by the digest of its stored bytes instead.
+ * A read that finds an object unchanged hands back the instance the caller
+ * holds ([WorkbenchDocumentChanges.documentChanges]), so that the caller can
+ * tell the objects that changed by identity. */
+public fun unchangedObject(earlier: RenderItem, read: RenderItem): Boolean =
+    earlier.shape !is Shape.Stroke && read.shape !is Shape.Stroke &&
+        earlier.contours.vertexCount == 0 && earlier.contours.contourCount == 0 && read.contours.vertexCount == 0 && read.contours.contourCount == 0 &&
+        earlier.objectId == read.objectId && earlier.layerId == read.layerId && earlier.layerOpacity == read.layerOpacity &&
+        earlier.layerBlend == read.layerBlend && earlier.locked == read.locked && earlier.bounds == read.bounds &&
+        earlier.transform == read.transform && earlier.style == read.style && earlier.shape == read.shape
 /** Optional project capability: write now the recovery checkpoint that
  * [WorkbenchProject.close] would write, and keep the project open. For an
  * app put in the background, whose process the system freezes within
