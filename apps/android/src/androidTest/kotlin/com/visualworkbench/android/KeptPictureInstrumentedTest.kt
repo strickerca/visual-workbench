@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
@@ -21,6 +22,23 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.visualworkbench.android.editor.BrushPreference
+import com.visualworkbench.android.editor.CanvasScene
+import com.visualworkbench.android.editor.EditorController
+import com.visualworkbench.android.editor.KeptPicture
+import com.visualworkbench.android.precision.PrecisionDrawing
+import com.visualworkbench.shared.DocumentControlCommand
+import com.visualworkbench.shared.EditCommand
+import com.visualworkbench.shared.EditOptions
+import com.visualworkbench.shared.EraserChoice
+import com.visualworkbench.shared.LayerControlUpdate
+import com.visualworkbench.shared.ObjectStyle
+import com.visualworkbench.shared.Rect
+import com.visualworkbench.shared.RenderItem
+import com.visualworkbench.shared.Transform
+import com.visualworkbench.shared.WorkbenchProject
+import com.visualworkbench.shared.WorkflowBinding
+import com.visualworkbench.shared.WorkflowMetadata
+import com.visualworkbench.shared.documentControlWorkflows
 import com.visualworkbench.android.editor.CanvasSurface
 import com.visualworkbench.android.editor.EditorDrawing
 import com.visualworkbench.android.editor.EditorPreferences
@@ -66,10 +84,21 @@ import kotlin.math.sin
  * off by at most [COARSE_STEPS] (a quarter of full coverage). The differences
  * found are written to the log and into the instrumentation's output.
  *
- * The tests also read how often a picture was made from every object and how
- * often a stroke was added to one, so that "drawn into it once" and "made
- * again when it would be wrong" are counted, not assumed; and they look at
- * the composited screen after a pen-up for the stroke that was just drawn.
+ * A change to the page draws again only the part of the picture it touched,
+ * and while an object is moved or turned each frame draws that part over the
+ * picture ([PATCHED]: the same bound as [ADDED]). These are checked on a page
+ * of three layers (one translucent, one a highlighter's multiply layer) after
+ * undo, redo, erasing a whole stroke and part of one, a move, a turn, a
+ * deletion, a restyle and edits the paired computer would make, and while the
+ * pen is down moving, turning and erasing. Scenes the editor does not make
+ * here (objects hidden while they are erased) are drawn by a kept picture of
+ * the test's own, as the canvas draws them, and compared the same way.
+ *
+ * The tests also read how often a picture was made from every object, how
+ * often a stroke was added to one and how often a part of one was drawn
+ * again, so that "drawn into it once", "only what changed" and "made again
+ * when it would be wrong" are counted, not assumed; and they look at the
+ * composited screen after a pen-up for the stroke that was just drawn.
  *
  * Synthetic pen events only: nothing here judges a pen's feel. */
 @RunWith(AndroidJUnit4::class)
@@ -93,7 +122,9 @@ class KeptPictureInstrumentedTest {
         scenario.onActivity { activity ->
             val editor = activity.editor
             detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} " +
-                "screen=${editor.screen} items=${editor.document?.render?.items?.size} canvas=${canvas(activity.window.decorView)?.lifeState()}"
+                "screen=${editor.screen} items=${editor.document?.render?.items?.size} selected=${editor.selected} " +
+                "transformed=${editor.scene?.transformed?.keys} tool=${editor.tool} pictures=${canvas(activity.window.decorView)?.pictureCounts} " +
+                "canvas=${canvas(activity.window.decorView)?.lifeState()}"
         }
         fail("Timed out in $phase: $detail\n$notes")
     }
@@ -218,14 +249,15 @@ class KeptPictureInstrumentedTest {
         } finally { kept.recycle(); whole.recycle() }
     }
 
-    private class Counts(val rebuilt: Long, val added: Long, val frames: Long, val whole: Long, val failed: Long) {
-        override fun toString() = "rebuilt=$rebuilt added=$added frames=$frames whole=$whole failed=$failed"
+    private class Counts(val rebuilt: Long, val added: Long, val patched: Long, val frames: Long, val over: Long, val whole: Long, val failed: Long, val area: Long) {
+        override fun toString() = "rebuilt=$rebuilt added=$added patched=$patched frames=$frames over=$over whole=$whole failed=$failed area=$area"
     }
     private fun counts(scenario: ActivityScenario<MainActivity>): Counts {
         var read: Counts? = null
         scenario.onActivity { activity ->
             val counted = requireNotNull(canvas(activity.window.decorView)).pictureCounts
-            read = Counts(counted.rebuilt.get(), counted.added.get(), counted.frames.get(), counted.whole.get(), counted.failed.get())
+            read = Counts(counted.rebuilt.get(), counted.added.get(), counted.patched.get(), counted.frames.get(), counted.over.get(),
+                counted.whole.get(), counted.failed.get(), counted.area.get())
         }
         return requireNotNull(read)
     }
@@ -351,7 +383,11 @@ class KeptPictureInstrumentedTest {
     /** A new page in the real app, the varied page put into it through the
      * core, then [body] with the page open. Afterwards the page is closed,
      * the preferences are put back and the project is deleted. */
-    private fun withPage(body: (ActivityScenario<MainActivity>, Int) -> Unit) {
+    private fun withPage(body: (ActivityScenario<MainActivity>, Int) -> Unit) = withPage(::fillPage, { it }, body)
+
+    /** As above, with the page put in by [fill], which returns what [body]
+     * is given; [count] is how many objects it put in. */
+    private fun <T> withPage(fill: (String) -> T, count: (T) -> Int, body: (ActivityScenario<MainActivity>, T) -> Unit) {
         var owned: String? = null
         var storageClosed = false
         var preferences: EditorPreferences? = null
@@ -369,10 +405,10 @@ class KeptPictureInstrumentedTest {
                 try {
                     scenario.onActivity { it.editor.navigate(WorkbenchScreen.Projects) }
                     await(scenario, "closed-to-fill") { it.editor.screen == WorkbenchScreen.Projects && !it.editor.busy }
-                    val filled = fillPage(id)
+                    val filled = fill(id)
                     scenario.onActivity { it.editor.open(id) }
                     await(scenario, "filled-page", timeoutMs = 120_000, predicate = ::settled)
-                    assertEquals(filled, items(scenario))
+                    assertEquals(count(filled), items(scenario))
                     body(scenario, filled)
                 } finally {
                     scenario.onActivity { activity ->
@@ -500,7 +536,7 @@ class KeptPictureInstrumentedTest {
         assertEquals("No picture failed to draw. $after\n$notes", 0L, after.failed)
     }
 
-    @Test fun whateverChangesThePageOrTheViewMakesThePictureAgain() = withPage { scenario, filled ->
+    @Test fun aChangeOfViewMakesThePictureAgain() = withPage { scenario, _ ->
         var page = Point(0.0, 0.0)
         scenario.onActivity { val doc = requireNotNull(it.editor.document); page = Point(doc.width.toDouble(), doc.height.toDouble()) }
         choose(scenario, EditorTool.Pen, 8.0, 0xff14326e)
@@ -515,47 +551,8 @@ class KeptPictureInstrumentedTest {
             assertTrue("$phase must make the picture again. before: $before after: $after\n$notes", after.rebuilt > before.rebuilt)
         }
 
-        // A stroke, then undo and redo.
-        stroke(scenario, "stroke-to-undo", Point(page.x * 0.2, page.y * 0.2), Point(page.x * 0.7, page.y * 0.6))
-        compare(scenario, "stroke-to-undo", ADDED)
-        remade("undo") {
-            scenario.onActivity { it.editor.undo() }
-            await(scenario, "undone") { settled(it) && it.editor.document?.render?.items?.size == filled }
-        }
-        run {
-            val before = counts(scenario)
-            scenario.onActivity { it.editor.redo() }
-            await(scenario, "redone") { settled(it) && it.editor.document?.render?.items?.size == filled + 1 }
-            compare(scenario, "redo", ADDED)
-            val after = counts(scenario)
-            assertTrue("Redo must change the picture. before: $before after: $after\n$notes", after.rebuilt + after.added > before.rebuilt + before.added)
-        }
-
-        // An edit: a rectangle is made, moved, and deleted.
-        scenario.onActivity { it.editor.chooseTool(EditorTool.Rectangle) }
-        SystemClock.sleep(400); await(scenario, "rectangle-tool", predicate = ::settled)
-        val corner = Point(page.x * 0.3, page.y * 0.3); val opposite = Point(page.x * 0.6, page.y * 0.55)
-        contact(scenario, listOf(corner, Point(page.x * 0.45, page.y * 0.4), opposite))
-        await(scenario, "rectangle-saved") { settled(it) && it.editor.document?.render?.items?.any { item -> item.shape is Shape.Rectangle } == true }
-        compare(scenario, "rectangle", ADDED)
-        scenario.onActivity { it.editor.chooseTool(EditorTool.Select) }
-        SystemClock.sleep(400); await(scenario, "select-tool", predicate = ::settled)
-        remade("moved", ADDED) {
-            // Its outline is taken hold of on the left side and dragged.
-            val grip = Point(corner.x, (corner.y + opposite.y) / 2)
-            contact(scenario, listOf(grip, Point(grip.x + page.x * 0.04, grip.y + page.y * 0.03), Point(grip.x + page.x * 0.08, grip.y + page.y * 0.06)))
-            await(scenario, "move-saved") { activity ->
-                settled(activity) && activity.editor.document?.render?.items?.any { it.shape is Shape.Rectangle && (it.transform.e != 0.0 || it.transform.f != 0.0) } == true
-            }
-        }
-        remade("deleted", ADDED) {
-            scenario.onActivity { it.editor.deleteSelected() }
-            await(scenario, "delete-saved") { settled(it) && it.editor.document?.render?.items?.none { item -> item.shape is Shape.Rectangle } == true }
-        }
-
         // The view: pan, zoom, a turn that is not a quarter turn, and back.
-        scenario.onActivity { it.editor.chooseTool(EditorTool.Pen) }
-        SystemClock.sleep(400); await(scenario, "pen-tool", predicate = ::settled)
+        stroke(scenario, "before-view-changes", Point(page.x * 0.2, page.y * 0.2), Point(page.x * 0.7, page.y * 0.6))
         compare(scenario, "before-view-changes", ADDED)
         var middle = Point(0.0, 0.0)
         scenario.onActivity { val camera = requireNotNull(it.editor.scene).camera; middle = Point(camera.viewportWidth / 2, camera.viewportHeight / 2) }
@@ -649,15 +646,353 @@ class KeptPictureInstrumentedTest {
         assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
     }
 
+    // A page of several layers, and changes that draw a part of the picture again.
+
+    /** What [fillLayered] put in: how many objects, and the ones the tests change. */
+    private class Layered(val count: Int, val faint: String, val highlight: String, val lone: String, val loneHighlight: String,
+                          val box: String, val band: String, val column: String, val lowRow: String)
+
+    /** Puts a page of three layers into the closed project through the core.
+     * The layer the pen draws in, beneath: eight pen strokes, a filled
+     * rectangle and a line. Above it a translucent layer (opacity 0.55) with
+     * wide marker strokes across the pen strokes, and one alone on the right.
+     * On top a highlighter layer (multiply) with two bands across both, and one
+     * alone low on the right. Straight strokes, so that the middle of each
+     * one's box lies on it. */
+    private fun fillLayered(id: String): Layered = runBlocking {
+        val project = core.open(projectPath(id))
+        try {
+            var info = project.info()
+            val documentId = info.documentIds.first()
+            val base = project.document(documentId).layers.first { it.visible && !it.locked && it.blend == "normal" }
+            val controls = documentControlWorkflows(project)
+            suspend fun control(command: DocumentControlCommand) {
+                info = project.info()
+                val now = System.currentTimeMillis()
+                val plan = controls.prepare(WorkflowBinding(info.projectId, documentId, info.hostSeq, info.stateHash),
+                    WorkflowMetadata(core.newId(now.toULong()), info.deviceId, info.nextLamport, now), command)
+                try { plan.commit() } finally { plan.close() }
+                info = project.info()
+            }
+            val faint = core.newId(System.currentTimeMillis().toULong())
+            control(DocumentControlCommand.CreateAnnotationLayer(faint, "Faint"))
+            control(DocumentControlCommand.UpdateLayer(LayerControlUpdate(faint, opacity = 0.55)))
+            val highlight = core.newId(System.currentTimeMillis().toULong())
+            control(DocumentControlCommand.CreateAnnotationLayer(highlight, "Highlight"))
+            control(DocumentControlCommand.UpdateLayer(LayerControlUpdate(highlight, blend = "multiply")))
+            val doc = project.document(documentId)
+            val order = doc.layers.map { it.id }
+            assertTrue("The pen's layer is beneath the translucent one, and that beneath the highlighter: $order",
+                order.indexOf(base.id) in 0 until order.indexOf(faint) && order.indexOf(faint) < order.indexOf(highlight))
+            assertEquals(0.55, doc.layers.first { it.id == faint }.opacity, 1e-6)
+            assertEquals("multiply", doc.layers.first { it.id == highlight }.blend)
+            val w = doc.width.toDouble(); val h = doc.height.toDouble()
+            fun at(x: Double, y: Double) = Point(w * x, h * y)
+            var count = 0
+            suspend fun stroke(layer: String, family: String, width: Double, rgba: UInt, from: Point, to: Point): String {
+                val now = System.currentTimeMillis()
+                val objectId = core.newId(now.toULong())
+                val run = project.beginStroke(StrokeOptions(core.newId(now.toULong()), core.newId(now.toULong()), objectId, documentId, layer,
+                    info.deviceId, info.nextLamport, now, family, width, rgba))
+                try {
+                    val samples = 16
+                    run.append(SampleBatch(1uL, DoubleArray(samples) { from.x + (to.x - from.x) * it / (samples - 1) },
+                        DoubleArray(samples) { from.y + (to.y - from.y) * it / (samples - 1) }, UIntArray(samples) { (it * 8).toUInt() }, FloatArray(samples) { .6f }))
+                    info = run.commit()
+                } finally { run.dispose() }
+                count++
+                return objectId
+            }
+            val pens = listOf(0x1b2a3affu, 0xc0392bffu, 0x1f7a4dffu, 0x2456c8ffu)
+            val rows = (0 until 8).map { k -> stroke(base.id, "pen", 6.0, pens[k % 4], at(0.1, 0.15 + 0.1 * k), at(0.6, 0.16 + 0.1 * k)) }
+            val now = System.currentTimeMillis()
+            val box = core.newId(now.toULong()); val line = core.newId(now.toULong() + 1uL)
+            info = project.edit(EditOptions(core.newId(now.toULong()), documentId, info.deviceId, info.nextLamport, now), listOf(
+                EditCommand.Create(box, base.id, Shape.Rectangle(Rect(w * 0.65, h * 0.45, w * 0.25, h * 0.15)), ObjectStyle(0x2456c8ffu, 4.0, fill = 0x8ecae6ffu)),
+                EditCommand.Create(line, base.id, Shape.Line(listOf(at(0.65, 0.8), at(0.95, 0.9))), ObjectStyle(0x8e44adffu, 5.0))))
+            count += 2
+            val columns = listOf(0.2, 0.35, 0.5).map { x -> stroke(faint, "marker", 16.0, 0xe08a00ffu, at(x, 0.1), at(x + 0.01, 0.6)) }
+            val lone = stroke(faint, "marker", 16.0, 0x8e44adffu, at(0.8, 0.1), at(0.81, 0.4))
+            val bands = listOf(0.3, 0.5).map { y -> stroke(highlight, "highlighter", 20.0, 0xf4d03fffu, at(0.05, y), at(0.66, y + 0.005)) }
+            val loneHighlight = stroke(highlight, "highlighter", 20.0, 0x58d68dffu, at(0.65, 0.7), at(0.95, 0.705))
+            Layered(count, faint, highlight, lone, loneHighlight, box, bands[0], columns[1], rows[7])
+        } finally { project.close() }
+    }
+
+    private fun pageSize(scenario: ActivityScenario<MainActivity>): Point {
+        var page = Point(0.0, 0.0)
+        scenario.onActivity { val doc = requireNotNull(it.editor.document); page = Point(doc.width.toDouble(), doc.height.toDouble()) }
+        return page
+    }
+    /** The object with [id] in the scene the editor last gave the canvas. */
+    private fun shown(activity: MainActivity, id: String): RenderItem? = activity.editor.scene?.objects?.firstOrNull { it.item.objectId == id }?.item
+    private fun shown(scenario: ActivityScenario<MainActivity>, id: String): RenderItem? {
+        var found: RenderItem? = null
+        scenario.onActivity { found = shown(it, id) }
+        return found
+    }
+    private fun centre(item: RenderItem) = Point(item.bounds.x + item.bounds.width / 2, item.bounds.y + item.bounds.height / 2)
+
+    /** With the selection tool: a tap where nothing lies, so that nothing is
+     * selected and no handle of an earlier selection lies under the next contact. */
+    private fun deselect(scenario: ActivityScenario<MainActivity>, empty: Point) {
+        contact(scenario, listOf(empty, empty))
+        await(scenario, "nothing-selected") { settled(it) && it.editor.selected == null }
+    }
+
+    /** Edits the project the editor holds without the editor, as the paired
+     * computer's session does, on a thread of its own. */
+    private fun outside(scenario: ActivityScenario<MainActivity>, commands: (com.visualworkbench.shared.ProjectInfo) -> List<EditCommand>) {
+        scenario.onActivity { activity ->
+            val project = EditorController::class.java.getDeclaredField("project").apply { isAccessible = true }.get(activity.editor) as WorkbenchProject
+            val documentId = requireNotNull(activity.editor.document).documentId
+            Thread {
+                runBlocking {
+                    val info = project.info(); val now = System.currentTimeMillis()
+                    project.edit(EditOptions(core.newId(now.toULong()), documentId, info.deviceId, info.nextLamport, now), commands(info))
+                }
+            }.start()
+        }
+    }
+
+    @Test fun undoRedoErasingMovingTurningDeletingRestylingAndTheComputerDrawAgainOnlyWhatTheyTouch() = withPage(::fillLayered, { it.count }) { scenario, layered ->
+        val page = pageSize(scenario)
+        fun at(x: Double, y: Double) = Point(page.x * x, page.y * y)
+        compare(scenario, "opened", REBUILT)
+        choose(scenario, EditorTool.Pen, 8.0, 0xff7a1420)
+        compare(scenario, "pen-chosen", REBUILT)
+
+        /** [change] (which waits until the editor shows it), then a comparison:
+         * a part of the picture was drawn again, and the picture was not made again. */
+        fun drawnAgain(phase: String, change: () -> Unit) {
+            val before = counts(scenario)
+            change()
+            await(scenario, "drawn-again-$phase") { settled(it) && requireNotNull(canvas(it.window.decorView)).pictureCounts.patched.get() > before.patched }
+            compare(scenario, phase, PATCHED)
+            val after = counts(scenario)
+            assertEquals("$phase must not make the picture again. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+        }
+        fun objects(): Int { var size = 0; scenario.onActivity { size = it.editor.scene?.objects?.size ?: -1 }; return size }
+
+        // A pen stroke in the layer beneath the translucent and highlighter
+        // layers: it cannot go on top of the picture, and is drawn where it lies.
+        drawnAgain("stroke-beneath") { stroke(scenario, "stroke-beneath", at(0.08, 0.42), at(0.62, 0.47)) }
+        var size = objects()
+        drawnAgain("undo") {
+            scenario.onActivity { it.editor.undo() }
+            await(scenario, "undone") { settled(it) && it.editor.scene?.objects?.size == size - 1 }
+        }
+        size = objects()
+        drawnAgain("redo") {
+            scenario.onActivity { it.editor.redo() }
+            await(scenario, "redone") { settled(it) && it.editor.scene?.objects?.size == size + 1 }
+        }
+        // The eraser: a whole translucent stroke, then part of a highlighter stroke.
+        scenario.onActivity { it.editor.chooseEraser(EraserChoice.Object) }
+        SystemClock.sleep(400); await(scenario, "object-eraser") { settled(it) && it.editor.erasers.state.value.ready }
+        drawnAgain("erase-whole") {
+            contact(scenario, line(at(0.74, 0.25), at(0.87, 0.25), steps = 8))
+            await(scenario, "erased-whole") { settled(it) && shown(it, layered.lone) == null }
+        }
+        scenario.onActivity { it.editor.chooseEraser(EraserChoice.Stroke) }
+        SystemClock.sleep(400); await(scenario, "stroke-eraser") { settled(it) && it.editor.erasers.state.value.ready }
+        drawnAgain("erase-part") {
+            contact(scenario, line(at(0.8, 0.66), at(0.8, 0.74), steps = 6))
+            await(scenario, "erased-part") { settled(it) && shown(it, layered.loneHighlight) == null }
+        }
+        // The selection tool: the filled rectangle moved, turned and deleted.
+        scenario.onActivity { it.editor.chooseTool(EditorTool.Select) }
+        SystemClock.sleep(400); await(scenario, "select-tool", predicate = ::settled)
+        deselect(scenario, at(0.93, 0.97))
+        var box = requireNotNull(shown(scenario, layered.box))
+        drawnAgain("move") {
+            val grip = centre(box)
+            contact(scenario, line(grip, Point(grip.x + page.x * 0.04, grip.y + page.y * 0.03), steps = 8))
+            await(scenario, "moved") { settled(it) && it.editor.scene?.transformed?.isEmpty() == true && shown(it, layered.box)?.transform != box.transform }
+        }
+        box = requireNotNull(shown(scenario, layered.box))
+        drawnAgain("turn") {
+            var handle: com.visualworkbench.shared.ObjectRotationHandle? = null
+            scenario.onActivity { handle = it.editor.scene?.rotationHandle }
+            val turn = requireNotNull(handle) { "No rotation handle for the selected rectangle\n$notes" }
+            val arm = Point(turn.point.x - turn.pivot.x, turn.point.y - turn.pivot.y)
+            contact(scenario, (0..8).map { step -> val angle = 0.6 * step / 8
+                Point(turn.pivot.x + arm.x * kotlin.math.cos(angle) - arm.y * sin(angle), turn.pivot.y + arm.x * sin(angle) + arm.y * kotlin.math.cos(angle)) })
+            await(scenario, "turned") { settled(it) && it.editor.scene?.transformed?.isEmpty() == true && shown(it, layered.box)?.transform != box.transform }
+        }
+        drawnAgain("delete") {
+            scenario.onActivity { it.editor.deleteSelected() }
+            await(scenario, "deleted") { settled(it) && shown(it, layered.box) == null }
+        }
+        // A highlighter band restyled.
+        val tap = at(0.63, 0.3015)
+        contact(scenario, listOf(tap, tap))
+        await(scenario, "band-selected") { settled(it) && it.editor.selected == layered.band }
+        drawnAgain("restyle") {
+            scenario.onActivity { it.editor.brush(BrushPreference(width = 24.0, colorArgb = 0xffaf7ac5)) }
+            await(scenario, "restyled") { settled(it) && shown(it, layered.band)?.style?.rgba == EditorDrawing.rgba(0xffaf7ac5) }
+        }
+        // The paired computer moves a translucent stroke and deletes a pen stroke.
+        val column = requireNotNull(shown(scenario, layered.column))
+        val target = EditorDrawing.compose(Transform(e = page.x * 0.05, f = page.y * 0.01), column.transform)
+        drawnAgain("computer-move") {
+            outside(scenario) { listOf(EditCommand.SetTransform(layered.column, target)) }
+            await(scenario, "computer-moved") { settled(it) && shown(it, layered.column)?.transform == target }
+        }
+        drawnAgain("computer-delete") {
+            outside(scenario) { listOf(EditCommand.Delete(layered.lowRow)) }
+            await(scenario, "computer-deleted") { settled(it) && shown(it, layered.lowRow) == null }
+        }
+        assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
+    }
+
+    @Test fun framesWhileAnObjectIsMovedTurnedOrErasedAreDrawnOverThePictureAsTheWholeScene() = withPage(::fillLayered, { it.count }) { scenario, layered ->
+        val page = pageSize(scenario)
+        fun at(x: Double, y: Double) = Point(page.x * x, page.y * y)
+        scenario.onActivity { it.editor.chooseTool(EditorTool.Select) }
+        SystemClock.sleep(400); await(scenario, "select-tool", predicate = ::settled)
+        deselect(scenario, at(0.93, 0.97))
+        compare(scenario, "opened", REBUILT)
+
+        /** A comparison while the pen is still down: the frame was drawn over the picture, and the picture was not changed. */
+        fun over(phase: String, before: Counts) {
+            compare(scenario, phase, PATCHED, settle = false)
+            val after = counts(scenario)
+            note("phase=$phase area=${after.area}")
+            assertTrue("$phase: frames are drawn over the picture. before: $before after: $after\n$notes", after.over > before.over)
+            assertEquals("$phase: the picture is not made again. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+            assertEquals("$phase: the picture is not changed. before: $before after: $after\n$notes", before.patched, after.patched)
+        }
+
+        // Moving: the pen is down on the rectangle and has moved, and stays down.
+        val box = requireNotNull(shown(scenario, layered.box))
+        val grip = centre(box)
+        var before = counts(scenario)
+        val step = Point(grip.x + page.x * 0.03, grip.y + page.y * 0.02)
+        contact(scenario, line(grip, step, steps = 6), up = false)
+        await(scenario, "moving") { it.editor.scene?.transformed?.containsKey(layered.box) == true }
+        over("moving", before)
+        // Further, across the pen strokes, the translucent columns and the highlighter bands.
+        val far = at(0.3, 0.32)
+        contact(scenario, line(step, far, steps = 10), down = false, up = false)
+        await(scenario, "moving-far") { it.editor.scene?.transformed?.get(layered.box)?.let { t -> kotlin.math.abs(t.e - box.transform.e) > page.x * 0.2 } == true }
+        over("moved-across-the-layers", before)
+        contact(scenario, listOf(far, far), down = false)
+        await(scenario, "move-saved") { settled(it) && it.editor.scene?.transformed?.isEmpty() == true && shown(it, layered.box)?.transform != box.transform }
+        run {
+            val saved = counts(scenario)
+            await(scenario, "drawn-again-after-move") { requireNotNull(canvas(it.window.decorView)).pictureCounts.patched.get() > before.patched }
+            compare(scenario, "move-saved", PATCHED)
+            assertEquals("The move did not make the picture again. $saved ${counts(scenario)}\n$notes", before.rebuilt, counts(scenario).rebuilt)
+        }
+
+        // Turning: the pen is down on the rotation handle and has turned part way.
+        val moved = requireNotNull(shown(scenario, layered.box))
+        var handle: com.visualworkbench.shared.ObjectRotationHandle? = null
+        scenario.onActivity { handle = it.editor.scene?.rotationHandle }
+        val turn = requireNotNull(handle) { "No rotation handle for the selected rectangle\n$notes" }
+        val arm = Point(turn.point.x - turn.pivot.x, turn.point.y - turn.pivot.y)
+        val arc = (0..8).map { k -> val angle = 0.5 * k / 8
+            Point(turn.pivot.x + arm.x * kotlin.math.cos(angle) - arm.y * sin(angle), turn.pivot.y + arm.x * sin(angle) + arm.y * kotlin.math.cos(angle)) }
+        before = counts(scenario)
+        contact(scenario, arc, up = false)
+        await(scenario, "turning") { it.editor.scene?.transformed?.containsKey(layered.box) == true }
+        over("turning", before)
+        contact(scenario, listOf(arc.last(), arc.last()), down = false)
+        await(scenario, "turn-saved") { settled(it) && it.editor.scene?.transformed?.isEmpty() == true && shown(it, layered.box)?.transform != moved.transform }
+        compare(scenario, "turn-saved", PATCHED)
+
+        // Erasing: the pen is down with the eraser over the lone translucent
+        // stroke. This eraser saves at pen-up and changes nothing on the canvas
+        // meanwhile (its sweep is drawn above it): the frames are the picture.
+        scenario.onActivity { it.editor.chooseEraser(EraserChoice.Object) }
+        SystemClock.sleep(400); await(scenario, "object-eraser") { settled(it) && it.editor.erasers.state.value.ready }
+        before = counts(scenario)
+        contact(scenario, line(at(0.74, 0.25), at(0.87, 0.25), steps = 8), up = false)
+        await(scenario, "erasing") { it.editor.erasers.state.value.draft != null }
+        compare(scenario, "erasing", PATCHED, settle = false)
+        assertEquals("Nothing is made while the eraser is down. $before ${counts(scenario)}\n$notes", before.rebuilt + before.patched, counts(scenario).let { it.rebuilt + it.patched })
+        contact(scenario, listOf(at(0.87, 0.25), at(0.87, 0.25)), down = false)
+        await(scenario, "erased") { settled(it) && shown(it, layered.lone) == null }
+        await(scenario, "drawn-again-after-erase") { requireNotNull(canvas(it.window.decorView)).pictureCounts.patched.get() > before.patched }
+        compare(scenario, "erased", PATCHED)
+
+        // Objects hidden while they are erased (as an eraser that hides what it
+        // sweeps would show them), several at once, with one moved as well, and
+        // then gone from the saved scene: drawn by a kept picture as the canvas
+        // draws it, and compared with the same scenes drawn whole.
+        probe(scenario, layered)
+        assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
+    }
+
+    /** Draws [layered]'s page as the editor shows it now into a [KeptPicture]
+     * on a drawing thread of its own, then frames of scenes made from it, each
+     * from the picture as the canvas would draw it and whole, and compares
+     * them. Everything made here is given up before it returns. */
+    private fun probe(scenario: ActivityScenario<MainActivity>, layered: Layered) {
+        await(scenario, "ready-to-probe", predicate = ::settled)
+        var shownScene: CanvasScene? = null; var surround = 0
+        scenario.onActivity { shownScene = it.editor.scene; surround = EditorDrawing.surroundArgb(it.editor.preferences.darkTheme) }
+        val scene = requireNotNull(shownScene)
+        val band = scene.objects.first { it.item.objectId == layered.band }.item
+        val turnedBand = EditorDrawing.compose(Transform(e = scene.document.width.toDouble() * 0.1, f = scene.document.height.toDouble() * 0.15), band.transform)
+        val hidden = scene.objects.filter { it.item.layerId == layered.faint }.map { it.item.objectId }
+        val variants = listOf(
+            Triple("hidden-one", scene.copy(revision = scene.revision + 1, hidden = setOf(layered.column)), false),
+            Triple("hidden-all-translucent", scene.copy(revision = scene.revision + 2, hidden = hidden.toSet()), false),
+            Triple("hidden-and-moved", scene.copy(revision = scene.revision + 3, hidden = setOf(layered.column), transformed = mapOf(layered.band to turnedBand)), false),
+            Triple("gone", scene.copy(revision = scene.revision + 4, objects = scene.objects.filter { it.item.objectId != layered.column }), true))
+        val width = scene.camera.viewportWidth.toInt(); val height = scene.camera.viewportHeight.toInt()
+        val thread = HandlerThread("vw-kept-probe").apply { start() }
+        val handler = Handler(thread.looper)
+        var surface: PictureSurface? = null; var picture: KeptPicture? = null
+        fun onThread(work: () -> Unit) {
+            val done = CountDownLatch(1); val error = AtomicReference<Throwable?>(null)
+            handler.post { try { work() } catch (t: Throwable) { error.set(t) } finally { done.countDown() } }
+            assertTrue("The probe's drawing thread did not answer", done.await(30, TimeUnit.SECONDS))
+            error.get()?.let { throw it }
+        }
+        try {
+            onThread {
+                surface = PictureSurface(width, height); picture = KeptPicture()
+                requireNotNull(requireNotNull(surface).render { assertTrue("The page at rest is drawn from the picture", requireNotNull(picture).draw(it, scene, true, false, false)) }).release()
+            }
+            for ((name, drawn, steady) in variants) {
+                var compared: PictureComparison? = null; var fromPicture = false; var counted = ""
+                onThread {
+                    val target = requireNotNull(surface); val kept = requireNotNull(picture)
+                    val before = kept.counts.over.get() + kept.counts.patched.get()
+                    val frame = requireNotNull(target.render { fromPicture = kept.draw(it, drawn, steady, false, false) })
+                    val whole = requireNotNull(target.render { PrecisionDrawing.draw(it, drawn) })
+                    try {
+                        compared = PictureComparison(requireNotNull(frame.bitmap.copy(Bitmap.Config.ARGB_8888, false)),
+                            requireNotNull(whole.bitmap.copy(Bitmap.Config.ARGB_8888, false)), drawn.matrix, drawn.document.width.toDouble(), drawn.document.height.toDouble())
+                    } finally { frame.release(); whole.release() }
+                    counted = "${kept.counts} drawn_again=${kept.counts.over.get() + kept.counts.patched.get() - before}"
+                }
+                assertTrue("probe-$name: drawn from the picture ($counted)\n$notes", fromPicture)
+                assertTrue("probe-$name: a part was drawn again ($counted)\n$notes", counted.endsWith("drawn_again=1"))
+                val found = difference(requireNotNull(compared), surround)
+                note("phase=probe-$name $found $counted")
+                assertTrue("probe-$name: nothing but page and surround was drawn. $found\n$notes", found.inked > 500)
+                assertTrue("probe-$name: the frame from the kept picture is not the whole scene (allowed: $PATCHED). $found\n$notes", PATCHED.allows(found))
+            }
+        } finally {
+            onThread { picture?.discard(); surface?.close() }
+            thread.quitSafely(); thread.join(5_000)
+        }
+    }
+
     private companion object {
         const val TAG = "VW_KEPT_PICTURE"
-        /** A frame from a picture made from every object is the whole scene. */
         /** A frame that follows a picture made from every object is the whole scene. */
         val REBUILT = Bound(steps = 0, coarse = 0, coarseSteps = 0)
         /** After strokes have been added to the picture: rounding at their edges. */
         const val COARSE_PIXELS = 8
         const val COARSE_STEPS = 64
         val ADDED = Bound(steps = 1, coarse = COARSE_PIXELS, coarseSteps = COARSE_STEPS)
+        /** After a part of the picture was drawn again, or while one is drawn over it: the same bound. */
+        val PATCHED = ADDED
         /** Pixels this close to the page's edge are cut by its anti-aliased outline. */
         const val EDGE_PX = 2.0
     }

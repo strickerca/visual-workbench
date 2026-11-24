@@ -6,10 +6,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /** The rules of the kept picture: when a frame may be drawn from it, when it
- * stands as it is, when a finished stroke is drawn into it and when it has to
- * be made again; and which saved objects a magnifier pane may leave out. The
- * drawing itself is framework code and is judged on the device
- * (KeptPictureInstrumentedTest). */
+ * stands as it is, when a finished stroke is drawn into it, when a part of it
+ * is drawn again and when it has to be made again; and which saved objects a
+ * part of the page may leave out. The drawing itself is framework code and is
+ * judged on the device (KeptPictureInstrumentedTest). */
 class KeptPictureTest {
     private fun item(id: String, layer: String, opacity: Double = 1.0, blend: String = "normal", shape: Shape = Shape.Stroke("pen")) =
         RenderItem(id, layer, opacity, blend, Rect(0.0, 0.0, 1.0, 1.0), Contours(longArrayOf(), longArrayOf(), uintArrayOf()),
@@ -83,13 +83,45 @@ class KeptPictureTest {
             }
         }
     }
+    /** After an undo, an erasure or a change from the computer the layer order
+     * is brought along by the objects taken away and put in: the answers must
+     * be those of starting over, or it must say that it cannot tell. */
+    @Test fun objects_taken_away_and_put_in_give_the_same_answers_as_starting_over() {
+        val random = java.util.Random(11)
+        val pool = listOf("notes", "top").flatMap { layer -> (0 until 6).map { item("$layer-$it", layer) } } +
+            (0 until 3).map { item("h-$it", "high", blend = "multiply") }
+        val ids = listOf("notes", "top", "high")
+        val probes = (ids + "unseen").flatMap { layer -> listOf(listOf(item("w", layer)), listOf(item("w", layer, blend = "multiply"))) }
+        repeat(300) {
+            val hidden = pool.filter { random.nextInt(8) == 0 }.map { it.objectId }.toSet()
+            val start = pool.filter { random.nextBoolean() }
+            val end = pool.filter { random.nextBoolean() }.shuffled(random)
+            val diff = requireNotNull(objectsDiff(start, end, 1_024))
+            val layersNow = DryLayers(ids, start, hidden)
+            assertTrue(layersNow.remove(diff.removed.map { start[it] }, hidden))
+            layersNow.add(diff.added.map { end[it] }, hidden)
+            val fresh = DryLayers(ids, end, hidden)
+            assertEquals(fresh.clean, layersNow.clean)
+            for (layer in ids) assertEquals(fresh.paintOf(layer) != null, layersNow.paintOf(layer) != null)
+            for (probe in probes) assertEquals("probe=${probe.map { it.layerId }}", fresh.inkOnTop(probe, hidden), layersNow.inkOnTop(probe, hidden))
+        }
+        // A layer whose objects are not composited alike, or one the document does not list left empty: it cannot tell.
+        assertFalse(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes", opacity = 0.5)), emptySet()).remove(listOf(item("a", "notes")), emptySet()))
+        assertFalse(DryLayers(ids, listOf(item("a", "notes"), item("u", "unlisted")), emptySet()).remove(listOf(item("u", "unlisted")), emptySet()))
+        assertTrue(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes")), emptySet()).remove(listOf(item("a", "notes")), emptySet()))
+        // What can be drawn by parts.
+        assertTrue(DryLayers(ids, pool, emptySet()).clean)
+        assertFalse(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes", opacity = 0.5)), emptySet()).clean)
+        assertFalse(DryLayers(ids, listOf(item("u", "unlisted")), emptySet()).clean)
+        assertTrue(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes", opacity = 0.5)), setOf("b")).clean)
+    }
     // endregion
 
     // region Which frames a picture can draw
     private fun refusal(hardware: Boolean = true, canvasWidth: Int = 1080, canvasHeight: Int = 2000, width: Int = 1080, height: Int = 2000,
         resizing: Boolean = false, giant: Boolean = false, documentTiles: Boolean = false, resultsReady: Boolean = true, results: Boolean = false,
-        draft: Boolean = false, preview: Boolean = false, erasing: Boolean = false) =
-        pictureRefusal(hardware, canvasWidth, canvasHeight, width, height, resizing, giant, documentTiles, resultsReady, results, draft, preview, erasing)
+        draft: Boolean = false) =
+        pictureRefusal(hardware, canvasWidth, canvasHeight, width, height, resizing, giant, documentTiles, resultsReady, results, draft)
 
     @Test fun an_ordinary_scene_is_drawn_from_the_picture() { assertNull(refusal()) }
 
@@ -106,39 +138,44 @@ class KeptPictureTest {
     @Test fun scenes_that_last_for_a_gesture_leave_the_picture_for_the_frames_after() {
         val cases = listOf(
             refusal(draft = true) to PictureRefusal.Draft,
-            refusal(preview = true) to PictureRefusal.Preview,
-            refusal(erasing = true) to PictureRefusal.Erasing,
             // A frame that is not the size the scene was laid out for, or a scene with no size yet.
             refusal(canvasWidth = 2000, canvasHeight = 1080) to PictureRefusal.Size,
             refusal(canvasHeight = 1999) to PictureRefusal.Size,
             refusal(width = 0, canvasWidth = 0) to PictureRefusal.Size,
             refusal(height = -1, canvasHeight = -1) to PictureRefusal.Size)
         for ((actual, expected) in cases) { assertEquals(expected, actual); assertTrue(expected.name, expected.keepsPicture) }
+        // A move, a turn or an erasure that cannot be drawn over the picture leaves it too.
+        assertTrue(PictureRefusal.Gesture.keepsPicture)
     }
     @Test fun a_reason_to_give_the_picture_back_comes_before_one_to_keep_it() {
-        assertEquals(PictureRefusal.Giant, refusal(giant = true, erasing = true, preview = true, draft = true))
+        assertEquals(PictureRefusal.Giant, refusal(giant = true, draft = true))
         assertEquals(PictureRefusal.Results, refusal(results = true, canvasWidth = 5))
-        assertEquals(PictureRefusal.Resizing, refusal(resizing = true, canvasWidth = 5, erasing = true))
+        assertEquals(PictureRefusal.Resizing, refusal(resizing = true, canvasWidth = 5, draft = true))
         assertEquals(PictureRefusal.Software, refusal(hardware = false, giant = true, resizing = true))
         // Every reason is one of the two kinds, and both kinds exist.
         assertEquals(setOf(true, false), PictureRefusal.entries.map { it.keepsPicture }.toSet())
     }
     // endregion
 
-    // region Keep, add a stroke, or make again
+    // region Keep, add a stroke, draw a part again, or make again
     private val view = Transform(a = 1.5, d = 1.5, e = 20.0, f = 40.0)
     private val page = Any()
     private fun basis(objects: List<RenderItem>, width: Int = 1080, height: Int = 2000, matrix: Transform = view, scale: Double = 1.5,
         background: Any? = page, smooth: Boolean = true, layerIds: List<String> = layers, hidden: Set<String> = emptySet()) =
         PictureBasis(width, height, matrix, scale, background, smooth, layerIds, hidden, objects)
     private fun step(held: PictureBasis<RenderItem>?, next: PictureBasis<RenderItem>): PictureStep =
-        pictureStep(held, held?.let { DryLayers(it.layerIds, it.objects, it.hidden) }, next) { it }
+        pictureStep(held, held?.let { DryLayers(it.layerIds, it.objects, it.hidden) }, next, { old, new -> objectsDiff(old, new, 1_024) },
+            { id -> next.objects.firstOrNull { it.objectId == id } }) { it }
     private val a = item("a", "notes"); private val b = item("b", "top"); private val c = item("c", "top")
     private val saved = listOf(a, b)
+    private fun patched(found: PictureStep): TouchedArea {
+        assertTrue("expected a part drawn again, got $found", found is PictureStep.Patch)
+        return (found as PictureStep.Patch).area
+    }
 
     @Test fun with_no_picture_it_is_made() {
         assertEquals(PictureStep.Rebuild(PictureChange.Missing), step(null, basis(saved)))
-        assertEquals(PictureStep.Rebuild(PictureChange.Missing), pictureStep(basis(saved), null, basis(saved)) { it })
+        assertEquals(PictureStep.Rebuild(PictureChange.Missing), pictureStep(basis(saved), null, basis(saved), { _, _ -> ObjectsDiff.NONE }, { null }) { it })
     }
     @Test fun the_same_saved_scene_keeps_the_picture() {
         val held = basis(saved)
@@ -159,39 +196,67 @@ class KeptPictureTest {
         // What is hidden above does not count as drawn above.
         assertEquals(PictureStep.Append(2), step(basis(saved, hidden = setOf("b")), basis(saved + item("n", "notes"), hidden = setOf("b"))))
     }
-    @Test fun a_stroke_that_is_not_plainly_on_top_makes_the_picture_again() {
-        val again = PictureStep.Rebuild(PictureChange.Objects)
-        // Under another layer; in a multiply (highlighter) layer; in a translucent layer; an AI result.
-        assertEquals(again, step(basis(saved), basis(saved + item("n", "notes"))))
-        assertEquals(again, step(basis(saved), basis(saved + item("n", "fresh", blend = "multiply"))))
+    @Test fun a_stroke_that_is_not_plainly_on_top_is_drawn_again_where_it_lies() {
+        // Under another layer; in a multiply (highlighter) layer; in a translucent layer; in two layers.
+        patched(step(basis(saved), basis(saved + item("n", "notes"))))
+        val highlit = listOf(a, item("h", "top", blend = "multiply"))
+        patched(step(basis(highlit), basis(highlit + item("n", "top", blend = "multiply"))))
         val faint = listOf(a, item("t", "top", opacity = 0.5))
-        assertEquals(again, step(basis(faint), basis(faint + item("n", "top"))))
-        assertEquals(again, step(basis(saved), basis(saved + item("n", "fresh", shape = Shape.Result("asset", "result")))))
-        // Two added strokes in two layers.
-        assertEquals(again, step(basis(saved), basis(saved + c + item("n", "fresh"))))
-        // Added, but hidden: there is nothing to draw on top, and the picture is made from what is shown.
-        val first = basis(saved, hidden = setOf("n"))
-        assertEquals(again, step(first, basis(saved + item("n", "top"), hidden = setOf("n"))))
+        patched(step(basis(faint), basis(faint + item("n", "top", opacity = 0.5))))
+        patched(step(basis(saved), basis(saved + c + item("n", "notes"))))
+        // Added, but hidden: nothing is drawn on top, and where it lies is drawn again.
+        patched(step(basis(saved, hidden = setOf("n")), basis(saved + item("n", "top"), hidden = setOf("n"))))
     }
-    @Test fun any_other_change_to_the_saved_objects_makes_the_picture_again() {
+    @Test fun a_change_that_cannot_be_drawn_by_parts_makes_the_picture_again() {
         val again = PictureStep.Rebuild(PictureChange.Objects)
+        // An AI result and a numbered marker draw what their box does not tell.
+        assertEquals(again, step(basis(saved), basis(saved + item("n", "fresh", shape = Shape.Result("asset", "result")))))
+        assertEquals(again, step(basis(saved), basis(listOf(a) + item("m", "top", shape = Shape.Marker(1u, Point(0.0, 0.0), null)))))
+        // A stroke in a layer the document does not list.
+        assertEquals(again, step(basis(saved), basis(listOf(a, item("n", "unlisted"), b))))
+        // An object composited otherwise than the rest of its layer, put in beneath it.
+        assertEquals(again, step(basis(saved), basis(listOf(a, item("n", "top", opacity = 0.5), b))))
+        // A layer's opacity or blend is carried by its objects: all of them change together.
+        val held = basis(listOf(a, b, c))
+        assertEquals(again, step(held, basis(listOf(a, b.copy(layerOpacity = 0.5), c.copy(layerOpacity = 0.5)))))
+        // A picture of a layer whose objects are not composited alike is not drawn by parts.
+        val mixed = basis(listOf(a, b, item("x", "top", opacity = 0.5)))
+        assertEquals(again, step(mixed, basis(listOf(a, b))))
+        // More changed than is followed one by one.
+        assertEquals(again, pictureStep(basis(saved), DryLayers(layers, saved, emptySet()), basis(listOf(c)), { _, _ -> null }, { null }) { it })
+    }
+    @Test fun any_other_change_to_the_saved_objects_draws_again_only_the_part_it_touched() {
         val held = basis(listOf(a, b, c))
         // Undo or an erasure takes an object away; redo puts another object in its place.
-        assertEquals(again, step(held, basis(listOf(a, b))))
-        assertEquals(again, step(held, basis(listOf(a, b, item("c", "top")))))
+        patched(step(held, basis(listOf(a, b))))
+        patched(step(held, basis(listOf(a, b, item("c", "top")))))
         // An edit, a move or a change from the paired computer arrives as another object.
-        assertEquals(again, step(held, basis(listOf(a, b.copy(transform = Transform(e = 5.0)), c))))
-        assertEquals(again, step(held, basis(listOf(a.copy(style = ObjectStyle(0xff0000ffu, 4.0)), b, c))))
-        // A layer's opacity or blend is carried by its objects.
-        assertEquals(again, step(held, basis(listOf(a, b.copy(layerOpacity = 0.5), c.copy(layerOpacity = 0.5)))))
-        // The same objects in another order, an object added anywhere but at the end, another document or page.
-        assertEquals(again, step(held, basis(listOf(a, c, b))))
-        assertEquals(again, step(held, basis(listOf(item("n", "top"), a, b, c))))
-        assertEquals(again, step(held, basis(listOf(a, item("n", "top"), b, c))))
-        assertEquals(again, step(held, basis(listOf(item("x", "notes"), item("y", "top"), item("z", "top")))))
-        assertEquals(again, step(held, basis(emptyList())))
+        patched(step(held, basis(listOf(a, b.copy(transform = Transform(e = 5.0)), c))))
+        patched(step(held, basis(listOf(a.copy(style = ObjectStyle(0xff0000ffu, 4.0)), b, c))))
+        // The same objects in another order, an object added anywhere but at the end, another set of objects.
+        patched(step(held, basis(listOf(a, c, b))))
+        patched(step(held, basis(listOf(item("n", "top"), a, b, c))))
+        patched(step(held, basis(listOf(a, item("n", "top"), b, c))))
+        patched(step(held, basis(listOf(item("x", "notes"), item("y", "top"), item("z", "top")))))
+        patched(step(held, basis(emptyList())))
+        // Objects hidden or shown again.
+        patched(step(basis(saved), basis(saved, hidden = setOf("a"))))
+        patched(step(basis(saved, hidden = setOf("a")), basis(saved)))
+        patched(step(basis(saved), basis(saved + c, hidden = setOf("a"))))
     }
-    @Test fun a_change_of_view_makes_the_picture_again() {
+    @Test fun a_change_that_covers_most_of_the_screen_makes_the_picture_again() {
+        val small = item("s", "top").copy(bounds = Rect(100.0, 100.0, 40.0, 30.0))
+        val big = item("g", "top").copy(bounds = Rect(0.0, 0.0, 700.0, 1300.0))
+        val held = basis(listOf(a, small, big))
+        assertEquals(PictureStep.Rebuild(PictureChange.Area), step(held, basis(listOf(a, small))))
+        val area = patched(step(held, basis(listOf(a, big))))
+        // The small object's box under the view (x 170..230, y 190..235), grown by the margin and out to whole pixels.
+        assertEquals(listOf(PixelBox(168, 188, 232, 237)), area.boxes)
+        // Off the screen: nothing to draw again, but the picture now stands for the new objects.
+        val away = item("w", "top").copy(bounds = Rect(-5_000.0, -5_000.0, 10.0, 10.0))
+        assertTrue(patched(step(basis(listOf(a, away)), basis(listOf(a)))).isEmpty)
+    }
+    @Test fun a_change_of_view_background_or_layers_makes_the_picture_again() {
         val held = basis(saved)
         // Pan, zoom and rotation all change how the document lies on the screen.
         assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved, matrix = view.copy(e = 21.0))))
@@ -201,9 +266,6 @@ class KeptPictureTest {
         // Another size of the canvas, as after turning the device or showing a tool's controls.
         assertEquals(PictureStep.Rebuild(PictureChange.Size), step(held, basis(saved, width = 2000, height = 1080)))
         assertEquals(PictureStep.Rebuild(PictureChange.Size), step(held, basis(saved, height = 1800)))
-    }
-    @Test fun a_change_of_background_layers_or_hidden_objects_makes_the_picture_again() {
-        val held = basis(saved)
         // Another page picture, none at all, or the same one shown smoothed or not.
         assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved, background = Any())))
         assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved, background = null)))
@@ -211,15 +273,9 @@ class KeptPictureTest {
         // Layers put in another order, added or removed.
         assertEquals(PictureStep.Rebuild(PictureChange.Layers), step(held, basis(saved, layerIds = listOf("top", "notes"))))
         assertEquals(PictureStep.Rebuild(PictureChange.Layers), step(held, basis(saved, layerIds = layers + "fresh")))
-        // An object hidden or shown again.
-        assertEquals(PictureStep.Rebuild(PictureChange.Hidden), step(held, basis(saved, hidden = setOf("a"))))
-        assertEquals(PictureStep.Rebuild(PictureChange.Hidden), step(basis(saved, hidden = setOf("a")), basis(saved)))
-    }
-    @Test fun a_stroke_added_together_with_another_change_makes_the_picture_again() {
-        val held = basis(saved)
+        // Together with a stroke added or another change.
         assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved + c, matrix = view.copy(f = 0.0))))
         assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved + c, background = Any())))
-        assertEquals(PictureStep.Rebuild(PictureChange.Hidden), step(held, basis(saved + c, hidden = setOf("a"))))
         assertEquals(PictureStep.Rebuild(PictureChange.Size), step(held, basis(saved + c, width = 900)))
     }
     /** Each stroke is drawn into the picture once: after it has been added the
@@ -232,16 +288,16 @@ class KeptPictureTest {
         assertEquals(PictureStep.Keep, step(third, basis(third.objects.toList())))
     }
     /** While the page is panned or zoomed every frame wants another picture.
-     * Making one for each would cost more than drawing the frame whole. */
+     * Making one for each would cost more than drawing the frame. */
     @Test fun a_picture_is_not_made_for_every_frame_of_a_movement() {
         val objects = PictureChange.Objects
         // A change after a quiet time, and the first there ever was: made at once.
-        for (why in listOf(PictureChange.Missing, objects, PictureChange.Background, PictureChange.Layers, PictureChange.Hidden)) {
+        for (why in listOf(PictureChange.Missing, objects, PictureChange.Background, PictureChange.Layers, PictureChange.Area)) {
             assertTrue(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = -1, why = why))
             assertTrue(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS, why = why))
         }
         assertTrue(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 5_000, why = objects))
-        // Another change right after the last: this frame is drawn whole.
+        // Another change right after the last: this frame is drawn over the picture, or whole.
         assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 0, why = objects))
         assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 8, why = objects))
         assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS - 1, why = objects))
@@ -254,50 +310,14 @@ class KeptPictureTest {
         // The movement has stopped: the next frame wants what the last one wanted, however soon it comes.
         assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 0, why = objects))
         assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 8, why = objects))
+        // The same scene, by its objects and not by the list that holds them.
+        val diff = { old: List<RenderItem>, new: List<RenderItem> -> objectsDiff(old, new, 1_024) }
+        assertTrue(sameBasis(basis(saved), basis(saved.toList()), diff))
+        assertFalse(sameBasis(basis(saved), basis(saved + c), diff))
+        assertFalse(sameBasis(basis(saved), basis(saved, hidden = setOf("a")), diff))
+        assertFalse(sameBasis(basis(saved), basis(saved, scale = 2.0), diff))
     }
     // endregion
-
-    /** The pen's loupe draws the page near the nib for every ink frame. The
-     * grid must name every saved object a pane could show (it is then tested
-     * exactly, as without the grid), and few others. */
-    @Test fun the_grid_names_every_object_that_could_reach_a_pane() {
-        val random = java.util.Random(7)
-        val count = 600
-        val boxes = List(count) { index -> when (index % 23) {
-            0 -> Rect(Double.NaN, 0.0, 1.0, 1.0)
-            1 -> Rect(-50.0, -30.0, 20.0, 10.0)            // off the page
-            2 -> Rect(10.0, 10.0, 900.0, 700.0)            // over most of it
-            3 -> Rect(400.0, 300.0, 0.0, 0.0)              // a dot
-            else -> Rect(random.nextDouble() * 1100 - 50, random.nextDouble() * 900 - 50, random.nextDouble() * 60, random.nextDouble() * 60)
-        } }
-        val cullable = List(count) { it % 17 != 0 }
-        val whole = SavedGrid(1000.0, 800.0).also { grid -> boxes.indices.forEach { grid.add(boxes[it], cullable[it]) } }
-        // Strokes saved one after another extend the grid; the answers are the same.
-        val grown = SavedGrid(1000.0, 800.0)
-        for (split in listOf(0, 1, 150, 151, count)) { while (grown.size < split) grown.add(boxes[grown.size], cullable[grown.size]) }
-        assertEquals(count, grown.size)
-        var named = 0
-        repeat(400) {
-            val visible = Rect(random.nextDouble() * 1200 - 100, random.nextDouble() * 1000 - 100, random.nextDouble() * 120, random.nextDouble() * 120)
-            val margin = random.nextDouble() * 5
-            val found = requireNotNull(whole.near(visible, margin))
-            assertArrayEquals(found, grown.near(visible, margin))
-            for (at in 1 until found.size) assertTrue("in list order, once each", found[at - 1] < found[at])
-            val set = found.toHashSet()
-            for (index in boxes.indices) if (!cullable[index] || boundsMayTouch(boxes[index], visible, margin))
-                assertTrue("object $index reaches $visible but was not named", index in set)
-            named += found.size
-        }
-        // A small pane names a small part of the page, not every object.
-        assertTrue("named on average ${named / 400} of $count", named / 400 < count / 4)
-        // A pane that cannot be judged: every object has to be looked at.
-        assertNull(whole.near(Rect(Double.NaN, 0.0, 1.0, 1.0), 1.0))
-        assertNull(whole.near(Rect(0.0, 0.0, 1.0, 1.0), Double.NaN))
-        // An empty page, and a page of no size.
-        assertArrayEquals(IntArray(0), SavedGrid(1000.0, 800.0).near(Rect(0.0, 0.0, 10.0, 10.0), 1.0))
-        val tiny = SavedGrid(0.0, 0.0).also { it.add(Rect(5.0, 5.0, 1.0, 1.0), true) }
-        assertArrayEquals(intArrayOf(0), tiny.near(Rect(0.0, 0.0, 100.0, 100.0), 0.0))
-    }
 
     @Test fun a_pane_leaves_out_only_objects_that_cannot_reach_it() {
         val visible = Rect(100.0, 100.0, 50.0, 40.0)

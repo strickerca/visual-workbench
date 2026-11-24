@@ -307,15 +307,78 @@ internal object EditorDrawing {
      * picture, which is the same as drawing it into the stack only when it is
      * in the layer drawn last and that layer is composited plainly
      * ([DryLayers.inkOnTop]). */
-    fun drawKept(canvas: Canvas, scene: CanvasScene, kept: Bitmap) {
+    fun drawKept(canvas: Canvas, scene: CanvasScene, kept: Bitmap, selection: DrawObject? = selectedObject(scene)) {
         drawPage(canvas, scene)
         val clipSave = canvas.save()
         clipToPage(canvas, scene)
         canvas.drawBitmap(kept, 0f, 0f, PICTURE_OVER)
         scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
         canvas.restoreToCount(clipSave)
-        drawOverlays(canvas, scene)
+        drawOverlays(canvas, scene, selection)
     }
+
+    // A part of the screen drawn again. Composition is per pixel: inside a
+    // clip of whole pixels, the stack drawn from the saved objects that can
+    // reach that part is the stack drawn from all of them, pixel for pixel,
+    // as long as each layer is composited the same way as in the whole scene.
+    // It is when every object of a layer shares that layer's compositing and
+    // the document lists every layer drawn ([DryLayers.clean]): the layer is
+    // then composited the same whichever of its objects comes first, and the
+    // layers come in the document's order. A layer with no object there is
+    // left out, as an empty layer changes no pixel.
+
+    /** A kept picture from the one [before], with the pixel boxes [boxes]
+     * cleared and drawn again: each from [parts] at the same position, the
+     * saved objects that can reach it in drawing order ([touching]). The same
+     * pixels as [drawStack] of the whole scene, everywhere. */
+    fun drawPatched(canvas: Canvas, scene: CanvasScene, before: Bitmap, boxes: List<PixelBox>, parts: List<List<DrawObject>>) {
+        canvas.drawBitmap(before, 0f, 0f, PICTURE_COPY)
+        for (at in boxes.indices) {
+            val box = boxes[at]
+            val save = canvas.save()
+            canvas.clipRect(box.left, box.top, box.right, box.bottom)
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, BlendMode.CLEAR)
+            drawStack(canvas, scene, parts[at], emptyList())
+            canvas.restoreToCount(save)
+        }
+    }
+
+    /** One frame from the kept picture [kept], with the pixel boxes [boxes]
+     * drawn again over it from [parts] (as [drawPatched]): the picture where
+     * nothing differs from it, and what a gesture changes (a stroke being
+     * moved or turned, objects hidden while erased) where something does.
+     * Then the ink in progress and the overlays, as [drawKept]. */
+    fun drawOver(canvas: Canvas, scene: CanvasScene, kept: Bitmap, boxes: List<PixelBox>, parts: List<List<DrawObject>>,
+                 selection: DrawObject? = selectedObject(scene)) {
+        drawPage(canvas, scene)
+        val clipSave = canvas.save()
+        clipToPage(canvas, scene)
+        val pictureSave = canvas.save()
+        for (box in boxes) canvas.clipOutRect(box.left, box.top, box.right, box.bottom)
+        canvas.drawBitmap(kept, 0f, 0f, PICTURE_OVER)
+        canvas.restoreToCount(pictureSave)
+        for (at in boxes.indices) {
+            val box = boxes[at]
+            val save = canvas.save()
+            canvas.clipRect(box.left, box.top, box.right, box.bottom)
+            // The document layer of a whole scene, here only as large as the box.
+            canvas.saveLayer(null, null)
+            drawStack(canvas, scene, parts[at], emptyList())
+            canvas.restoreToCount(save)
+        }
+        scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+        canvas.restoreToCount(clipSave)
+        drawOverlays(canvas, scene, selection)
+    }
+
+    /** Of [candidates] (saved objects of [scene] in drawing order, among them
+     * every one that could reach [visible]), those that could put a pixel
+     * inside the document-space rectangle [visible]. */
+    fun touching(scene: CanvasScene, candidates: List<DrawObject>, visible: Rect): List<DrawObject> = candidates.filter { mayTouch(scene, it, visible) }
+
+    /** How far beyond its native box a saved object may be taken to reach, in
+     * document units: four screen pixels at [scene]'s scale. */
+    fun cullMargin(scene: CanvasScene): Double = 4.0 / scene.camera.scale
 
     /** A picture is drawn pixel for pixel, never smoothed. Made at first use:
      * the unit tests use this object without a graphics framework. */
@@ -325,6 +388,16 @@ internal object EditorDrawing {
     /** The document as it is stacked, on whatever is beneath: the source
      * pixels, then every object layer in order, each composited as a whole. */
     private fun drawStack(canvas: Canvas, scene: CanvasScene, provisional: List<DrawObject>, visible: Rect?, near: SavedNear? = null) {
+        // With [near], only the saved objects it names are looked at: it names
+        // every one that could touch [visible], in drawing order, and the same
+        // test as without it then picks the same ones.
+        val saved = if (visible == null) scene.objects
+            else (near?.invoke(visible, cullMargin(scene)) ?: scene.objects).filter { mayTouch(scene, it, visible) }
+        drawStack(canvas, scene, saved, provisional)
+    }
+
+    /** [drawStack] of the saved objects [saved] (in drawing order) and [provisional]. */
+    private fun drawStack(canvas: Canvas, scene: CanvasScene, saved: List<DrawObject>, provisional: List<DrawObject>) {
         val sourceSave=canvas.save()
         canvas.concat(matrix(scene.matrix))
         scene.giantFrame?.let{drawGiantAndroidTiles(canvas,it)}
@@ -335,11 +408,6 @@ internal object EditorDrawing {
             canvas.drawRect(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat(),maxOf(a.x,b.x).toFloat(),maxOf(a.y,b.y).toFloat(),paint)
         }
         canvas.restoreToCount(sourceSave)
-        // With [near], only the saved objects it names are looked at: it names
-        // every one that could touch [visible], in drawing order, and the same
-        // test as without it then picks the same ones.
-        val saved = if (visible == null) scene.objects
-            else (near?.invoke(visible, cullMargin(scene)) ?: scene.objects).filter { mayTouch(scene, it, visible) }
         val combined = (saved + provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
         val grouped = combined.groupBy { it.item.layerId }
@@ -360,24 +428,33 @@ internal object EditorDrawing {
         }
     }
 
-    /** Whether a saved object could put a pixel inside [visible]. Only pen
-     * strokes are ever skipped: a stroke is a filled outline, and its native
-     * bounds contain that outline whole. Shapes, text, markers, results and
-     * anything under a preview transform are always drawn. */
+    /** Whether a saved object could put a pixel inside [visible]. Only
+     * objects whose native bounds hold everything drawn for them are ever
+     * skipped ([cullable]). Markers, results, outlines of constant screen
+     * width and anything under a preview transform are always drawn. */
     private fun mayTouch(scene: CanvasScene, obj: DrawObject, visible: Rect): Boolean {
         val item = obj.item
         if (!cullable(item, obj.marker != null) || item.objectId in scene.transformed) return true
         return boundsMayTouch(item.bounds, visible, cullMargin(scene))
     }
 
-    /** How far beyond its native box an object may be taken to reach, in document units. */
-    private fun cullMargin(scene: CanvasScene): Double = 4.0 / scene.camera.scale
+    /** Whether [item] may ever be left out of a part of the page by its
+     * native box alone ([mayTouch]): a stroke is a filled outline, and its box
+     * holds that outline whole; a shape's box (line, arrow, polygon,
+     * rectangle, ellipse, guide) is grown by twice its width, more than the
+     * half width its outline reaches (and an arrow's by more than its head);
+     * text is a filled outline, and its box holds every point of the glyphs'
+     * curves. An outline whose width is constant on the screen reaches farther
+     * in the document the further out the page is zoomed, so it is not. */
+    fun cullable(item: RenderItem, marker: Boolean): Boolean = !marker && !item.style.screenConstantWidth && boxHoldsDrawing(item)
 
-    /** Whether [item] may ever be left out of a pane by its native box alone ([mayTouch]). */
-    fun cullable(item: RenderItem, marker: Boolean): Boolean = item.shape is Shape.Stroke && !marker && !item.style.screenConstantWidth
+    /** The saved object [scene] has selected, found by a pass over its saved
+     * objects; a frame from the kept picture finds it by its id instead. */
+    fun selectedObject(scene: CanvasScene): DrawObject? = scene.selected?.let { id -> scene.objects.firstOrNull { it.item.objectId == id } }
 
-    /** Peer viewport outline, rotation handle, selection and hover: drawn after the document. */
-    fun drawOverlays(canvas: Canvas, scene: CanvasScene) {
+    /** Peer viewport outline, rotation handle, selection and hover: drawn
+     * after the document. [selection] is the saved object [scene] has selected. */
+    fun drawOverlays(canvas: Canvas, scene: CanvasScene, selection: DrawObject? = selectedObject(scene)) {
         if (scene.peerViewport.size == 4) {
             val points = scene.peerViewport.map { map(scene.matrix, it) }
             val outline = Path().apply {
@@ -395,8 +472,6 @@ internal object EditorDrawing {
             canvas.drawLine(pivot.x.toFloat(),pivot.y.toFloat(),point.x.toFloat(),point.y.toFloat(),paint)
             canvas.drawCircle(point.x.toFloat(),point.y.toFloat(),6f*scene.density,paint)
         }
-        // Nothing selected: no pass over the saved objects, which a frame from the kept picture never makes.
-        val selection = scene.selected?.let { id -> scene.objects.firstOrNull { it.item.objectId == id } }
         if (selection != null) {
             val points = screenBounds(scene, selection.item)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xff087dba.toInt(); style = Paint.Style.STROKE; strokeWidth = 2 * scene.density }

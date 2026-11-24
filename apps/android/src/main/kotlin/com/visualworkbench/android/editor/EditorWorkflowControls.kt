@@ -30,7 +30,11 @@ internal fun showFrameControls(available: Boolean, state: ImageFramesState): Boo
         else OutlinedButton({},Modifier.heightIn(min=48.dp),enabled=false){Text("Output frame unavailable for this source")}
         OutlinedButton({owner.activate(EditorWorkflowPanel.OfflineReview,true)},Modifier.heightIn(min=48.dp),enabled=editor.document!=null){Text("Offline conflicts")}
     }
-    if(editor.selected!=null)RotationSnapControl(editor.rotationSnap15,!editor.busy,editor::rotationSnap)
+    // Shown for as long as the selection tool is (objects are turned only with
+    // it), so that selecting or letting go of an object never changes the
+    // canvas's size: that would make its whole picture again and end a drag
+    // that is under way.
+    if(editor.tool==EditorTool.Select)RotationSnapControl(editor.rotationSnap15,editor.selected!=null&&!editor.busy,editor::rotationSnap)
     if(panel==EditorWorkflowPanel.OfflineReview)AlertDialog(
         onDismissRequest={owner.activate(EditorWorkflowPanel.OfflineReview,false)},
         title={Text("Review offline conflicts")},
