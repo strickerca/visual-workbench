@@ -234,19 +234,70 @@ class KeptPictureTest {
     /** While the page is panned or zoomed every frame wants another picture.
      * Making one for each would cost more than drawing the frame whole. */
     @Test fun a_picture_is_not_made_for_every_frame_of_a_movement() {
+        val objects = PictureChange.Objects
         // A change after a quiet time, and the first there ever was: made at once.
-        assertTrue(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = -1))
-        assertTrue(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS))
-        assertTrue(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 5_000))
+        for (why in listOf(PictureChange.Missing, objects, PictureChange.Background, PictureChange.Layers, PictureChange.Hidden)) {
+            assertTrue(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = -1, why = why))
+            assertTrue(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS, why = why))
+        }
+        assertTrue(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 5_000, why = objects))
         // Another change right after the last: this frame is drawn whole.
-        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 0))
-        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 8))
-        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS - 1))
+        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 0, why = objects))
+        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 8, why = objects))
+        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS - 1, why = objects))
+        // A pan, zoom, turn or resize starts a movement: drawn whole however long the page rested.
+        for (why in listOf(PictureChange.View, PictureChange.Size)) {
+            assertFalse(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = -1, why = why))
+            assertFalse(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 5_000, why = why))
+            assertTrue(why.name, pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 0, why = why))
+        }
         // The movement has stopped: the next frame wants what the last one wanted, however soon it comes.
-        assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 0))
-        assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 8))
+        assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 0, why = objects))
+        assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 8, why = objects))
     }
     // endregion
+
+    /** The pen's loupe draws the page near the nib for every ink frame. The
+     * grid must name every saved object a pane could show (it is then tested
+     * exactly, as without the grid), and few others. */
+    @Test fun the_grid_names_every_object_that_could_reach_a_pane() {
+        val random = java.util.Random(7)
+        val count = 600
+        val boxes = List(count) { index -> when (index % 23) {
+            0 -> Rect(Double.NaN, 0.0, 1.0, 1.0)
+            1 -> Rect(-50.0, -30.0, 20.0, 10.0)            // off the page
+            2 -> Rect(10.0, 10.0, 900.0, 700.0)            // over most of it
+            3 -> Rect(400.0, 300.0, 0.0, 0.0)              // a dot
+            else -> Rect(random.nextDouble() * 1100 - 50, random.nextDouble() * 900 - 50, random.nextDouble() * 60, random.nextDouble() * 60)
+        } }
+        val cullable = List(count) { it % 17 != 0 }
+        val whole = SavedGrid(1000.0, 800.0).also { grid -> boxes.indices.forEach { grid.add(boxes[it], cullable[it]) } }
+        // Strokes saved one after another extend the grid; the answers are the same.
+        val grown = SavedGrid(1000.0, 800.0)
+        for (split in listOf(0, 1, 150, 151, count)) { while (grown.size < split) grown.add(boxes[grown.size], cullable[grown.size]) }
+        assertEquals(count, grown.size)
+        var named = 0
+        repeat(400) {
+            val visible = Rect(random.nextDouble() * 1200 - 100, random.nextDouble() * 1000 - 100, random.nextDouble() * 120, random.nextDouble() * 120)
+            val margin = random.nextDouble() * 5
+            val found = requireNotNull(whole.near(visible, margin))
+            assertArrayEquals(found, grown.near(visible, margin))
+            for (at in 1 until found.size) assertTrue("in list order, once each", found[at - 1] < found[at])
+            val set = found.toHashSet()
+            for (index in boxes.indices) if (!cullable[index] || boundsMayTouch(boxes[index], visible, margin))
+                assertTrue("object $index reaches $visible but was not named", index in set)
+            named += found.size
+        }
+        // A small pane names a small part of the page, not every object.
+        assertTrue("named on average ${named / 400} of $count", named / 400 < count / 4)
+        // A pane that cannot be judged: every object has to be looked at.
+        assertNull(whole.near(Rect(Double.NaN, 0.0, 1.0, 1.0), 1.0))
+        assertNull(whole.near(Rect(0.0, 0.0, 1.0, 1.0), Double.NaN))
+        // An empty page, and a page of no size.
+        assertArrayEquals(IntArray(0), SavedGrid(1000.0, 800.0).near(Rect(0.0, 0.0, 10.0, 10.0), 1.0))
+        val tiny = SavedGrid(0.0, 0.0).also { it.add(Rect(5.0, 5.0, 1.0, 1.0), true) }
+        assertArrayEquals(intArrayOf(0), tiny.near(Rect(0.0, 0.0, 100.0, 100.0), 0.0))
+    }
 
     @Test fun a_pane_leaves_out_only_objects_that_cannot_reach_it() {
         val visible = Rect(100.0, 100.0, 50.0, 40.0)

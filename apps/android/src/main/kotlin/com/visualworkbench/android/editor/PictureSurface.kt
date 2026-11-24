@@ -12,7 +12,6 @@ import android.hardware.HardwareBuffer
 import android.media.Image
 import android.media.ImageReader
 import android.os.Build
-import android.os.SystemClock
 import android.util.Log
 import java.time.Duration
 
@@ -24,6 +23,8 @@ import java.time.Duration
  * One code path for every Android version the app supports: a platform
  * [HardwareRenderer] drawing into an [ImageReader]. A render waits until the
  * picture is finished, so nothing here is asynchronous and no thread is made.
+ * A renderer that has just drawn may skip the next frame (see [render]); the
+ * render is then made again once.
  *
  * A picture is never drawn into again while it is held. Its buffer goes back
  * to be reused only at [Picture.release]; the caller releases a picture once
@@ -46,10 +47,10 @@ internal class PictureSurface(val width: Int, val height: Int) {
 
     private val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, MAX_PICTURES,
         HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT)
-    private val node = RenderNode("vw-kept-picture").apply { setPosition(0, 0, width, height) }
+    // Not `apply`: inside it, width and height would be the node's own, still zero.
+    private val node = RenderNode("vw-kept-picture").also { it.setPosition(0, 0, width, height) }
     private val renderer = HardwareRenderer()
     private var out = 0
-    private var drawnMs = 0L
     @Volatile var closed = false
         private set
 
@@ -67,23 +68,23 @@ internal class PictureSurface(val width: Int, val height: Int) {
     val room: Boolean get() = !closed && out < MAX_PICTURES
 
     /** Draws one picture. Null when it could not be drawn; the surface is then
-     * closed, because a frame the renderer put off could otherwise arrive
-     * later and be taken for a newer one. Pictures made before stay good. */
+     * closed. Pictures made before stay good. */
     fun render(draw: (Canvas) -> Unit): Picture? {
         if (!room) return null
         try {
-            // The renderer puts off a frame that follows another on the same
-            // surface within two milliseconds. A picture is wanted now.
-            val since = SystemClock.uptimeMillis() - drawnMs
-            if (drawnMs != 0L && since in 0 until MIN_GAP_MS) SystemClock.sleep(MIN_GAP_MS - since)
-            val canvas = node.beginRecording()
-            try { canvas.drawColor(Color.TRANSPARENT, BlendMode.CLEAR); draw(canvas) } finally { node.endRecording() }
-            val result = renderer.createRenderRequest().setWaitForPresent(true).syncAndDraw()
-            drawnMs = SystemClock.uptimeMillis()
-            // The commands hold the picture drawn before and the document's paths.
-            node.discardDisplayList()
-            if (result and NOT_DRAWN != 0) return failed("the renderer put the frame off (sync result $result)")
-            val image = reader.acquireNextImage() ?: return failed("no picture came out of the renderer")
+            var image = frame(draw)
+            if (image == null) {
+                // The renderer puts off or skips a frame it takes to be a second
+                // one within the same display frame: within two milliseconds of
+                // its last (and then says so), and on recent versions, without a
+                // word, until another window of the app has drawn. A picture is
+                // wanted now. Setting the surface again starts the renderer's
+                // frame history afresh, and its first frame is always drawn.
+                renderer.setSurface(reader.surface)
+                retried++
+                image = frame(draw)
+            }
+            if (image == null) return failed("no picture came out of the renderer")
             out++
             val bitmap = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !finished(image)) null
@@ -93,6 +94,23 @@ internal class PictureSurface(val width: Int, val height: Int) {
             return Picture(bitmap, image, this)
         } catch (error: RuntimeException) { return failed(error.javaClass.simpleName) }
     }
+
+    /** Records [draw], has the renderer draw it and takes the result; null
+     * when nothing came out. */
+    private fun frame(draw: (Canvas) -> Unit): Image? {
+        val canvas = node.beginRecording()
+        try { canvas.drawColor(Color.TRANSPARENT, BlendMode.CLEAR); draw(canvas) } finally { node.endRecording() }
+        val result = renderer.createRenderRequest().setWaitForPresent(true).syncAndDraw()
+        // The commands hold the picture drawn before and the document's paths.
+        node.discardDisplayList()
+        if (result and NOT_DRAWN != 0) return null
+        // The newest, should a frame the renderer put off have come out since.
+        return reader.acquireLatestImage()
+    }
+
+    /** On-device tests only: pictures that came out only once the surface was set again. */
+    var retried = 0
+        private set
 
     /** Fixed words and numbers only; the canvas falls back to drawing whole scenes. */
     private fun failed(why: String): Picture? {
@@ -127,7 +145,6 @@ internal class PictureSurface(val width: Int, val height: Int) {
         const val TAG = "VW_CANVAS"
         /** The picture shown, up to two waiting to be released, and the one being drawn. */
         const val MAX_PICTURES = 4
-        const val MIN_GAP_MS = 3L
         const val FENCE_WAIT_MS = 500L
         const val NOT_DRAWN = HardwareRenderer.SYNC_LOST_SURFACE_REWARD_IF_FOUND or HardwareRenderer.SYNC_CONTEXT_IS_STOPPED or
             HardwareRenderer.SYNC_FRAME_DROPPED

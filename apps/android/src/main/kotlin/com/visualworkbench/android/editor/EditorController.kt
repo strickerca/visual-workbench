@@ -2826,7 +2826,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) {
             exportPreflight = null; checkedExport = null; checkedExportIntent = null
         }
-        if (objects.none { it.item.objectId == selected }) selected = null
+        if (selected != null && objects.none { it.item.objectId == selected }) selected = null
         publish()
     }
     fun saveText(text: String, font: String, size: Double) {

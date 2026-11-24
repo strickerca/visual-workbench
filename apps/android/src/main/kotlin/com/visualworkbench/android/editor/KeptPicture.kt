@@ -12,6 +12,7 @@ import com.visualworkbench.shared.RenderItem
 import com.visualworkbench.shared.Shape
 import com.visualworkbench.shared.Transform
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicLongArray
 
 // The canvas shows a kept picture of the saved page, as a paint program does.
 // The picture is made once for a view, each finished stroke is drawn into it
@@ -175,9 +176,18 @@ internal sealed interface PictureStep {
     data class Rebuild(val why: PictureChange) : PictureStep
 }
 
+/** Whether [list] holds the very objects of [prefix], in order, before anything else. */
+internal fun <T> listStartsWith(list: List<T>, prefix: List<T>): Boolean {
+    if (list === prefix) return true
+    if (list.size < prefix.size) return false
+    for (index in prefix.indices) if (list[index] !== prefix[index]) return false
+    return true
+}
+
 /** What to do with a picture drawn from [held] so that it shows [next].
  * [layers] is what [DryLayers] holds for [held]'s objects. */
-internal fun <T> pictureStep(held: PictureBasis<T>?, layers: DryLayers?, next: PictureBasis<T>, item: (T) -> RenderItem): PictureStep {
+internal fun <T> pictureStep(held: PictureBasis<T>?, layers: DryLayers?, next: PictureBasis<T>,
+    startsWith: (List<T>, List<T>) -> Boolean = ::listStartsWith, item: (T) -> RenderItem): PictureStep {
     if (held == null || layers == null) return PictureStep.Rebuild(PictureChange.Missing)
     if (held.width != next.width || held.height != next.height) return PictureStep.Rebuild(PictureChange.Size)
     if (held.matrix != next.matrix || held.scale != next.scale) return PictureStep.Rebuild(PictureChange.View)
@@ -186,24 +196,25 @@ internal fun <T> pictureStep(held: PictureBasis<T>?, layers: DryLayers?, next: P
     if (held.hidden !== next.hidden && held.hidden != next.hidden) return PictureStep.Rebuild(PictureChange.Hidden)
     if (held.objects === next.objects) return PictureStep.Keep
     val from = held.objects.size
-    if (next.objects.size < from) return PictureStep.Rebuild(PictureChange.Objects)
-    for (index in 0 until from) if (held.objects[index] !== next.objects[index]) return PictureStep.Rebuild(PictureChange.Objects)
+    if (!startsWith(next.objects, held.objects)) return PictureStep.Rebuild(PictureChange.Objects)
     if (next.objects.size == from) return PictureStep.Keep
     val added = ArrayList<RenderItem>(next.objects.size - from)
     for (index in from until next.objects.size) added.add(item(next.objects[index]))
     return if (layers.inkOnTop(added, next.hidden)) PictureStep.Append(from) else PictureStep.Rebuild(PictureChange.Objects)
 }
 
-/** Whether a picture that has to be made again is made for this frame. It
- * is, unless the scene is changing from frame to frame, as it does while the
- * page is panned, zoomed or turned and while the paired computer moves an
- * object: then each frame would make a picture that the next one throws away.
- * Such a frame is drawn whole, as every frame used to be, and the picture is
- * made once the scene has stopped changing. [sameAsLastFrame]: the frame
+/** Whether a picture that has to be made again ([why]) is made for this
+ * frame. It is, unless the scene is changing from frame to frame, as it does
+ * while the page is panned, zoomed or turned and while the paired computer
+ * moves an object: then each frame would make a picture that the next one
+ * throws away. Such a frame is drawn whole, as every frame used to be, and the
+ * picture is made once the scene has stopped changing. A change of view or
+ * size is taken to be the start of such a movement; any other change is made
+ * at once unless it follows another closely. [sameAsLastFrame]: the frame
  * before wanted this very picture. [sinceChangeMs]: how long ago a frame last
- * wanted another picture than the one before it. */
-internal fun pictureMadeNow(sameAsLastFrame: Boolean, sinceChangeMs: Long): Boolean =
-    sameAsLastFrame || sinceChangeMs < 0 || sinceChangeMs >= PICTURE_STREAK_MS
+ * wanted another picture than the one before it, negative when none ever did. */
+internal fun pictureMadeNow(sameAsLastFrame: Boolean, sinceChangeMs: Long, why: PictureChange): Boolean =
+    sameAsLastFrame || (why != PictureChange.View && why != PictureChange.Size && (sinceChangeMs < 0 || sinceChangeMs >= PICTURE_STREAK_MS))
 
 /** Changes closer together than this are one movement. */
 internal const val PICTURE_STREAK_MS = 100L
@@ -213,12 +224,96 @@ internal class PictureCounts {
     /** Pictures made from every object, pictures a stroke was added to, frames
      * drawn from a picture, frames drawn as a whole scene, and renders that failed. */
     val rebuilt = AtomicLong(); val added = AtomicLong(); val frames = AtomicLong(); val whole = AtomicLong(); val failed = AtomicLong()
-    override fun toString(): String = "rebuilt=${rebuilt.get()} added=${added.get()} frames=${frames.get()} whole=${whole.get()} failed=${failed.get()}"
+    /** Pictures that came out only once their surface was set again ([PictureSurface.render]). */
+    val retried = AtomicLong()
+    /** Frames drawn whole, by [PictureRefusal]. */
+    val refused = AtomicLongArray(PictureRefusal.entries.size)
+    override fun toString(): String = "rebuilt=${rebuilt.get()} added=${added.get()} frames=${frames.get()} whole=${whole.get()} failed=${failed.get()} retried=${retried.get()}" +
+        PictureRefusal.entries.joinToString("") { reason -> refused.get(reason.ordinal).let { if (it == 0L) "" else " ${reason.name.lowercase()}=$it" } }
+}
+
+/** The saved objects of one list placed on a coarse grid over the page by
+ * their native boxes, so that a magnifier pane, which shows a small part of
+ * the page, finds the objects that could reach it without a pass over all of
+ * them. Objects that may not be left out by their box ([cullable] false), whose
+ * box cannot be judged, or that would cover many cells are always named.
+ * Extended, not built again, when objects are added at the end of the list
+ * ([add]). Indexes are positions in that list. */
+internal class SavedGrid(val pageWidth: Double, val pageHeight: Double) {
+    private val cellWidth = (if (pageWidth.isFinite() && pageWidth > 0) pageWidth / CELLS else 1.0).coerceAtLeast(1.0)
+    private val cellHeight = (if (pageHeight.isFinite() && pageHeight > 0) pageHeight / CELLS else 1.0).coerceAtLeast(1.0)
+    private val cells = arrayOfNulls<IntArray>(CELLS * CELLS)
+    private val filled = IntArray(CELLS * CELLS)
+    private var always = IntArray(8)
+    private var alwaysCount = 0
+    private var seen = IntArray(64)
+    private var stamp = 0
+    /** How many objects have been added. */
+    var size = 0
+        private set
+
+    /** The next object of the list: its native box, and whether it may be left out by it. */
+    fun add(bounds: Rect, cullable: Boolean) {
+        val index = size++
+        if (seen.size < size) seen = seen.copyOf(maxOf(size, seen.size * 2))
+        if (!cullable || !bounds.x.isFinite() || !bounds.y.isFinite() || !bounds.width.isFinite() || !bounds.height.isFinite() ||
+            bounds.width < 0 || bounds.height < 0) { addAlways(index); return }
+        val x0 = column(bounds.x); val x1 = column(bounds.x + bounds.width)
+        val y0 = row(bounds.y); val y1 = row(bounds.y + bounds.height)
+        if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) { addAlways(index); return }
+        for (y in y0..y1) for (x in x0..x1) {
+            val at = y * CELLS + x
+            val list = cells[at]?.takeIf { filled[at] < it.size } ?: (cells[at]?.copyOf(cells[at]!!.size * 2) ?: IntArray(4)).also { cells[at] = it }
+            list[filled[at]++] = index
+        }
+    }
+
+    /** Every object whose box could reach [visible] grown by [margin] on each
+     * side, and every object always named, in list order. Null when [visible]
+     * cannot be judged: then all of them could. */
+    fun near(visible: Rect, margin: Double): IntArray? {
+        if (!(margin >= 0.0) || !visible.x.isFinite() || !visible.y.isFinite() || !visible.width.isFinite() || !visible.height.isFinite() ||
+            !margin.isFinite()) return null
+        val x0 = column(visible.x - margin); val x1 = column(visible.x + visible.width + margin)
+        val y0 = row(visible.y - margin); val y1 = row(visible.y + visible.height + margin)
+        if (++stamp == Int.MAX_VALUE) { seen.fill(0); stamp = 1 }
+        var found = IntArray(16); var count = 0
+        fun take(index: Int) {
+            if (seen[index] == stamp) return
+            seen[index] = stamp
+            if (count == found.size) found = found.copyOf(count * 2)
+            found[count++] = index
+        }
+        for (i in 0 until alwaysCount) take(always[i])
+        for (y in y0..y1) for (x in x0..x1) {
+            val at = y * CELLS + x
+            val list = cells[at] ?: continue
+            for (i in 0 until filled[at]) take(list[i])
+        }
+        return found.copyOf(count).also { it.sort() }
+    }
+
+    private fun addAlways(index: Int) {
+        if (alwaysCount == always.size) always = always.copyOf(alwaysCount * 2)
+        always[alwaysCount++] = index
+    }
+    // Monotonic, and clamped to the grid: a box off the page lands in the edge
+    // cells, as does any part of a pane off the page, so overlaps are kept.
+    private fun column(x: Double): Int = kotlin.math.floor(x / cellWidth).coerceIn(0.0, (CELLS - 1).toDouble()).toInt()
+    private fun row(y: Double): Int = kotlin.math.floor(y / cellHeight).coerceIn(0.0, (CELLS - 1).toDouble()).toInt()
+
+    private companion object {
+        /** Cells across and down the page. */
+        const val CELLS = 32
+        /** An object covering more cells than this is always named. */
+        const val MAX_CELLS = 64
+    }
 }
 
 /** On-device tests only: one frame as the kept picture draws it and the same
- * scene drawn whole, both as plain pixels. */
-internal class PictureComparison(val kept: Bitmap, val whole: Bitmap)
+ * scene drawn whole, both as plain pixels, and where the page lies in them
+ * ([matrix] maps the page of [pageWidth] x [pageHeight] to the frame). */
+internal class PictureComparison(val kept: Bitmap, val whole: Bitmap, val matrix: Transform, val pageWidth: Double, val pageHeight: Double)
 
 /** The kept picture of one render session, and the frames drawn from it.
  *
@@ -226,7 +321,9 @@ internal class PictureComparison(val kept: Bitmap, val whole: Bitmap)
  * up to the saved scene first (nothing to do, one stroke to add, or all of it
  * again) and then draws the surround, the page, the picture, the ink in
  * progress, the overlays and the magnifier. When it returns false nothing was
- * drawn and the caller draws the whole scene as it always could.
+ * drawn and the caller draws the whole scene as it always could. The pen's
+ * loupe redraws the page near the nib at every frame; a [SavedGrid] finds the
+ * saved objects there, so that no part of a frame visits every saved object.
  *
  * While the scene changes from frame to frame (a pan, a zoom, a turn, an
  * object moved from the paired computer) no picture is made for each frame:
@@ -256,6 +353,19 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
     private var surface: PictureSurface? = null
     private var held: Held? = null
     private var judged: Judged? = null
+    /** The last answer of [startsWith]: after a stroke is saved the layer
+     * order, the picture and the grid each ask it of the same two lists. */
+    private var prefixList: List<DrawObject>? = null
+    private var prefixOf: List<DrawObject>? = null
+    private var prefixAnswer = false
+    private fun startsWith(list: List<DrawObject>, prefix: List<DrawObject>): Boolean {
+        if (list === prefix) return true
+        if (list !== prefixList || prefix !== prefixOf) { prefixAnswer = listStartsWith(list, prefix); prefixList = list; prefixOf = prefix }
+        return prefixAnswer
+    }
+    /** The grid of the saved objects last given to a magnifier pane, and that list. */
+    private var grid: SavedGrid? = null
+    private var gridOf: List<DrawObject>? = null
     private var layerIdsOf: DocumentSnapshot? = null
     private var layerIds: List<String> = emptyList()
     private var failures = 0
@@ -294,7 +404,10 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
             giant = scene.giantMode || scene.giantFrame != null, documentTiles = scene.documentFrame != null,
             resultsReady = scene.resultDisplayReady, results = scene.aiResults.isNotEmpty(), draft = scene.documentDraft != null,
             preview = scene.transformed.isNotEmpty(), erasing = !steady)
-        if (refusal != null) { if (!refusal.keepsPicture) forget(); counts.whole.incrementAndGet(); return false }
+        if (refusal != null) {
+            if (!refusal.keepsPicture) forget()
+            counts.whole.incrementAndGet(); counts.refused.incrementAndGet(refusal.ordinal); return false
+        }
         // Releasing a replaced picture is posted to this thread, behind every frame drawn before.
         val looper = Looper.myLooper()
         if (looper == null || failures >= MAX_FAILURES) { counts.whole.incrementAndGet(); return false }
@@ -306,11 +419,11 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         }
         val next = PictureBasis(width, height, scene.matrix, scene.camera.scale, scene.background, scene.smoothBackground, ids, scene.hidden, scene.objects)
         val now = held
-        val step = pictureStep(now?.basis, now?.layers, next) { it.item }
+        val step = pictureStep(now?.basis, now?.layers, next, ::startsWith) { it.item }
         if (step is PictureStep.Rebuild) {
             val uptime = SystemClock.uptimeMillis()
-            val same = wanted?.let { pictureStep(it, layers, next) { drawn -> drawn.item } == PictureStep.Keep } == true
-            val made = !first && pictureMadeNow(same, if (changedMs == 0L) -1 else uptime - changedMs)
+            val same = wanted?.let { pictureStep(it, layers, next, ::startsWith) { drawn -> drawn.item } == PictureStep.Keep } == true
+            val made = !first && pictureMadeNow(same, if (changedMs == 0L) -1 else uptime - changedMs, step.why)
             if (!same) changedMs = uptime
             if (!made) {
                 // Drawn whole for now; made when the next frame wants the same, or when none comes.
@@ -329,9 +442,28 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
             is PictureStep.Rebuild -> replace(post, next, layers, counts.rebuilt) { EditorDrawing.drawStack(it, scene) }
         } ?: return false
         EditorDrawing.drawKept(canvas, scene, picture.bitmap)
-        PrecisionDrawing.drawPanes(canvas, scene, onlyVisible = true)
+        // The pen's loupe shows the page near the nib while the pen is down
+        // or hovers: only the saved objects the grid finds there are looked at.
+        PrecisionDrawing.drawPanes(canvas, scene, onlyVisible = true) { visible, margin ->
+            gridFor(scene).near(visible, margin)?.let { found -> val objects = scene.objects; List(found.size) { objects[found[it]] } }
+        }
         counts.frames.incrementAndGet()
         return true
+    }
+
+    /** The grid of [scene]'s saved objects: the one held, the one held with
+     * the objects added at the end, or a new one. Made when a pane first asks. */
+    private fun gridFor(scene: CanvasScene): SavedGrid {
+        val objects = scene.objects
+        val last = grid
+        val width = scene.document.width.toDouble(); val height = scene.document.height.toDouble()
+        if (last != null && gridOf === objects && last.size == objects.size) return last
+        val extends = last != null && last.pageWidth == width && last.pageHeight == height &&
+            gridOf?.let { held -> held.size == last.size && startsWith(objects, held) } == true
+        val target = if (extends) checkNotNull(last) else SavedGrid(width, height)
+        for (at in target.size until objects.size) objects[at].let { target.add(it.item.bounds, EditorDrawing.cullable(it.item, it.marker != null)) }
+        grid = target; gridOf = objects
+        return target
     }
 
     /** The layer order for [scene]'s saved objects: the one held, the one held
@@ -342,10 +474,7 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         if (last != null && last.layerIds == ids && (last.hidden === scene.hidden || last.hidden == scene.hidden)) {
             if (last.objects === objects) return last.layers
             val from = last.objects.size
-            var extends = objects.size >= from
-            var index = 0
-            while (extends && index < from) { if (last.objects[index] !== objects[index]) extends = false; index++ }
-            if (extends) {
+            if (startsWith(objects, last.objects)) {
                 val added = ArrayList<RenderItem>(objects.size - from)
                 for (at in from until objects.size) added.add(objects[at].item)
                 // A held picture has its own copy of what it was drawn from.
@@ -368,7 +497,10 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         // Pictures replaced a moment ago are still waiting for the frames that
         // show them. Without room for another, this frame is drawn whole.
         if (!target.room) { post.postDelayed(rest, REST_MS); counts.whole.incrementAndGet(); return null }
-        val made = target.render(draw) ?: return failed()
+        val retriedBefore = target.retried
+        val made = target.render(draw)
+        counts.retried.addAndGet((target.retried - retriedBefore).toLong())
+        if (made == null) return failed()
         val old = held?.picture
         held = Held(made, basis, layers.copy())
         failures = 0; count.incrementAndGet()
@@ -393,15 +525,17 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
     @Synchronized fun compare(scene: CanvasScene): PictureComparison? {
         val now = held ?: return null
         val pictures = try { PictureSurface(now.basis.width, now.basis.height) } catch (error: RuntimeException) { return null }
+        // Both are drawn before either is read: a picture is read back only
+        // once the surface has drawn everything it is asked for.
+        var kept: PictureSurface.Picture? = null
+        var whole: PictureSurface.Picture? = null
         try {
-            fun pixels(draw: (Canvas) -> Unit): Bitmap? {
-                val made = pictures.render(draw) ?: return null
-                return try { made.bitmap.copy(Bitmap.Config.ARGB_8888, false) } finally { made.release() }
-            }
-            val kept = pixels { EditorDrawing.drawKept(it, scene, now.picture.bitmap); PrecisionDrawing.drawPanes(it, scene, onlyVisible = true) } ?: return null
-            val whole = pixels { PrecisionDrawing.draw(it, scene) } ?: run { kept.recycle(); return null }
-            return PictureComparison(kept, whole)
-        } finally { pictures.close() }
+            kept = pictures.render { EditorDrawing.drawKept(it, scene, now.picture.bitmap); PrecisionDrawing.drawPanes(it, scene, onlyVisible = true) } ?: return null
+            whole = pictures.render { PrecisionDrawing.draw(it, scene) } ?: return null
+            val keptPixels = kept.bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: return null
+            val wholePixels = whole.bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: run { keptPixels.recycle(); return null }
+            return PictureComparison(keptPixels, wholePixels, scene.matrix, scene.document.width.toDouble(), scene.document.height.toDouble())
+        } finally { kept?.release(); whole?.release(); pictures.close() }
     }
 
     /** Any thread: the picture is given up as soon as the drawing thread can,
@@ -419,7 +553,7 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         surface?.close(); surface = null
         held?.picture?.release(); held = null
         replaced.forEach { it.release() }; replaced.clear()
-        judged = null; layerIdsOf = null; layerIds = emptyList()
+        judged = null; layerIdsOf = null; layerIds = emptyList(); grid = null; gridOf = null; prefixList = null; prefixOf = null
     }
 
     /** Main thread, once the session has been released: everything is given
