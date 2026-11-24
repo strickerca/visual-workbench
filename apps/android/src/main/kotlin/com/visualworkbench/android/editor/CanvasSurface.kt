@@ -98,6 +98,10 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         @Volatile var picture: KeptPicture? = null
         /** On-device tests only (under [lock]): takes the comparison of the next saved frame. */
         var compare: ((PictureComparison?) -> Unit)? = null
+        /** Under [lock]: the kept pictures were drawn at a view that has come
+         * to rest since the frame on screen, which was softer; a saved frame of
+         * the same scene is owed, asked for as soon as none is in flight. */
+        var settledRedraw = false
         /** Lifecycle diagnostics only, under [lock] and only while switched on: saved
          * frames started and completed, which frames are recorded, and the
          * viewport size of the scene last drawn into a saved frame. */
@@ -261,7 +265,7 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         val current = renderer ?: return
         val frame = synchronized(lock) {
             val made = if (target.closed || target !== session) null
-                else if (dry) target.dryFrames.request()?.let { Frame(target, true, lastInputMs, it) }
+                else if (dry) target.dryFrames.request()?.let { target.settledRedraw = false; Frame(target, true, lastInputMs, it) }
                 else if (target.frontQueued) null
                 else { target.frontQueued = true; Frame(target, false, lastInputMs) }
             // Ink frames are only counted, when drawn. Saved-frame requests are
@@ -534,13 +538,17 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
     }
 
     private fun redrawNewer(target: RenderSession) {
+        var settled = false
         val state = synchronized(lock) {
             if (target.closed || target !== session) null else target.latest?.let {
                 val dry = !wet(it)
-                if (it.revision > (if (dry) target.drawn else maxOf(target.drawn, target.frontDrawn))) dry else null
+                if (it.revision > (if (dry) target.drawn else maxOf(target.drawn, target.frontDrawn))) dry
+                // A frame owed since the kept pictures came to rest, asked for while another was in flight.
+                else if (dry && target.settledRedraw) { settled = true; true }
+                else null
             }
         }
-        if (state != null) enqueue(target, state, "newer_scene")
+        if (state != null) enqueue(target, state, if (settled) "settled" else "newer_scene")
     }
 
     private fun wet(scene: CanvasScene): Boolean =
@@ -561,7 +569,11 @@ internal class CanvasSurface(context: Context, val controller: EditorController)
         // A generation that owes the redraw of an in-place resize may be about
         // to leave, and is short of buffers while it does: it keeps no picture.
         val resizing = synchronized(lock) { target.awaitingResizeRedraw }
-        val picture = target.picture ?: KeptPicture(pictureCounts).also { target.picture = it }
+        // Once the view has rested and the pictures are drawn at it, a frame
+        // that is the whole scene again is asked for.
+        val picture = target.picture ?: KeptPicture(pictureCounts) {
+            main.post { synchronized(lock) { target.settledRedraw = true }; enqueue(target, true, "settled") }
+        }.also { target.picture = it }
         return picture.draw(canvas, scene, steady = !erasing(scene), resizing = resizing, first = !target.presented)
     }
 

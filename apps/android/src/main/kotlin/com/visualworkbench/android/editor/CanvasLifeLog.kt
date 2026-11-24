@@ -277,7 +277,7 @@ internal enum class CanvasLifeEvent(private val template: String) {
 /** The fixed words some canvas lifecycle records carry, by position in each list. */
 internal object CanvasLifeWords {
     val redrawCauses = listOf("surface_destroyed", "detached", "presented")
-    val frameCauses = listOf("publish", "created", "newer_scene")
+    val frameCauses = listOf("publish", "created", "newer_scene", "settled")
     val frameResults = listOf("granted", "closed", "not_current", "request_pending", "draw_in_flight")
     val waitReasons = listOf("detached", "no_scene", "no_surface", "viewport_changing", "release_settling", "controller_gate", "other")
 }

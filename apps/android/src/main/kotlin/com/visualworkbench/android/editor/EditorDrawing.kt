@@ -55,6 +55,9 @@ internal data class CanvasScene(
      * wet ink of this scene and of that stroke's pen-down; 0 without wet ink. */
     val wetSampleMs: Long = 0,
     val wetStartMs: Long = 0,
+    /** Fingers are on the canvas moving the view (a pan, a pinch, a turn):
+     * the kept pictures are drawn moved or scaled until they lift. */
+    val viewMoving: Boolean = false,
 )
 
 /** The path commands of a stroke's contours, in f32 coordinates around an f64
@@ -278,97 +281,143 @@ internal object EditorDrawing {
         return true
     }
 
-    // The kept picture. It holds exactly what [drawDocument] puts into its
-    // document layer for the saved objects, so a frame drawn from it goes
-    // through the same steps as a whole scene: surround, page, the stack laid
-    // on through the page's edge, overlays.
+    // Kept pictures. A layer's picture holds what a whole scene's layer of it
+    // holds: its saved objects drawn plainly on a transparent ground, in a
+    // layer of their own, so that the renderer draws every outline exactly as
+    // it does there. The page's edge is not in the picture: the frame cuts
+    // the pictures with it once, as a whole scene cuts its layers (cut twice,
+    // its smoothed edge would come out darker). A frame composites the
+    // pictures as a whole scene composites its layers: the page, the document
+    // layer with the source pixels, then each layer's picture with that
+    // layer's opacity and blend. When more layers draw than are kept one by
+    // one, the first picture holds the source pixels and the layers beneath
+    // the kept ones as the document layer holds them (a prefix).
 
-    /** A kept picture from nothing: the saved document stack on a transparent
-     * ground, for a scene [pictureRefusal] lets through. */
-    fun drawStack(canvas: Canvas, scene: CanvasScene) = drawStack(canvas, scene, emptyList(), null)
-
-    /** A kept picture from the one [before], which lacks only [added]: the
-     * same pixels, and those objects drawn over them. Only valid when they
-     * are drawn after everything else in a plainly composited layer
-     * ([DryLayers.inkOnTop]). What is drawn is the added objects alone,
-     * whatever the document holds. */
-    fun drawAdded(canvas: Canvas, scene: CanvasScene, before: Bitmap, added: List<DrawObject>) {
-        canvas.drawBitmap(before, 0f, 0f, PICTURE_COPY)
-        // In a layer of their own, as a whole scene draws its object layers:
-        // the renderer then draws their outlines the same way it does there.
+    /** The picture of one layer ([prefix] false: [objects] are that layer's)
+     * or of the source pixels and several layers ([prefix]: [objects] are
+     * theirs, each layer composited as [paints] says), from nothing. [objects]
+     * are in drawing order, hidden ones left out, and hold every one that
+     * could reach the screen. */
+    fun drawSlot(canvas: Canvas, scene: CanvasScene, prefix: Boolean, objects: List<DrawObject>, paints: Map<String, RenderItem>) {
         val layer = canvas.saveLayer(null, null)
-        added.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+        if (prefix) drawStack(canvas, scene, objects, emptyList(), paints)
+        else for (index in objects.indices) drawObject(canvas, scene, objects[index])
         canvas.restoreToCount(layer)
     }
 
-    /** One frame from the kept picture [kept] of [scene]'s saved objects:
-     * the page, the picture laid on through the page's edge, the ink in
-     * progress over it and the overlays. The ink goes straight over the
-     * picture, which is the same as drawing it into the stack only when it is
-     * in the layer drawn last and that layer is composited plainly
-     * ([DryLayers.inkOnTop]). */
-    fun drawKept(canvas: Canvas, scene: CanvasScene, kept: Bitmap, selection: DrawObject? = selectedObject(scene)) {
+    /** A picture from the one [before] drawn for the same layers [dx], [dy]
+     * whole pixels away (the view moved by that much), with [appended] (the
+     * layer's new saved objects, drawn after all of its others) drawn over it
+     * as the layer draws them, and the pixel boxes [boxes] cleared and drawn
+     * again, each from [parts] at the same position. Moved pixels are the
+     * same as drawn there only where the page lay on the screen whole both
+     * times; [appended] go into a layer of their own only for a prefix, which
+     * never has any. */
+    fun drawSlotChanged(canvas: Canvas, scene: CanvasScene, before: Bitmap, dx: Int, dy: Int, prefix: Boolean, boxes: List<PixelBox>,
+                        parts: List<List<DrawObject>>, appended: List<DrawObject>, paints: Map<String, RenderItem>) {
+        if (appended.isEmpty() || prefix) canvas.drawBitmap(before, dx.toFloat(), dy.toFloat(), PICTURE_COPY)
+        else {
+            // Within a layer as the whole scene draws them in, over what it already holds.
+            val save = canvas.saveLayer(null, null)
+            canvas.drawBitmap(before, dx.toFloat(), dy.toFloat(), PICTURE_OVER)
+            for (index in appended.indices) if (appended[index].item.objectId !in scene.hidden) drawObject(canvas, scene, appended[index])
+            canvas.restoreToCount(save)
+        }
+        for (at in boxes.indices) {
+            val box = boxes[at]
+            val save = canvas.save()
+            canvas.clipRect(box.left, box.top, box.right, box.bottom)
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, BlendMode.CLEAR)
+            drawSlot(canvas, scene, prefix, parts[at], paints)
+            canvas.restoreToCount(save)
+        }
+    }
+
+    /** One frame drawn from kept pictures as [plan] lays them out. Where the
+     * pictures lie whole pixels from where they were drawn ([FramePlan.aligned])
+     * they are drawn pixel for pixel; otherwise under [FramePlan.toScreen],
+     * smoothed, and what they do not cover of the page is filled from
+     * [FramePlan.fill]. The boxes of [FramePlan.boxes] are drawn from the saved
+     * objects, the whole stack as the scene holds it. Then the overlays. */
+    fun drawFrame(canvas: Canvas, scene: CanvasScene, plan: FramePlan) {
         drawPage(canvas, scene)
         val clipSave = canvas.save()
         clipToPage(canvas, scene)
-        canvas.drawBitmap(kept, 0f, 0f, PICTURE_OVER)
-        scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
+        val document = canvas.saveLayer(null, null)
+        val cover = plan.cover
+        if (cover != null) {
+            val save = canvas.save()
+            canvas.clipOutPath(cover)
+            for (box in plan.boxes) canvas.clipOutRect(box.left, box.top, box.right, box.bottom)
+            when (val fill = plan.fill) {
+                is FrameFill.Overview -> canvas.drawBitmap(fill.bitmap, matrix(fill.toScreen), PICTURE_SMOOTH)
+                is FrameFill.Objects -> drawStack(canvas, scene, fill.objects, emptyList(), plan.paints)
+                null -> Unit
+            }
+            canvas.restoreToCount(save)
+        }
+        val groupsSave = canvas.save()
+        if (cover != null) canvas.clipPath(cover)
+        for (box in plan.boxes) canvas.clipOutRect(box.left, box.top, box.right, box.bottom)
+        if (plan.source) drawSource(canvas, scene)
+        for (group in plan.groups) {
+            val picture = group.picture
+            if (group.prefix) { if (picture != null) placePicture(canvas, picture, plan); continue }
+            val save = canvas.saveLayer(null, group.paint?.let(::layerPaint))
+            if (picture != null) placePicture(canvas, picture, plan)
+            for (index in group.extra.indices) drawObject(canvas, scene, group.extra[index])
+            canvas.restoreToCount(save)
+        }
+        canvas.restoreToCount(groupsSave)
+        for (at in plan.boxes.indices) {
+            val box = plan.boxes[at]
+            val save = canvas.save()
+            canvas.clipRect(box.left, box.top, box.right, box.bottom)
+            // The document layer of a whole scene, here only as large as the box.
+            canvas.saveLayer(null, null)
+            drawStack(canvas, scene, plan.parts[at], scene.provisional, plan.paints)
+            canvas.restoreToCount(save)
+        }
+        canvas.restoreToCount(document)
         canvas.restoreToCount(clipSave)
-        drawOverlays(canvas, scene, selection)
+        drawOverlays(canvas, scene, plan.selection)
     }
 
-    // A part of the screen drawn again. Composition is per pixel: inside a
-    // clip of whole pixels, the stack drawn from the saved objects that can
-    // reach that part is the stack drawn from all of them, pixel for pixel,
-    // as long as each layer is composited the same way as in the whole scene.
-    // It is when every object of a layer shares that layer's compositing and
-    // the document lists every layer drawn ([DryLayers.clean]): the layer is
-    // then composited the same whichever of its objects comes first, and the
-    // layers come in the document's order. A layer with no object there is
-    // left out, as an empty layer changes no pixel.
+    private fun placePicture(canvas: Canvas, picture: Bitmap, plan: FramePlan) {
+        val toScreen = plan.toScreen
+        if (toScreen == null) canvas.drawBitmap(picture, plan.offsetX.toFloat(), plan.offsetY.toFloat(), PICTURE_OVER)
+        else canvas.drawBitmap(picture, matrix(toScreen), PICTURE_SMOOTH)
+    }
 
-    /** A kept picture from the one [before], with the pixel boxes [boxes]
-     * cleared and drawn again: each from [parts] at the same position, the
-     * saved objects that can reach it in drawing order ([touching]). The same
-     * pixels as [drawStack] of the whole scene, everywhere. */
-    fun drawPatched(canvas: Canvas, scene: CanvasScene, before: Bitmap, boxes: List<PixelBox>, parts: List<List<DrawObject>>) {
+    /** The page as one soft picture, for what a pinch, a turn or a pan shows
+     * that no kept picture holds: [scene] is laid out for it (its matrix maps
+     * the page onto the picture). The source pixels and [objects] (the saved
+     * ones, in drawing order), each layer composited as [paints] says. */
+    fun drawOverview(canvas: Canvas, scene: CanvasScene, objects: List<DrawObject>, paints: Map<String, RenderItem>) {
+        val save = canvas.save()
+        clipToPage(canvas, scene)
+        canvas.saveLayer(null, null)
+        drawStack(canvas, scene, objects, emptyList(), paints)
+        canvas.restoreToCount(save)
+    }
+
+    /** The overview from the one [before], with the boxes [boxes] drawn again from [parts]. */
+    fun drawOverviewPatched(canvas: Canvas, scene: CanvasScene, before: Bitmap, boxes: List<PixelBox>, parts: List<List<DrawObject>>, paints: Map<String, RenderItem>) {
         canvas.drawBitmap(before, 0f, 0f, PICTURE_COPY)
         for (at in boxes.indices) {
             val box = boxes[at]
             val save = canvas.save()
             canvas.clipRect(box.left, box.top, box.right, box.bottom)
             canvas.drawColor(android.graphics.Color.TRANSPARENT, BlendMode.CLEAR)
-            drawStack(canvas, scene, parts[at], emptyList())
+            drawOverview(canvas, scene, parts[at], paints)
             canvas.restoreToCount(save)
         }
     }
 
-    /** One frame from the kept picture [kept], with the pixel boxes [boxes]
-     * drawn again over it from [parts] (as [drawPatched]): the picture where
-     * nothing differs from it, and what a gesture changes (a stroke being
-     * moved or turned, objects hidden while erased) where something does.
-     * Then the ink in progress and the overlays, as [drawKept]. */
-    fun drawOver(canvas: Canvas, scene: CanvasScene, kept: Bitmap, boxes: List<PixelBox>, parts: List<List<DrawObject>>,
-                 selection: DrawObject? = selectedObject(scene)) {
-        drawPage(canvas, scene)
-        val clipSave = canvas.save()
-        clipToPage(canvas, scene)
-        val pictureSave = canvas.save()
-        for (box in boxes) canvas.clipOutRect(box.left, box.top, box.right, box.bottom)
-        canvas.drawBitmap(kept, 0f, 0f, PICTURE_OVER)
-        canvas.restoreToCount(pictureSave)
-        for (at in boxes.indices) {
-            val box = boxes[at]
-            val save = canvas.save()
-            canvas.clipRect(box.left, box.top, box.right, box.bottom)
-            // The document layer of a whole scene, here only as large as the box.
-            canvas.saveLayer(null, null)
-            drawStack(canvas, scene, parts[at], emptyList())
-            canvas.restoreToCount(save)
-        }
-        scene.provisional.forEach { if (it.item.objectId !in scene.hidden) drawObject(canvas, scene, it) }
-        canvas.restoreToCount(clipSave)
-        drawOverlays(canvas, scene, selection)
+    /** How a layer is composited: the opacity and blend of [item], its first drawn object. */
+    private fun layerPaint(item: RenderItem): Paint = Paint().apply {
+        alpha = (item.layerOpacity.coerceIn(0.0, 1.0) * 255).toInt()
+        blendMode = if (item.layerBlend == "multiply") BlendMode.MULTIPLY else BlendMode.SRC_OVER
     }
 
     /** Of [candidates] (saved objects of [scene] in drawing order, among them
@@ -384,6 +433,8 @@ internal object EditorDrawing {
      * the unit tests use this object without a graphics framework. */
     private val PICTURE_OVER by lazy { Paint().apply { isFilterBitmap = false; isAntiAlias = false; isDither = false } }
     private val PICTURE_COPY by lazy { Paint(PICTURE_OVER).apply { blendMode = BlendMode.SRC } }
+    /** A picture moved by part of a pixel, scaled or turned: smoothed, for the moment it is shown so. */
+    private val PICTURE_SMOOTH by lazy { Paint().apply { isFilterBitmap = true; isAntiAlias = false; isDither = false } }
 
     /** The document as it is stacked, on whatever is beneath: the source
      * pixels, then every object layer in order, each composited as a whole. */
@@ -396,18 +447,14 @@ internal object EditorDrawing {
         drawStack(canvas, scene, saved, provisional)
     }
 
-    /** [drawStack] of the saved objects [saved] (in drawing order) and [provisional]. */
-    private fun drawStack(canvas: Canvas, scene: CanvasScene, saved: List<DrawObject>, provisional: List<DrawObject>) {
-        val sourceSave=canvas.save()
-        canvas.concat(matrix(scene.matrix))
-        scene.giantFrame?.let{drawGiantAndroidTiles(canvas,it)}
-        scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(if(scene.smoothBackground) Paint.FILTER_BITMAP_FLAG else 0))}
-        scene.documentFrame?.let{drawDocumentTiles(canvas,scene.documentTiles,it.binding)}
-        scene.documentDraft?.let{(a,b)->
-            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xffecc769.toInt();style=Paint.Style.STROKE;strokeWidth=(1.0/scene.camera.scale).toFloat()}
-            canvas.drawRect(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat(),maxOf(a.x,b.x).toFloat(),maxOf(a.y,b.y).toFloat(),paint)
-        }
-        canvas.restoreToCount(sourceSave)
+    /** [drawStack] of the saved objects [saved] (in drawing order) and
+     * [provisional]. A layer is composited with the opacity and blend of its
+     * first drawn object, or of the object [paints] names for it: what the
+     * layer's first drawn object is in the whole scene, when [saved] holds only
+     * some of its objects. */
+    private fun drawStack(canvas: Canvas, scene: CanvasScene, saved: List<DrawObject>, provisional: List<DrawObject>,
+                          paints: Map<String, RenderItem> = emptyMap()) {
+        drawSource(canvas, scene)
         val combined = (saved + provisional).filter { it.item.objectId !in scene.hidden }
         val orderedLayers = (scene.document.layers.map { it.id } + combined.map { it.item.layerId }).distinct()
         val grouped = combined.groupBy { it.item.layerId }
@@ -418,14 +465,24 @@ internal object EditorDrawing {
                 require(objects.size==1)
                 drawObject(canvas,scene,first);continue
             }
-            val layer = Paint().apply {
-                alpha = (first.item.layerOpacity.coerceIn(0.0, 1.0) * 255).toInt()
-                blendMode = if (first.item.layerBlend == "multiply") BlendMode.MULTIPLY else BlendMode.SRC_OVER
-            }
-            val save = canvas.saveLayer(null, layer)
+            val save = canvas.saveLayer(null, layerPaint(paints[layerId] ?: first.item))
             objects.forEach { drawObject(canvas, scene, it) }
             canvas.restoreToCount(save)
         }
+    }
+
+    /** The source pixels: the page's picture (or giant tiles, document tiles), and a region being marked. */
+    private fun drawSource(canvas: Canvas, scene: CanvasScene) {
+        val sourceSave=canvas.save()
+        canvas.concat(matrix(scene.matrix))
+        scene.giantFrame?.let{drawGiantAndroidTiles(canvas,it)}
+        scene.background?.let{canvas.drawBitmap(it,0f,0f,Paint(if(scene.smoothBackground) Paint.FILTER_BITMAP_FLAG else 0))}
+        scene.documentFrame?.let{drawDocumentTiles(canvas,scene.documentTiles,it.binding)}
+        scene.documentDraft?.let{(a,b)->
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xffecc769.toInt();style=Paint.Style.STROKE;strokeWidth=(1.0/scene.camera.scale).toFloat()}
+            canvas.drawRect(minOf(a.x,b.x).toFloat(),minOf(a.y,b.y).toFloat(),maxOf(a.x,b.x).toFloat(),maxOf(a.y,b.y).toFloat(),paint)
+        }
+        canvas.restoreToCount(sourceSave)
     }
 
     /** Whether a saved object could put a pixel inside [visible]. Only

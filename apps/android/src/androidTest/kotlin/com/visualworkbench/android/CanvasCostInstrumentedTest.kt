@@ -78,7 +78,15 @@ import kotlin.math.sqrt
  *   frame drawn meanwhile (the one that brings the picture up to date);
  * - while a stroke is being moved: the time to draw one frame, drawn as the
  *   canvas draws it (from its kept picture where it can, whole where it
- *   cannot) and finished by the graphics processor.
+ *   cannot) and finished by the graphics processor;
+ * - zoomed three times onto the strokes, while the page is panned, pinched
+ *   out and turned: the saved frames drawn meanwhile, the same frames drawn as
+ *   the canvas draws them and finished, and (reported) from the fingers
+ *   lifting, and from a fit, to a frame that is the whole scene again;
+ * - on pages of 200 and 4,000 strokes (the most the layers panel takes) with
+ *   a highlighter's multiply layer over them: strokes beneath it and in it,
+ *   ink in progress in each drawn as the canvas draws it, and the frame that
+ *   shows the layer hidden, shown and made fainter.
  *
  * The page of five thousand may take at most [FACTOR] times as long as the
  * page of two hundred, plus a small fixed allowance for timer resolution and

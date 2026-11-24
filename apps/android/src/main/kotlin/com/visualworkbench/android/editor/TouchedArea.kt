@@ -111,15 +111,24 @@ internal fun invert(t: Transform): Transform? {
 /** Adds to [area] where [item] is drawn on the screen: its native box (which
  * already holds its own transform) under [view] (document to screen), moved
  * by [preview] in place of its own transform when one is given, grown by
- * [TOUCH_MARGIN_PX] and, for an outline of constant screen width, by that
- * width. False: it cannot be placed ([boxHoldsDrawing], a box or transform
- * that cannot be judged). */
-internal fun addDrawn(area: TouchedArea, item: RenderItem, view: Transform, preview: Transform?): Boolean {
-    if (!boxHoldsDrawing(item)) return false
+ * [TOUCH_MARGIN_PX] and [extra] pixels (where it shows in a picture drawn
+ * smoothed) and, for an outline of constant screen width, by that width.
+ * False: it cannot be placed ([boxHoldsDrawing], a box or transform that
+ * cannot be judged). */
+internal fun addDrawn(area: TouchedArea, item: RenderItem, view: Transform, preview: Transform?, extra: Double = 0.0): Boolean {
+    val box = drawnBox(item, view, preview, extra) ?: return false
+    area.add(box[0], box[1], box[2], box[3])
+    return true
+}
+
+/** Where [item] is drawn on the screen, as [addDrawn] places it: left, top,
+ * right and bottom in pixels with any fraction; null when it cannot be placed. */
+internal fun drawnBox(item: RenderItem, view: Transform, preview: Transform?, extra: Double = 0.0): DoubleArray? {
+    if (!boxHoldsDrawing(item)) return null
     val b = item.bounds
-    if (!(b.x.isFinite() && b.y.isFinite() && b.width.isFinite() && b.height.isFinite()) || b.width < 0 || b.height < 0) return false
+    if (!(b.x.isFinite() && b.y.isFinite() && b.width.isFinite() && b.height.isFinite()) || b.width < 0 || b.height < 0) return null
     val full = if (preview == null || preview == item.transform) view else {
-        val inverse = invert(item.transform) ?: return false
+        val inverse = invert(item.transform) ?: return null
         EditorDrawing.compose(view, EditorDrawing.compose(preview, inverse))
     }
     var minX = Double.POSITIVE_INFINITY; var minY = Double.POSITIVE_INFINITY
@@ -131,11 +140,40 @@ internal fun addDrawn(area: TouchedArea, item: RenderItem, view: Transform, prev
         if (sx < minX) minX = sx; if (sx > maxX) maxX = sx
         if (sy < minY) minY = sy; if (sy > maxY) maxY = sy
     }
-    if (!(minX.isFinite() && minY.isFinite() && maxX.isFinite() && maxY.isFinite())) return false
-    val margin = TOUCH_MARGIN_PX + if (item.style.screenConstantWidth && item.style.width.isFinite()) maxOf(0.0, item.style.width) else 0.0
-    area.add(minX - margin, minY - margin, maxX + margin, maxY + margin)
-    return true
+    if (!(minX.isFinite() && minY.isFinite() && maxX.isFinite() && maxY.isFinite())) return null
+    val margin = TOUCH_MARGIN_PX + maxOf(0.0, extra) + if (item.style.screenConstantWidth && item.style.width.isFinite()) maxOf(0.0, item.style.width) else 0.0
+    return doubleArrayOf(minX - margin, minY - margin, maxX + margin, maxY + margin)
 }
+
+/** Grows [area] until no object it is drawn again from is cut by the edge of
+ * one of its boxes, for at most [rounds] rounds: the renderer smooths a path
+ * that a clip cuts otherwise than one that lies within, so a part drawn again
+ * is the whole scene's pixels only where nothing in it is cut. [near] names
+ * the objects that could reach a screen box (with where each is drawn under
+ * [view], moved by a preview when [preview] gives one). Objects that cannot be
+ * placed (a numbered marker, an AI result) are drawn as they are. Stops early
+ * once the area is large ([TouchedArea.large]). */
+internal fun <T> closeArea(area: TouchedArea, view: Transform, near: (PixelBox) -> List<T>?, item: (T) -> RenderItem, preview: (T) -> Transform?,
+                           extra: Double = 0.0, rounds: Int = CLOSE_ROUNDS) {
+    repeat(rounds) {
+        if (area.isEmpty || area.large) return
+        val before = area.boxes.toList()
+        for (box in before) {
+            val found = near(box) ?: run { area.add(Double.NaN, 0.0, 0.0, 0.0); return }
+            for (one in found) {
+                val drawn = drawnBox(item(one), view, preview(one), extra) ?: continue
+                // Cut by this box: it reaches in, and does not lie within.
+                val reaches = drawn[0] < box.right && drawn[2] > box.left && drawn[1] < box.bottom && drawn[3] > box.top
+                val within = drawn[0] >= box.left && drawn[2] <= box.right && drawn[1] >= box.top && drawn[3] <= box.bottom
+                if (reaches && !within) area.add(drawn[0], drawn[1], drawn[2], drawn[3])
+            }
+        }
+        if (area.boxes == before) return
+    }
+}
+
+/** Rounds [closeArea] grows an area by at most. */
+internal const val CLOSE_ROUNDS = 4
 
 /** What differs between two lists of saved objects in drawing order, by
  * identity (a saved object is never changed in place: an edit arrives as
@@ -155,17 +193,18 @@ internal class ObjectsDiff(val removed: IntArray, val added: IntArray) {
 
 /** The difference between [old] and [new]; null when more than [limit]
  * objects differ, or when one list holds the same object twice. The lists'
- * common start and end are passed over by identity; what lies between is
- * matched by identity, and of the objects in both, the longest run that kept
- * its order is kept. The cost is one look at each object of the common start
- * and end, and more only for the part that changed. */
-internal fun <T : Any> objectsDiff(old: List<T>, new: List<T>, limit: Int): ObjectsDiff? {
+ * common start and end are passed over by identity, or by [same] when it is
+ * given (objects it takes for one another count as the same there); what lies
+ * between is matched by identity, and of the objects in both, the longest run
+ * that kept its order is kept. The cost is one look at each object of the
+ * common start and end, and more only for the part that changed. */
+internal fun <T : Any> objectsDiff(old: List<T>, new: List<T>, limit: Int, same: ((T, T) -> Boolean)? = null): ObjectsDiff? {
     if (old === new) return ObjectsDiff.NONE
     val shorter = minOf(old.size, new.size)
     var start = 0
-    while (start < shorter && old[start] === new[start]) start++
+    while (start < shorter && (old[start] === new[start] || same?.invoke(old[start], new[start]) == true)) start++
     var oldEnd = old.size; var newEnd = new.size
-    while (oldEnd > start && newEnd > start && old[oldEnd - 1] === new[newEnd - 1]) { oldEnd--; newEnd-- }
+    while (oldEnd > start && newEnd > start && (old[oldEnd - 1] === new[newEnd - 1] || same?.invoke(old[oldEnd - 1], new[newEnd - 1]) == true)) { oldEnd--; newEnd-- }
     val oldCount = oldEnd - start; val newCount = newEnd - start
     if (oldCount == 0 && newCount == 0) return ObjectsDiff.NONE
     if (oldCount == 0 || newCount == 0) {
