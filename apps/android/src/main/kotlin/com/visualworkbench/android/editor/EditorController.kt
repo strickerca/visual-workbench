@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.visualworkbench.android.diagnostics.DiagnosticsController
+import com.visualworkbench.android.diagnostics.PenRefusal
 import com.visualworkbench.android.diagnostics.PenTiming
 import com.visualworkbench.android.input.*
 import com.visualworkbench.android.precision.*
@@ -563,6 +564,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     private var sceneRevision = 0L
     private var background: Bitmap? = null
     private var objects = emptyList<DrawObject>()
+    /** The document while it is the one [showSavedStroke] made from the one
+     * before and a stroke this editor saved; null once anything else is shown. */
+    private var shownStroke: DocumentSnapshot? = null
     /** Diagnostics only: the newest pen sample that has ink, and the pen-down of its stroke. */
     private var inkSampleMs = 0L
     private var inkStartMs = 0L
@@ -841,7 +845,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val token=rotation.begin(handle.pivot,point)?:return false
         rotationGesture=token;rotationDisplay=handle.copy(point=point);rotationPhysical=physical;publish();return true
     }
-    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)}
+    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)};bindControls()}
+    /** Binds the layer, tone and frame controls and the document list to the
+     * document shown, at the sequence of the newest announced change. An
+     * announcement fences them until this is done for its sequence. */
+    private fun bindControls(){
         if(streamDraftOnly)return
         workflowAttachment()?.let(workflows::bind)
         val current=project;val doc=document
@@ -1516,10 +1524,12 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 val token = epoch
                 info = current.info()
                 val doc = info?.documentIds?.firstOrNull() ?: error("This project has no image document")
-                val snapshot = current.document(doc)
+                // Read as changes from nothing: the same document, and the project
+                // then knows which strokes the editor holds from the first save on.
+                val snapshot = readDocument(current, doc, null)
                 val drawing = preparedDrawing(snapshot.render.items)
                 if (disposing || token != epoch || current !== project) return@launch
-                document = snapshot; info = snapshot.render.revision; objects = drawing
+                document = snapshot; info = snapshot.render.revision; objects = drawing; shownStroke = null
                 documentOwner.bind(current,snapshot)
                 instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
                 observeProject(current, token)
@@ -1602,7 +1612,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                 latest.binding.documentId != value.binding.documentId) {
                                 failedCaptureOpen = value.createdHostSeq; captureArrivals.changed(current, token); return@capture
                             }
-                            val next = current.document(value.binding.documentId)
+                            val next = readDocument(current, value.binding.documentId, null)
                             val drawing = preparedDrawing(next.render.items)
                             staged = captureDisplayBitmap(current.background(next.documentId, memoryBudgetBytes = 96uL * 1024uL * 1024uL, assumeUntaggedSrgb = false))
                             val checked = current.info()
@@ -1683,7 +1693,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                         try { closing.step(EditorCloseStage.ProjectStorage) { if(!streamDraftOnly || previous !== streamBorrow)previous?.close() } }
                         finally {
                             document = null; info = null
-                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); savedIdsOf = null; savedIdsKept = emptySet(); selected = null; transientShape = null
+                            background = null; composedBackground = null; colorAssumed=false; colorAssumedSourceAsset=null; objects = emptyList(); shownStroke = null; savedIdsOf = null; savedIdsKept = emptySet(); selected = null; transientShape = null
                             transformed = emptyMap(); erased = emptySet(); scene = null; blockingMessage = null; needsColorConsent = false; originalFormatNotice = null; originalFormat = null
                         }
                     }
@@ -1704,7 +1714,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             try {
                 for (ignored in queue) {
                     if (token != epoch || current !== project || disposing) break
-                    refreshAdmission.queuedTurn(::report) { refreshDocument(current, current.info(), token, queued = true) }
+                    refreshAdmission.queuedTurn(::report) { refreshMutex.withLock { refreshLocked(current, null, token) } }
                 }
             } finally { refreshAdmission.stopServing(serving) }
         }
@@ -2149,7 +2159,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
 
     private class StrokeRun(val epoch: Long, val camera: Camera, val start: PenSample, val origin: Point, val capabilities: StylusCapabilities,
                             val options: StrokeOptions, val layerId: String, val opacity: Double, val blend: String, val link: ProjectLink?) {
-        val queue = Channel<List<PenSample>>(64)
+        /** Bounded by [accepted], not by a number of batches: a stroke that
+         * has to wait for its turn keeps every sample of the pen meanwhile. */
+        val queue = Channel<List<PenSample>>(Channel.UNLIMITED)
+        /** Samples taken from the pen for this stroke, at most [MAX_STROKE_SAMPLES]. */
+        var accepted = 0
         val canceled = AtomicBoolean(false)
         var native: WorkbenchStroke? = null
         var drawing: DrawObject? = null
@@ -2160,7 +2174,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         var sequence = 1uL
         var lastTime = start.timeMs
         var finished = false
+        /** The predicted tail has been replaced by the stroke's real contours. */
+        var settled = false
         var committed = false
+        /** The saved stroke is in the document shown. */
+        var shown = false
     }
     private data class ToolGesture(val tool: EditorTool, val camera: Camera, val first: Point, val startScreen: Point,
                                    val layer: LayerInfo, val brush: BrushPreference, val stroke: StrokeRun? = null,
@@ -2169,35 +2187,50 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                                    val revision: ProjectInfo? = null, val newObjectId: String? = null,
                                    val createdAtMs: Long = System.currentTimeMillis(), var semanticEnd: Point = first, val semanticModifier: Boolean = false,val physical:Transform=Transform())
 
-    private fun editorInputAllowed(ownCaptureStream: Boolean = false, ink: Boolean = false): Boolean =
-        (ownCaptureStream || !captureStreamBlocksParent) && !streamEditsSealed&&!disposing&&!rotationUnavailable()&&!workflows.blocksInput()&&!imageFrames.state.value.blocksInput&&screen==WorkbenchScreen.Canvas&&!busy&&strokes.size<3&&
-        (ink||(!instructionEditor.state.value.busy&&!semanticEditor.state.value.busy))&&!documents.state.value.busy&&
-        !ai.state.value.open&&blockingMessage==null&&textDraft==null&&!showBrush&&!showContext&&instructionAdmission.allows(false,false,false,false)
-    internal fun precisionInputAllowed():Boolean = precisionInputAllowed(false)
-    private fun precisionInputAllowed(ink:Boolean):Boolean = editorInputAllowed(ink = ink) && airModals.isEmpty() && aiResultReady() &&
-        document?.let{(!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
-            (background!=null||streamBackgroundReady()||documentOwner.matchingFrame(it,epoch)!=null||giantInputReady(it))}==true
+    /** What a pen-down is checked against ([penDownRefusal]). With [canvas]
+     * also what drawing on the canvas needs: no air-action dialog and the
+     * page picture shown. The capture stream panel asks without it, for its
+     * own pen ([ownCaptureStream]). */
+    private fun penDownState(ownCaptureStream: Boolean = false, canvas: Boolean = true) = PenDownState(
+        streamOwnsInput = streamEditsSealed || (!ownCaptureStream && captureStreamBlocksParent),
+        busy = disposing || busy,
+        modal = rotationUnavailable() || workflows.blocksInput() || imageFrames.state.value.blocksInput || screen != WorkbenchScreen.Canvas ||
+            documents.state.value.busy || ai.state.value.open || blockingMessage != null || textDraft != null || showBrush || showContext ||
+            !instructionAdmission.allows(false, false, false, false) || (canvas && airModals.isNotEmpty()),
+        listsBusy = instructionEditor.state.value.busy || semanticEditor.state.value.busy,
+        pictureMissing = canvas && !(aiResultReady() && document?.let {
+            (!it.hasToneAdjustments || composedCurrent(it) || (giantMode && giantInputReady(it))) &&
+                (background != null || streamBackgroundReady() || documentOwner.matchingFrame(it, epoch) != null || giantInputReady(it)) } == true),
+        strokesInFlight = strokes.size, unsavedSamples = strokes.sumOf { it.accepted.toLong() })
+    private fun editorInputAllowed(ownCaptureStream: Boolean = false): Boolean =
+        penDownRefusal(penDownState(ownCaptureStream, canvas = false), ink = false) == null
+    internal fun precisionInputAllowed(): Boolean = penDownRefusal(penDownState(), ink = false) == null
     override fun beginTool(rawSample: PenSample, capabilities: StylusCapabilities) {
-        if(streamEditsSealed||captureStreamBlocksParent)return
-        if (streamDraftOnly && rawSample.tool == PointerTool.Eraser && erasers.state.value.mode != EraserMode.Object) return
+        val eraserEnd = rawSample.tool == PointerTool.Eraser
+        fun asksInk() = asksForInk(tool, assistedCollecting, documents.state.value.textTool, documents.state.value.regionTool) { erasers.tools.route(eraserEnd) }
+        // A pen-down that asked for ink and gets none is counted by its reason,
+        // so that the diagnostics show whether any was lost.
+        fun refuse(reason: PenRefusal, ink: Boolean = asksInk()) { if (ink) diagnostics.pen.penDown(reason) }
+        if (streamEditsSealed || captureStreamBlocksParent) return refuse(PenRefusal.Stream)
+        if (streamDraftOnly && eraserEnd && erasers.state.value.mode != EraserMode.Object) return
         interruptAirInput()
-        if(rotationUnavailable()||workflows.blocksInput()||imageFrames.state.value.blocksInput||ai.state.value.open||!aiResultReady())return
+        if (rotationUnavailable() || workflows.blocksInput() || imageFrames.state.value.blocksInput || ai.state.value.open) return refuse(PenRefusal.Modal)
+        if (!aiResultReady()) return refuse(PenRefusal.Loading)
         val retainPolygon = !selectionPointer && !eraserPointer && gesture == null && documentPress == null &&
-            precisionInputAllowed() && erasers.tools.route(rawSample.tool == PointerTool.Eraser) == EraserInputRoute.Selection &&
+            precisionInputAllowed() && erasers.tools.route(eraserEnd) == EraserInputRoute.Selection &&
             selections.interaction.canResumePolygonContact(camera)
         clearToolContact(retainPolygon); previewJob?.cancel(); cancelNative(previewHandle); previewHandle = null
-        // Developer switch: after every save the instruction and marker lists are
-        // read again, and a pen-down in those few milliseconds was dropped without
-        // a message. A plain ink stroke needs neither list, so it is let through.
-        val ink = inkPassesListRefresh(preferences.penPath[PenPathToggle.CanvasInkBeforeSave], tool, assistedCollecting,
-            documents.state.value.textTool, documents.state.value.regionTool) { erasers.tools.route(rawSample.tool == PointerTool.Eraser) }
-        if (busy || (!ink && (instructionEditor.state.value.busy || semanticEditor.state.value.busy)) || blockingMessage != null || (background == null && !streamBackgroundReady() && document?.let{documentOwner.matchingFrame(it,epoch)}==null && document?.let{giantInputReady(it)}!=true) || documents.state.value.busy || strokes.size >= 3) {
-            if (strokes.size >= 3) message = "The save queue is full. Wait for the current strokes to finish."
-            return
+        // After every saved edit the instruction and marker lists are read
+        // again, and earlier strokes may still be waiting to be saved. Neither
+        // holds back a plain ink stroke: it reads no list, its ink starts at
+        // once and it is saved in its turn.
+        val ink = asksInk()
+        penDownRefusal(penDownState(), ink)?.let { reason ->
+            if (reason == PenRefusal.Backlog) message = "Ink is still being saved. Wait a moment, then draw again."
+            return refuse(reason, ink)
         }
-        val current = project ?: return
-        if(!precisionInputAllowed(ink))return
-        val route=erasers.tools.route(rawSample.tool==PointerTool.Eraser)
+        val current = project ?: return refuse(PenRefusal.Busy, ink)
+        val route=erasers.tools.route(eraserEnd)
         if(route==EraserInputRoute.Blocked)return
         val raw=Point(rawSample.x,rawSample.y)
         precision.down(raw)
@@ -2227,17 +2260,17 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if(tool==EditorTool.Select&&route==EraserInputRoute.Editor&&beginRotation(toDocument(sample,camera),raw,physical))return
         val activeTool = tool
         if (activeTool == EditorTool.Eraser) {precision.end();return} // all erasers use the guarded route above
+        var run: StrokeRun? = null
         try {
             val layer = selectedLayer(); val brush = preferences.brush(activeTool); val first = toDocument(sample, camera)
-            var run: StrokeRun? = null
             var item: RenderItem? = null
             var anchor: Point? = null
-            if (activeTool in listOf(EditorTool.Pen, EditorTool.Highlighter, EditorTool.Marker)) {
+            if (activeTool in INK_TOOLS) {
                 val now = System.currentTimeMillis(); val gestureId = core.newId(now.toULong())
                 val family = when (activeTool) { EditorTool.Highlighter -> "highlighter"; EditorTool.Marker -> "marker"; else -> "pen" }
                 val explicitLayer=workflows.controls.state.value.drawingLayerId
                 if(family=="highlighter"&&explicitLayer!=null&&layer.blend!="multiply"){
-                    message="Choose a multiply annotation layer for highlighter marks.";precision.cancel();return
+                    message="Choose a multiply annotation layer for highlighter marks.";precision.cancel();return refuse(PenRefusal.Failed, ink)
                 }
                 val highlighter = if(family!="highlighter")null else if(explicitLayer!=null)layer
                     else document?.layers?.filter { it.visible && !it.locked && it.blend == "multiply" }?.minByOrNull { it.id }
@@ -2245,9 +2278,10 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 val options = StrokeOptions(gestureId, core.newId(now.toULong()), core.newId(now.toULong()), checkNotNull(document).documentId,
                     layer.id, repository.deviceId, repository.lamport(3), now, family, brush.width, EditorDrawing.rgba(brush.colorArgb),
                     brush.stabilization, brush.pressure.values())
-                run = StrokeRun(epoch, camera, sample, first, capabilities, options, target, highlighter?.opacity ?: layer.opacity,
+                val begun = StrokeRun(epoch, camera, sample, first, capabilities, options, target, highlighter?.opacity ?: layer.opacity,
                     if (family == "highlighter") "multiply" else "normal", link)
-                invalidateExport(); strokes += run; pending++; startStroke(current, run)
+                run = begun
+                invalidateExport(); strokes += begun; pending++; startStroke(current, begun)
             } else if (activeTool == EditorTool.Select) {
                 val snapshot = scene?.let{precisionHitScene(it,physical)}
                 val previous = objects.firstOrNull { it.item.objectId == selected }
@@ -2280,7 +2314,14 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 textDraft = if (text != null) TextDraft(hit.objectId, text.anchor, text.text, text.font, text.size) else TextDraft(null, first)
             }
             extendMappedTool(listOf(sample)); publish()
-        } catch (error: Exception) { cancelTool(); report(error) }
+            // Drawn only if the stroke took its first sample: one that the core
+            // refused to begin, or that ended at once, has said why and is counted so.
+            if (run != null) diagnostics.pen.penDown(if (gesture?.stroke === run) null else PenRefusal.Failed)
+        } catch (error: Exception) {
+            // A stroke already begun is not left waiting for a pen that will never reach it.
+            run?.let { begun -> begun.canceled.set(true); cancelNative(begun.native); begun.queue.close(); begun.drawing = null }
+            cancelTool(); report(error); refuse(PenRefusal.Failed, ink)
+        }
     }
 
     override fun extendTool(samples: List<PenSample>) {
@@ -2303,7 +2344,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         try {
             val run = active.stroke
             if (run != null) {
-                if (!run.queue.trySend(samples.toList()).isSuccess) { cancelTool(); message = "Ink input exceeded its bounded queue. The unfinished stroke was canceled; saved marks are unchanged." }
+                if (run.accepted + samples.size > MAX_STROKE_SAMPLES) { cancelTool(); message = "Stroke sample limit reached. The unfinished stroke was canceled; saved marks are unchanged." }
+                else if (run.queue.trySend(samples.toList()).isSuccess) run.accepted += samples.size
+                else cancelTool() // The stroke has ended early and has said why.
                 return
             }
             val end = toDocument(samples.last(), active.camera)
@@ -2455,99 +2498,83 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (run.capabilities.orientation) samples.map { it.orientation ?: 0f }.toFloatArray() else floatArrayOf())
     }
 
-    // region Stroke: ink, then save
+    // region Stroke: ink at once, saved in pen-down order
     private fun startStroke(current: WorkbenchProject, run: StrokeRun) {
-        // Developer switch, read at pen-down. Off: the whole stroke, from its
-        // first sample to its refresh, runs under the mutation lock, so it
-        // starts only after the stroke before it is saved and refreshed.
-        val inkFirst = preferences.penPath[PenPathToggle.CanvasInkBeforeSave]
         scope.launch {
             try {
-                // On: the core begins the stroke without waiting for the project.
-                // A stroke it cannot begin that way (a highlighter, which may have
-                // to create its layer from what the project holds) is null here and
-                // takes the original path below, whole.
-                val early = if (run.canceled.get() || run.epoch != epoch) null else earlyInkStroke(inkFirst, current, run.options)
-                if (early == null) mutations.withLock {
-                    val native = inkStroke(current, run, null) ?: return@withLock
-                    val saved = saveStroke(run, native) ?: return@withLock
-                    refresh(current, saved.first, run.epoch)
-                    diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
-                } else {
-                    run.native = early
-                    // The stroke takes its place in the mutation queue now, at
-                    // pen-down, as it always did, so strokes, edits, undo and
-                    // closing are still saved in the order they were asked for.
-                    // Only its ink no longer waits there.
-                    val saved = inkThenSaveInOrder(mutations, ink = {
-                        val native = inkStroke(current, run, early)
-                        if (native != null && run.finished && !run.canceled.get() && run.epoch == epoch) {
+                // The core begins the stroke without waiting for the project, so
+                // its ink starts with its first sample whatever the project is
+                // doing. A stroke it cannot begin that way (a highlighter, which
+                // may need its layer chosen or made from what the project holds;
+                // a project too busy to take the request) begins when its turn to
+                // save comes, and keeps every sample of the pen until then.
+                val early = if (run.canceled.get() || run.epoch != epoch) null
+                    else (current as? WorkbenchDeferredStrokes)?.beginStrokeDeferred(run.options)
+                run.native = early
+                // The stroke takes its place in the mutation queue now, at
+                // pen-down, so strokes, edits, undo and closing are saved in the
+                // order they were asked for. Ink never waits there.
+                inkThenSaveInOrder(mutations, ink = {
+                    if (early == null) run.takeUnless { it.canceled.get() || it.epoch != epoch }
+                    else {
+                        inkStroke(run, early)
+                        if (run.finished && !run.canceled.get() && run.epoch == epoch) {
                             // The predicted tail goes at pen-up, not after a wait for the lock.
-                            run.drawing = wetObject(run, Path(run.real)); publish()
-                            native
+                            run.drawing = wetObject(run, Path(run.real)); run.settled = true; publish()
+                            run
                         } else {
                             // A cancelled stroke has nothing to save and waits for nobody.
-                            if (native != null) cancelNative(native)
+                            cancelNative(early)
                             null
                         }
-                    }, save = { saveStroke(run, it) })
-                    // The next stroke may save now; it does not wait for this refresh.
-                    if (saved != null) {
-                        refresh(current, saved.first, run.epoch)
-                        diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - saved.second)
                     }
-                }
+                }, save = {
+                    val native = early ?: beginInTurn(current, run)?.also { inkStroke(run, it) }
+                    if (native != null) saveStroke(current, run, native)
+                })
             } catch (cancel: CancellationException) { cancelNative(run.native); throw cancel }
             catch (error: Exception) { cancelNative(run.native); if (!run.canceled.get()) report(error) }
             finally {
                 withContext(NonCancellable) {
+                    // A stroke that ended before the pen lifted takes no more samples.
+                    run.queue.close()
                     try { if (!run.committed) finishRemotePreview(run.link, run.options.gestureId, true) }
                     finally {
                         try { run.native?.dispose() }
-                        finally { run.native = null; strokes.remove(run); pending--; publish() }
+                        // A stroke shown as saved is already drawn from the document.
+                        finally { run.native = null; strokes.remove(run); pending--; if (!run.shown) publish() }
                     }
                 }
             }
         }
     }
 
-    /** Begins the native stroke, unless [early] already began it, and feeds it
-     * every queued batch until pen-up or cancellation. Null: the stroke ended
-     * before it began. With [early] each batch makes one trip off the main
-     * thread instead of three. */
-    private suspend fun inkStroke(current: WorkbenchProject, run: StrokeRun, early: WorkbenchStroke?): WorkbenchStroke? {
-        if (run.canceled.get() || run.epoch != epoch) { if (early != null) cancelNative(early); return null }
-        val native = early ?: current.beginStroke(run.options)
+    /** Begins, in its turn under the mutation lock, a stroke the core could
+     * not begin at pen-down. The project may still be working through what
+     * was asked of it before; that is waited for, not reported. Null: the
+     * stroke was cancelled meanwhile. */
+    private suspend fun beginInTurn(current: WorkbenchProject, run: StrokeRun): WorkbenchStroke? {
+        val native = retryWhileBusy(BEGIN_PATIENCE_MS) {
+            if (run.canceled.get() || run.epoch != epoch) null else current.beginStroke(run.options)
+        } ?: return null
         run.native = native
-        diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
         if (run.canceled.get()) { cancelNative(native); return null }
-        for (samples in run.queue) {
-            if (run.canceled.get() || run.epoch != epoch) break
-            require(run.samples + samples.size <= 100_000) { "Stroke sample limit reached. The unfinished stroke was canceled." }
-            if (early != null) { inkBatchInOneTrip(native, run, samples); continue }
-            val realBatch = batch(run, samples)
-            val update = appendWithBackpressure(native, realBatch)
-            try { run.link?.streamStroke(native, realBatch, run.samples.toUInt()) }
-            catch (_: SessionFailure) { /* Durable samples stay in native; disposable prediction is never sent. */ }
-            require(update.firstPolygon == run.polygons) { "Unexpected core geometry sequence" }
-            val additions = withContext(Dispatchers.Default) { EditorDrawing.contourPath(update.contours, run.origin) }
-            run.real.addPath(additions); run.polygons += update.contours.ends.size.toULong()
-            run.samples += samples.size; run.lastTime = samples.last().timeMs; run.sequence++
-            val path = Path(run.real)
-            val predicted = run.prediction
-            if (!run.finished && predicted != null && predicted.timeMs > run.lastTime && predicted.timeMs - run.lastTime <= 100) {
-                try { path.addPath(EditorDrawing.contourPath(native.predict(batch(run, listOf(predicted), true)).contours, run.origin)) }
-                catch (error: CoreFailure) { if (error.kind != CoreFailureKind.Backpressure && error.kind != CoreFailureKind.Cancelled) throw error }
-            }
-            if (!run.canceled.get() && run.epoch == epoch) { inkSampleMs = run.lastTime; inkStartMs = run.start.timeMs; run.drawing = wetObject(run, path); publish() }
-        }
         return native
     }
 
-    /** The same work as one pass of the loop above, with the append, the path
-     * of its contours and the predicted tail done in a single trip off the main
-     * thread instead of three. The stroke's counters stay on the main thread. */
-    private suspend fun inkBatchInOneTrip(native: WorkbenchStroke, run: StrokeRun, samples: List<PenSample>) {
+    /** Feeds [native] every queued batch until pen-up or cancellation. */
+    private suspend fun inkStroke(run: StrokeRun, native: WorkbenchStroke) {
+        diagnostics.pen.recordMillis(PenTiming.CanvasStrokeStart, SystemClock.uptimeMillis() - run.start.timeMs)
+        for (samples in run.queue) {
+            if (run.canceled.get() || run.epoch != epoch) break
+            inkBatch(native, run, samples)
+        }
+    }
+
+    /** One batch: the append, the path of its contours and the predicted tail
+     * in a single trip off the main thread. The stroke's counters stay on the
+     * main thread. */
+    private suspend fun inkBatch(native: WorkbenchStroke, run: StrokeRun, samples: List<PenSample>) {
         val realBatch = batch(run, samples)
         val last = samples.last().timeMs
         val predicted = run.prediction?.takeIf { !run.finished && it.timeMs > last && it.timeMs - last <= 100 }
@@ -2571,18 +2598,58 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (!run.canceled.get() && run.epoch == epoch) { inkSampleMs = run.lastTime; inkStartMs = run.start.timeMs; run.drawing = wetObject(run, path); publish() }
     }
 
-    /** Saves a finished stroke and returns its revision with the time it was
-     * saved; a stroke that was cancelled instead is cancelled natively. */
-    private suspend fun saveStroke(run: StrokeRun, native: WorkbenchStroke): Pair<ProjectInfo, Long>? {
-        if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); return null }
+    /** Saves a finished stroke and shows it as saved; a stroke that was
+     * cancelled instead is cancelled natively. Runs under the mutation lock,
+     * and from the save to the document that shows it under the refresh lock,
+     * so no other read of the document can come between the two.
+     *
+     * A project too busy to take the save has saved nothing and is asked
+     * again ([retryWhileBusy]): with many strokes waiting, its queue can be
+     * full when this stroke's turn comes. The stroke stays on screen as ink
+     * meanwhile. A save still refused after that fails as any save does: it
+     * is reported, never dropped without a word. */
+    private suspend fun saveStroke(current: WorkbenchProject, run: StrokeRun, native: WorkbenchStroke) {
+        if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); return }
         // Predictions are replaced by canonical real contours before commit.
-        run.drawing = wetObject(run, Path(run.real)); publish()
-        val result = native.commit()
-        run.committed = true
-        val saved = SystemClock.uptimeMillis()
-        diagnostics.pen.recordMillis(PenTiming.CanvasSave, saved - run.lastTime)
-        finishRemotePreview(run.link, run.options.gestureId, false)
-        return result to saved
+        if (!run.settled) { run.drawing = wetObject(run, Path(run.real)); run.settled = true; publish() }
+        refreshMutex.withLock {
+            // One trip off the main thread: the save, and the path of the one
+            // stroke it hands back.
+            val (saved, drawn) = withContext(Dispatchers.Default) {
+                val saved = retryWhileBusy(SAVE_PATIENCE_MS) {
+                    (native as? WorkbenchStrokeSaves)?.save() ?: StrokeSave(native.commit(), null)
+                }
+                saved to saved.added?.let { EditorDrawing.objectPath(it.item) }
+            }
+            run.committed = true
+            val savedAt = SystemClock.uptimeMillis()
+            diagnostics.pen.recordMillis(PenTiming.CanvasSave, savedAt - run.lastTime)
+            finishRemotePreview(run.link, run.options.gestureId, false)
+            // The stroke is added to the document that is shown. Whenever that
+            // cannot be shown to be the whole change, the document is read.
+            if (showSavedStroke(current, run.epoch, saved, drawn)) run.shown = true
+            else refreshLocked(current, saved.revision, run.epoch)
+            diagnostics.pen.recordMillis(PenTiming.CanvasRefresh, SystemClock.uptimeMillis() - savedAt)
+        }
+    }
+
+    /** Shows a stroke this editor just saved without reading the document:
+     * the document held, plus that stroke where a read lists it. Work for one
+     * stroke, whatever the document holds. False when the project cannot show
+     * that the save directly followed the document held (an edit, undo or a
+     * change from the other device came between; a project that queues its
+     * edits; a paged document; anything else): the caller reads instead. */
+    private suspend fun showSavedStroke(current: WorkbenchProject, token: Long, saved: StrokeSave, drawn: DrawObject?): Boolean {
+        val held = document ?: return false
+        if (token != epoch || current !== project || disposing || drawn == null) return false
+        val at = addedStrokeIndex(held.layers, objects, drawn.item.layerId) { it.item.layerId } ?: return false
+        val next = (current as? WorkbenchAddedStrokes)?.withAddedStroke(held, saved) ?: return false
+        val drawing = ArrayList<DrawObject>(objects.size + 1)
+        drawing.addAll(objects); drawing.add(at, drawn)
+        val before = held.render.revision
+        adoptDocument(current, next, drawing, strokeAfter = WorkflowBinding(before.projectId, held.documentId, before.hostSeq, before.stateHash))
+        shownStroke = next
+        return true
     }
     // endregion
 
@@ -2653,28 +2720,79 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
     }
     private suspend fun refresh(current: WorkbenchProject, revision: ProjectInfo, token: Long) {
-        refreshDocument(current, revision, token, queued = false)
+        refreshMutex.withLock { refreshLocked(current, revision, token) }
     }
-    /** One read of the document and, when nothing newer was observed during
-     * it, its adoption. A save's own read ([queued] false) that its change
-     * event overtook is dropped as before; the refresh that event queued
-     * adopts, and the save stays pending until then. */
-    private suspend fun refreshDocument(current: WorkbenchProject, revision: ProjectInfo, token: Long, queued: Boolean): RefreshAdmission.Verdict =
-        refreshMutex.withLock {
-        if (token != epoch || current !== project || disposing || revision.projectId != info?.projectId) return@withLock RefreshAdmission.Verdict.Dropped
-        refreshAdmission.refresh(queued, read = {
+    /** What one refresh has to show. */
+    private sealed interface Refreshed {
+        /** The document as read, with its objects prepared. */
+        class Read(val snapshot: DocumentSnapshot, val drawing: List<DrawObject>) : Refreshed
+        /** The project stands at the revision shown: nothing was read. */
+        data object Shown : Refreshed
+    }
+    /** One refresh, for a caller that holds the refresh lock: one read of the
+     * document and, when nothing newer was observed during it, its adoption.
+     * The project is told which strokes are held and rebuilds only the others.
+     *
+     * With [revision] it is a save's own read. One that its change event
+     * overtook is dropped; the refresh that event queued adopts, and the save
+     * stays pending until then. Without, it is the refresh an announced
+     * change queued. That one first asks the project where it stands: the
+     * announcement of a stroke this editor saved and already shows
+     * ([showSavedStroke]) finds the project at the revision shown, and then
+     * nothing is read. */
+    private suspend fun refreshLocked(current: WorkbenchProject, revision: ProjectInfo?, token: Long): RefreshAdmission.Verdict {
+        if (token != epoch || current !== project || disposing || (revision != null && revision.projectId != info?.projectId)) return RefreshAdmission.Verdict.Dropped
+        return refreshAdmission.refresh(queued = revision == null, read = {
             val doc = document ?: return@refresh null
-            // Developer switch: ask only for what changed and keep the paths
-            // already built for untouched strokes. Off: the full read, as before.
-            val quick = preferences.penPath[PenPathToggle.CanvasQuickRefresh]
-            val fetched = documentRefresh.load(doc,{document}){readDocumentSnapshot(current,doc,quick)} ?: return@refresh null
-            val prepared = preparedDrawing(fetched.snapshot.render.items, if (quick) objects else emptyList())
+            if (revision == null) {
+                val now = current.info()
+                if (token != epoch || project !== current || disposing || now.projectId != info?.projectId) return@refresh null
+                if (document === doc && doc === shownStroke && now == doc.render.revision) return@refresh Refreshed.Shown
+            }
+            val fetched = documentRefresh.load(doc,{document}){readDocument(current,doc.documentId,doc)} ?: return@refresh null
+            val prepared = preparedDrawing(fetched.snapshot.render.items, objects)
             if (token != epoch || project !== current || disposing ||
                 !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
-            else fetched.snapshot to prepared
-        }, adopt = { loaded -> adoptDocument(current, loaded.first, loaded.second) })
-        }
-    private suspend fun adoptDocument(current: WorkbenchProject, next: DocumentSnapshot, drawing: List<DrawObject>) {
+            else Refreshed.Read(fetched.snapshot, prepared)
+        }, adopt = { loaded -> when (loaded) {
+            is Refreshed.Read -> adoptDocument(current, loaded.snapshot, loaded.drawing)
+            Refreshed.Shown -> rebindShown()
+        } })
+    }
+    /** The project announced a change and stands at the revision already
+     * shown, so nothing was read. What the announcement itself set aside is
+     * put back, as the adoption of a read would: it fenced the layer, tone
+     * and frame controls and the document list until the document of its
+     * sequence is bound, and it may have overtaken a composed picture of the
+     * page that was still being made. Nothing else the announcement touches
+     * waits for an adoption: selections and erasers are bound by the scene it
+     * publishes, peer previews are fetched again by their own loop, a tiled
+     * original is fenced by revision, and the format information and a plain
+     * picture are kept past an announced change. An unconfirmed rotation is
+     * not cleared here: that is for a document that was read or saved. */
+    private suspend fun rebindShown() {
+        val doc = document ?: return
+        bindControls()
+        if (!giantMode && !giantDisplayRequired(doc) &&
+            (composedReload.pending || (doc.hasToneAdjustments && !composedCurrent(doc)))) loadBackground()
+    }
+    /** The information about a document's original names the revision it was
+     * read for and otherwise only its source, which no stroke changes. After
+     * a saved stroke it stands for the new revision. False when none is held
+     * for [before]: it is read. */
+    private fun keepOriginalFormat(before: WorkflowBinding, next: DocumentSnapshot): Boolean {
+        val held = originalFormat?.takeIf { it.binding == before } ?: return false
+        val revision = next.render.revision
+        originalFormat = held.copy(binding = WorkflowBinding(revision.projectId, next.documentId, revision.hostSeq, revision.stateHash))
+        return true
+    }
+    /** [strokeAfter]: [next] is the document shown so far, which stood at that
+     * binding, plus one ink stroke this editor saved ([showSavedStroke]).
+     * What a new ink stroke cannot change is then carried over to the new
+     * revision instead of being read again: whether the document has pages,
+     * the information about its original, and the instruction and marker
+     * lists. */
+    private suspend fun adoptDocument(current: WorkbenchProject, next: DocumentSnapshot, drawing: List<DrawObject>, strokeAfter: WorkflowBinding? = null) {
         // The document and its own revision are one native snapshot. Host sequence
         // alone cannot order optimistic edits sharing the same accepted base.
         if (document?.render?.revision != next.render.revision) clearPeerObjects()
@@ -2685,15 +2803,16 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         }
         info = next.render.revision
         if(giantMode||giantOwner.retaining)giantOwner.invalidate()
-        document = next; objects = drawing
-        documentOwner.bind(current,next)
+        document = next; objects = drawing; shownStroke = null
+        if (strokeAfter == null || documents.state.value.descriptor != null) documentOwner.bind(current,next)
         bindWorkflows()
         if(priorComposition || next.hasToneAdjustments)publish()
-        refreshOriginalFormatNotice()
+        if (strokeAfter == null || !keepOriginalFormat(strokeAfter, next)) refreshOriginalFormatNotice()
         if(giantMode||giantDisplayRequired(next)||composedReload.needsReload(next.hasToneAdjustments)){
             loadBackground()
         }
-        instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh()
+        if (strokeAfter == null) { instructionEditor.refresh(); instructionFocus.revisionChanged(); semanticEditor.refresh() }
+        else { instructionEditor.strokeAdded(strokeAfter); instructionFocus.revisionChanged(); semanticEditor.strokeAdded(strokeAfter) }
         if (exportReady?.matches(info, document) != true) exportReady = null
         if (exportPreflight?.revision?.stateHash != info?.stateHash || exportPreflight?.revision?.hostSeq != info?.hostSeq) {
             exportPreflight = null; checkedExport = null; checkedExportIntent = null

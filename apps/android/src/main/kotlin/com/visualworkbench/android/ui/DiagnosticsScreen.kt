@@ -99,6 +99,8 @@ internal fun PenPathTimings(metrics: PenPathMetrics, penPath: PenPathToggles) {
         Text("${timing.label}: typical ${PenPathMetrics.ms(s.p50Micros)} ms · slow end ${PenPathMetrics.ms(s.p95Micros)} ms · worst ${PenPathMetrics.ms(s.maxMicros)} ms (${s.count} of ${s.total})",
             style = MaterialTheme.typography.body2)
     }
+    val downs = remember(tick, metrics) { metrics.penDowns() }
+    if (downs.accepted != 0L || downs.refusedTotal != 0L) Text(PenPathMetrics.penDownsLine(downs), style = MaterialTheme.typography.body2)
     Text(if (switchesOn.isEmpty()) "Developer switches on: none" else "Developer switches on: ${switchesOn.joinToString(", ")}", style = MaterialTheme.typography.caption)
     Text("Typical is the middle value (p50); slow end is the value 95 in 100 stay under (p95). They end when the frame is handed to the display, not at the glass.", style = MaterialTheme.typography.caption)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

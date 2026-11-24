@@ -8,6 +8,12 @@ use vw_proto::v1 as pb;
 
 pub const MAX_BATCH_SAMPLES: usize = 512;
 pub const MAX_GESTURE_SAMPLES: usize = 100_000;
+/// Strokes of one project that have begun and are not yet shut down: being
+/// drawn, waiting to be saved, or saved and not yet disposed. Each holds one
+/// ink worker thread and its samples until then. The apps let the pen go down
+/// again while earlier strokes are still being saved, so this is far more than
+/// are ever drawn at once; an app bounds the samples it leaves unsaved.
+pub const MAX_ACTIVE_GESTURES: usize = 64;
 const ACTIVE: u8 = 0;
 const QUEUED: u8 = 1;
 const COMMITTED: u8 = 2;
@@ -136,7 +142,7 @@ impl ProjectSession {
         brush.validate()?;
         self.active_gestures
             .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
-                (n < 4).then_some(n + 1)
+                (n < MAX_ACTIVE_GESTURES).then_some(n + 1)
             })
             .map_err(|_| CoreError::Backpressure)?;
         let permit = GesturePermit(self.active_gestures.clone());
@@ -266,7 +272,7 @@ impl ProjectSession {
         brush.validate()?;
         self.active_gestures
             .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
-                (n < 4).then_some(n + 1)
+                (n < MAX_ACTIVE_GESTURES).then_some(n + 1)
             })
             .map_err(|_| CoreError::Backpressure)?;
         let permit = GesturePermit(self.active_gestures.clone());
@@ -489,13 +495,29 @@ impl StrokeGesture {
         }
     }
     pub async fn commit(&self, cancellation: Arc<Cancellation>) -> Result<ProjectInfo> {
+        Ok(self.save(cancellation, false).await?.revision)
+    }
+    /// `commit`, which also hands back the saved stroke as the display list
+    /// of its document now holds it, so that a caller holding that document
+    /// need not read it again: see `StrokeSave`. The stroke is saved whether
+    /// or not `StrokeSave::added` is set, and an exact retry of a finished
+    /// save returns its revision without it.
+    pub async fn commit_added(&self, cancellation: Arc<Cancellation>) -> Result<StrokeSave> {
+        self.save(cancellation, true).await
+    }
+}
+impl StrokeGesture {
+    async fn save(&self, cancellation: Arc<Cancellation>, added: bool) -> Result<StrokeSave> {
         if self.phase.load(Ordering::Acquire) == COMMITTED {
-            return self
-                .receipt
-                .lock()
-                .map_err(|_| CoreError::Worker)?
-                .clone()
-                .ok_or(CoreError::Worker);
+            return Ok(StrokeSave {
+                revision: self
+                    .receipt
+                    .lock()
+                    .map_err(|_| CoreError::Worker)?
+                    .clone()
+                    .ok_or(CoreError::Worker)?,
+                added: None,
+            });
         }
         let project = self.project.upgrade().ok_or(CoreError::Closed)?;
         project.check_open()?;
@@ -542,6 +564,17 @@ impl StrokeGesture {
                     Some(base) => base,
                     None => deferred.as_ref().ok_or(CoreError::Worker)?.answer()?,
                 };
+                // The revision this save directly follows. A mirror queues its
+                // edit instead of saving it, and a new highlighter layer changes
+                // more of the document than its display list: neither is only
+                // an added stroke.
+                let previous = if added && state.replica.is_none() && highlighter_layer.is_none() {
+                    Some(state.info()?)
+                } else {
+                    None
+                };
+                let document_id = options.document_id.clone();
+                let object_id = options.object_id.clone();
                 let model = state.project()?;
                 let layer_id = Id::try_from(options.layer_id)?;
                 let layer_wire = layer_id.to_proto();
@@ -621,7 +654,24 @@ impl StrokeGesture {
                     Ok(info) => {
                         *receipt.lock().map_err(|_| CoreError::Worker)? = Some(info.clone());
                         phase.store(COMMITTED, Ordering::Release);
-                        Ok(info)
+                        // The stroke is saved. Failing to describe it only
+                        // means the caller reads the document instead.
+                        let added = previous.and_then(|previous| {
+                            let (item, digest, cost) =
+                                crate::queries::added_stroke(state, &document_id, &object_id)
+                                    .ok()
+                                    .flatten()?;
+                            Some(AddedStroke {
+                                previous,
+                                item,
+                                digest: digest.to_vec(),
+                                cost: cost as u64,
+                            })
+                        });
+                        Ok(StrokeSave {
+                            revision: info,
+                            added,
+                        })
                     }
                     Err(error) => {
                         phase.store(ACTIVE, Ordering::Release);

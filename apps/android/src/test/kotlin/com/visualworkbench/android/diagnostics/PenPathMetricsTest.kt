@@ -91,11 +91,11 @@ class PenPathMetricsTest {
         assertEquals("pen_path_timings v1\nswitches=none\n", metrics.report(emptyList()))
         metrics.recordMillis(PenTiming.CanvasSave, 3); metrics.recordMillis(PenTiming.CanvasSave, 12)
         metrics.record(PenTiming.RemoteEcho, 61_250)
-        val text = metrics.report(listOf("remoteExactTimes", "canvasQuickRefresh"))
+        val text = metrics.report(listOf("remoteExactTimes", "canvasInkOnly"))
         assertEquals("pen_path_timings v1\n" +
             "canvas_save n=2 p50_ms=3.0 p95_ms=12.0 max_ms=12.0\n" +
             "remote_echo n=1 p50_ms=61.3 p95_ms=61.3 max_ms=61.3\n" +
-            "switches=canvasQuickRefresh,remoteExactTimes\n", text)
+            "switches=canvasInkOnly,remoteExactTimes\n", text)
         val line = Regex("[a-z_]+ n=[0-9]+ p50_ms=[0-9]+\\.[0-9] p95_ms=[0-9]+\\.[0-9] max_ms=[0-9]+\\.[0-9]")
         val lines = text.trimEnd().lines()
         assertEquals("pen_path_timings v1", lines.first())
@@ -104,5 +104,33 @@ class PenPathMetricsTest {
         assertEquals(PenTiming.entries.size, PenTiming.entries.map { it.key }.toSet().size)
         for (timing in PenTiming.entries) assertTrue(timing.key.matches(Regex("[a-z]+(_[a-z]+)+")) && timing.label.isNotBlank())
         assertEquals("0.0", PenPathMetrics.ms(0)); assertEquals("0.1", PenPathMetrics.ms(50)); assertEquals("25.0", PenPathMetrics.ms(25_000))
+    }
+    /** A pen-down that asked for ink is counted as drawn or as refused with its
+     * reason, so a person or a test can see that none was lost. */
+    @Test fun pen_downs_for_ink_are_counted_as_drawn_or_refused_by_reason() {
+        val metrics = PenPathMetrics()
+        assertEquals(PenDownCounts(0, emptyMap()), metrics.penDowns())
+        repeat(412) { metrics.penDown(null) }
+        assertEquals(PenDownCounts(412, emptyMap()), metrics.penDowns())
+        assertEquals(0L, metrics.penDowns().refusedTotal)
+        assertEquals("Pen-downs for ink: 412 drawn, none refused", PenPathMetrics.penDownsLine(metrics.penDowns()))
+        assertEquals("pen_path_timings v1\npen_downs accepted=412 refused=0\nswitches=none\n", metrics.report(emptyList()))
+        metrics.penDown(PenRefusal.Modal); metrics.penDown(PenRefusal.Backlog); metrics.penDown(PenRefusal.Modal)
+        val counts = metrics.penDowns()
+        assertEquals(412L, counts.accepted); assertEquals(3L, counts.refusedTotal)
+        assertEquals(mapOf(PenRefusal.Backlog to 1L, PenRefusal.Modal to 2L), counts.refused)
+        assertEquals("Pen-downs for ink: 412 drawn, 3 refused (too much ink still unsaved: 1; a dialog, panel or another screen was open: 2)",
+            PenPathMetrics.penDownsLine(counts))
+        metrics.recordMillis(PenTiming.CanvasSave, 3)
+        assertEquals("pen_path_timings v1\n" +
+            "canvas_save n=1 p50_ms=3.0 p95_ms=3.0 max_ms=3.0\n" +
+            "pen_downs accepted=412 refused=3 backlog=1 modal=2\n" +
+            "switches=none\n", metrics.report(emptyList()))
+        // Fixed names only, as for the timings; the reasons add up to the total.
+        assertEquals(PenRefusal.entries.size, PenRefusal.entries.map { it.key }.toSet().size)
+        for (reason in PenRefusal.entries) assertTrue(reason.key.matches(Regex("[a-z]+(_[a-z]+)*")) && reason.label.isNotBlank())
+        metrics.clear()
+        assertEquals(PenDownCounts(0, emptyMap()), metrics.penDowns())
+        assertEquals("pen_path_timings v1\nswitches=none\n", metrics.report(emptyList()))
     }
 }

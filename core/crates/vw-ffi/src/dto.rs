@@ -434,6 +434,34 @@ pub struct PackedDocumentSnapshotChanges {
     pub items: Vec<PackedRenderItemChange>,
     pub has_tone_adjustments: bool,
 }
+/// What `StrokeGesture::commit_added` returns.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct StrokeSave {
+    /// The project after the save: what `StrokeGesture::commit` returns.
+    pub revision: ProjectInfo,
+    /// Set when all the save did to the display list of its document was to
+    /// add this stroke to it. Unset when it did more or that cannot be shown:
+    /// the project is a mirror, which queues its edit; the stroke made a new
+    /// highlighter layer; its layer is not drawn; the document is read page
+    /// by page; or this is a retry of a finished save. Read the document then.
+    pub added: Option<AddedStroke>,
+}
+/// A saved stroke as the display list of its document holds it.
+#[derive(Clone, Debug, uniffi::Record)]
+pub struct AddedStroke {
+    /// The project just before the save. Only a caller that holds the document
+    /// at exactly this revision may add `item` to what it holds; it then
+    /// holds the document at `StrokeSave::revision`.
+    pub previous: ProjectInfo,
+    /// The stroke as `document_snapshot_changes_packed` sends it. A read lists
+    /// it after every other item of its layer, and the layers in the order of
+    /// `PackedDocumentSnapshotChanges::layers`.
+    pub item: PackedRenderItem,
+    /// The digest and cost `document_snapshot_changes_packed` gives for it:
+    /// pass them back as its `KnownStroke`.
+    pub digest: Vec<u8>,
+    pub cost: u64,
+}
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct BackgroundImage {
     pub width: u32,

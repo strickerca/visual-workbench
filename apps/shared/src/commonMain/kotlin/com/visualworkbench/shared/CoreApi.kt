@@ -38,7 +38,8 @@ public interface WorkbenchDocumentChanges {
      * [RenderItem] instance as in [previous] (or a copy sharing its contours
      * when only its layer's opacity, blend or lock changed), so a caller can
      * keep whatever it derived from it. [previous] must be the snapshot this
-     * project returned last for the document, or null for a first read.
+     * project returned last for the document, from this call or from
+     * [WorkbenchAddedStrokes.withAddedStroke], or null for a first read.
      * Null result: this document has no such path (paged documents); use
      * [WorkbenchProject.document]. */
     public suspend fun documentChanges(documentId: String, previous: DocumentSnapshot?): DocumentSnapshot?
@@ -58,6 +59,54 @@ public interface WorkbenchDeferredStrokes {
      * right now; use [WorkbenchProject.beginStroke] then. The caller owns the
      * result and must [WorkbenchStroke.dispose] it. */
     public fun beginStrokeDeferred(options: StrokeOptions): WorkbenchStroke?
+}
+/** What [WorkbenchStrokeSaves.save] returns: the project after the save and,
+ * when that can be shown, what the save added to its document. */
+public class StrokeSave(public val revision: ProjectInfo, public val added: AddedStroke?)
+/** A saved stroke as the display list of its document holds it. [previous] is
+ * the project just before the save: only a document held at exactly that
+ * revision becomes the document at [StrokeSave.revision] by adding [item].
+ * [digest] and [cost] are the project's own bookkeeping for the stroke. */
+public class AddedStroke(public val previous: ProjectInfo, public val item: RenderItem, public val digest: ByteArray, public val cost: ULong)
+/** Optional stroke capability: save the stroke and learn what the save added,
+ * so that a caller holding the document need not read it again. */
+public interface WorkbenchStrokeSaves {
+    /** [WorkbenchStroke.commit], with the saved stroke. [StrokeSave.added] is
+     * null whenever the save did more to its document than add this stroke,
+     * or that cannot be shown (a project that mirrors another one and queues
+     * its edits, a highlighter stroke that made its layer, a layer that is
+     * not drawn, a paged document, a repeated save): read the document then.
+     * The stroke is saved either way. */
+    public suspend fun save(): StrokeSave
+}
+/** Optional project capability, the other half of [WorkbenchStrokeSaves]:
+ * the document a caller holds, with a stroke it just saved added to it. */
+public interface WorkbenchAddedStrokes {
+    /** The document exactly as [WorkbenchProject.document] returned it right
+     * after [saved], built from [held] and the saved stroke alone: every
+     * other item is the instance [held] has. [held] must be the snapshot this
+     * project returned last for the document, from
+     * [WorkbenchDocumentChanges.documentChanges] or from this call, and the
+     * save must directly follow its revision. Null whenever that does not
+     * hold, [saved] added nothing that can be shown, or the document is too
+     * close to the size limit of a read for this call to decide: read the
+     * document then. A non-null result is the snapshot returned last. */
+    public fun withAddedStroke(held: DocumentSnapshot, saved: StrokeSave): DocumentSnapshot?
+}
+/** Where a read of a document lists a stroke just added to the layer
+ * [layerId]: after everything of that layer and of the layers under it.
+ * [layers] and [items] are in drawing order, as every snapshot has them, and
+ * [layerOf] names the layer of one of [items]. Null when the layer is unknown
+ * or not drawn. */
+public fun <T> addedStrokeIndex(layers: List<LayerInfo>, items: List<T>, layerId: String, layerOf: (T) -> String): Int? {
+    val order = layers.indexOfFirst { it.id == layerId }
+    if (order < 0 || !layers[order].visible || layers[order].opacity <= 0.0) return null
+    if (order == layers.lastIndex) return items.size
+    val above = HashSet<String>()
+    for (index in order + 1 until layers.size) above += layers[index].id
+    var index = items.size
+    while (index > 0 && layerOf(items[index - 1]) in above) index--
+    return index
 }
 /** Optional project capability: write now the recovery checkpoint that
  * [WorkbenchProject.close] would write, and keep the project open. For an

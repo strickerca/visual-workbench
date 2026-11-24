@@ -10,8 +10,9 @@ async fn shutdown_releases_capacity_while_closed_gesture_handles_remain_alive() 
         .await
         .unwrap();
     let initial = project.info().await.unwrap();
+    // Every stroke the project admits at once is begun; one more is refused.
     let mut active = Vec::new();
-    for _ in 0..4 {
+    for _ in 0..MAX_ACTIVE_GESTURES {
         active.push(project.clone().begin_stroke(stroke()).await.unwrap());
     }
     assert!(matches!(
@@ -39,7 +40,7 @@ async fn shutdown_releases_capacity_while_closed_gesture_handles_remain_alive() 
         gesture.shutdown().await.unwrap();
         retained.push(gesture);
     }
-    assert_eq!(retained.len(), 36);
+    assert_eq!(retained.len(), 32 + MAX_ACTIVE_GESTURES);
     assert_eq!(project.info().await.unwrap(), initial);
     project.close().await.unwrap();
 }
