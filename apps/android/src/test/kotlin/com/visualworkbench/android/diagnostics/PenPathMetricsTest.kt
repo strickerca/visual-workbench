@@ -91,11 +91,11 @@ class PenPathMetricsTest {
         assertEquals("pen_path_timings v1\nswitches=none\n", metrics.report(emptyList()))
         metrics.recordMillis(PenTiming.CanvasSave, 3); metrics.recordMillis(PenTiming.CanvasSave, 12)
         metrics.record(PenTiming.RemoteEcho, 61_250)
-        val text = metrics.report(listOf("remoteExactTimes", "canvasInkOnly"))
+        val text = metrics.report(listOf("remoteExactTimes", "remoteQuickFrames"))
         assertEquals("pen_path_timings v1\n" +
             "canvas_save n=2 p50_ms=3.0 p95_ms=12.0 max_ms=12.0\n" +
             "remote_echo n=1 p50_ms=61.3 p95_ms=61.3 max_ms=61.3\n" +
-            "switches=canvasInkOnly,remoteExactTimes\n", text)
+            "switches=remoteExactTimes,remoteQuickFrames\n", text)
         val line = Regex("[a-z_]+ n=[0-9]+ p50_ms=[0-9]+\\.[0-9] p95_ms=[0-9]+\\.[0-9] max_ms=[0-9]+\\.[0-9]")
         val lines = text.trimEnd().lines()
         assertEquals("pen_path_timings v1", lines.first())

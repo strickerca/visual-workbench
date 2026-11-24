@@ -30,6 +30,24 @@ public fun aiAdmitResultPreview(document: DocumentSnapshot, item: RenderItem): B
         item.layerId == prior.layerId && item.layerBlend == prior.layerBlend && item.layerOpacity == prior.layerOpacity
 }
 
+/** Whether [after] shows exactly the Results [before] shows: the same Result
+ * objects in the same order, each with the same saved asset, layer, opacity,
+ * blend and placement, and each still alone in its layer. Pixels read for the
+ * Results of [before] are then the pixels of [after]. */
+public fun aiResultsUnchanged(before: DocumentSnapshot, after: DocumentSnapshot): Boolean {
+    if (before.documentId != after.documentId || before.width != after.width || before.height != after.height) return false
+    val earlier = before.render.items.filter { it.shape is Shape.Result }
+    val later = after.render.items.filter { it.shape is Shape.Result }
+    if (earlier.size != later.size) return false
+    for (index in earlier.indices) {
+        val a = earlier[index]; val b = later[index]
+        if (a.objectId != b.objectId || a.shape != b.shape || a.layerId != b.layerId || a.layerOpacity != b.layerOpacity ||
+            a.layerBlend != b.layerBlend || a.transform != b.transform) return false
+    }
+    val layers = later.mapTo(HashSet()) { it.layerId }
+    return layers.size == later.size && after.render.items.count { it.layerId in layers } == later.size
+}
+
 /** Affine inversion is used only for conservative tile admission. Camera
  * physical/D mapping comes from WorkbenchCore; painting uses its same transform.
  * Native remains responsible for Result binding, pixel conversion and proof. */
@@ -148,6 +166,25 @@ public class AiResultController<T>(
                 if (!published) acquired.forEach(abandonImage)
             }
         }
+    }
+    /** [after] is the document the shown frame was read for, when that stood
+     * at [before], plus one ink stroke the editor saved itself. A stroke
+     * changes no Result: its pixels are those of the same saved asset, placed
+     * the same way. The frame then stands for [after] and nothing is read
+     * again, so the Results stay on screen and the pen is not held back while
+     * they would be loading. Anything that cannot be shown to be that case
+     * (another frame, another project, a Result that differs or whose layer
+     * holds something else) leaves the frame alone, and the next [request]
+     * reads as before. */
+    public fun strokeAdded(before: WorkflowBinding, after: AiAttachment) {
+        if (closed || retiring) return
+        val frame = mutable.value.frame ?: return
+        if (frame.images.isEmpty() || !frame.attachment.sameProject(after) || frame.attachment.binding != before) return
+        if (!aiResultsUnchanged(frame.attachment.document, after.document)) return
+        // A read still under way was asked for the document before; it can no
+        // longer publish, and must not be taken for a request for this one.
+        ticket++; requested = null; reader.cancelPending()
+        mutable.value = AiResultState(frame = frame.copy(attachment = after))
     }
     public fun retry() { requested = null; request() }
     public fun invalidate() { ticket++; requested = null; reader.cancelPending(); mutable.value = AiResultState() }

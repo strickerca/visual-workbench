@@ -6,8 +6,6 @@ package com.visualworkbench.android.editor
  * the app behaves exactly as it did before the switch existed. [key] is the
  * stored name and never changes; [title] and [effect] are shown to the owner. */
 internal enum class PenPathToggle(val key: String, val title: String, val effect: String) {
-    CanvasInkOnly("canvasInkOnly", "Canvas: draw only the new stroke",
-        "While a pen or marker stroke is in progress, the finished picture of the document is kept and only the new stroke is drawn over it, instead of redrawing every object for every pen sample. Highlighter strokes and strokes under another layer are drawn the old way."),
     RemoteUnbufferedPen("remoteUnbufferedPen", "Remote pen: samples at the pen's own rate",
         "Asks Android to deliver each pen sample as it is reported instead of once per display frame, so samples leave for the computer, and ghost ink appears, up to a frame sooner. Applies the next time the remote view opens."),
     RemoteExactTimes("remoteExactTimes", "Remote pen: exact sample times",

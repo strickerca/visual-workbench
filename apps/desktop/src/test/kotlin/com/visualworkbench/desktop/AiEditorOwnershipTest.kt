@@ -123,6 +123,57 @@ class AiEditorOwnershipTest {
         api.refuse = false; result.retry(); until { result.state.value.frame != null }
         assertEquals(2, api.reads)
     }
+    private fun ink(id: String, layer: String) = RenderItem(id, layer, 1.0, "normal", Rect(0.0,0.0,1.0,1.0),
+        Contours(longArrayOf(),longArrayOf(),uintArrayOf()), Transform(), ObjectStyle(0x102030ffu,2.0), Shape.Stroke("pen"), false)
+    private fun withItems(seq: ULong, vararg added: RenderItem) = snapshot(seq).let { doc -> doc.copy(render = doc.render.copy(items = doc.render.items + added)) }
+    @Test fun aSavedInkStrokeKeepsTheResultFrameForTheNewRevisionWithoutAnotherRead() = fixture {
+        result.request(); until { result.state.value.frame != null }
+        val shown = result.state.value.frame!!; val before = attachment.binding
+        assertEquals(1, api.reads)
+        attachment = attachment.copy(document = withItems(2u, ink("stroke", "notes")))
+        result.strokeAdded(before, attachment)
+        val carried = result.state.value.frame!!
+        assertEquals(attachment.binding, carried.attachment.binding); assertEquals(2uL, carried.attachment.binding.hostSeq)
+        assertSame(shown.images, carried.images)
+        // The frame stands for the new revision: asking again reads nothing and gives no image up.
+        repeat(5) { result.request() }; yield()
+        assertSame(carried, result.state.value.frame); assertEquals(1, api.reads); assertTrue(abandoned.isEmpty())
+    }
+    @Test fun aResultFrameIsNotKeptWhenTheChangeIsNotShownToBeOneStrokeBesideTheResults() = fixture {
+        result.request(); until { result.state.value.frame != null }
+        val shown = result.state.value.frame!!; val before = attachment.binding
+        // Not the revision the frame was read for.
+        val next = attachment.copy(document = withItems(2u, ink("stroke", "notes")))
+        result.strokeAdded(before.copy(hostSeq = 9u), next)
+        assertSame(shown, result.state.value.frame)
+        // Something else in the Result's own layer, another placement, another asset, another project.
+        result.strokeAdded(before, attachment.copy(document = withItems(2u, ink("stroke", "layer"))))
+        val moved = snapshot(2u).let { doc -> doc.copy(render = doc.render.copy(items = doc.render.items.map { it.copy(transform = Transform(e = 4.0)) })) }
+        result.strokeAdded(before, attachment.copy(document = moved))
+        val other = snapshot(2u).let { doc -> doc.copy(render = doc.render.copy(items = doc.render.items.map { it.copy(shape = Shape.Result("d".repeat(64), "saved")) })) }
+        result.strokeAdded(before, attachment.copy(document = other))
+        result.strokeAdded(before, AiAttachment(Project(), next.document, 1))
+        assertSame(shown, result.state.value.frame)
+        // The document does change: the next request reads for it, as it always did.
+        attachment = next.copy(document = withItems(2u, ink("stroke", "layer")))
+        result.request(); until { result.state.value.frame == null || result.state.value.message != null || api.reads > 1 }
+        assertNotSame(shown, result.state.value.frame)
+    }
+    @Test fun resultsAreUnchangedOnlyWhenEveryResultAndItsLayerAre() {
+        val doc = snapshot(1u)
+        assertTrue(aiResultsUnchanged(doc, snapshot(2u)))
+        assertTrue(aiResultsUnchanged(doc, withItems(2u, ink("a", "notes"), ink("b", "notes"))))
+        assertTrue(aiResultsUnchanged(snapshot(1u, results = false), snapshot(2u, results = false)))
+        assertFalse(aiResultsUnchanged(doc, withItems(2u, ink("a", "layer"))))
+        assertFalse(aiResultsUnchanged(doc, snapshot(2u, results = false)))
+        assertFalse(aiResultsUnchanged(snapshot(1u, results = false), doc))
+        assertFalse(aiResultsUnchanged(doc, snapshot(2u, width = 4u)))
+        for (change in listOf<(RenderItem) -> RenderItem>({ it.copy(objectId = "other") }, { it.copy(layerOpacity = 0.5) }, { it.copy(layerId = "moved") },
+            { it.copy(transform = Transform(a = 2.0)) }, { it.copy(shape = Shape.Result("c".repeat(64), "other")) })) {
+            val changed = snapshot(2u).let { next -> next.copy(render = next.render.copy(items = next.render.items.map(change))) }
+            assertFalse(aiResultsUnchanged(doc, changed))
+        }
+    }
     @Test fun displayedSendIdentityAndCostMustMatchTheRetainedReview() = fixture {
         prepared()
         editor.send("different-review", 7u, false)?.join()

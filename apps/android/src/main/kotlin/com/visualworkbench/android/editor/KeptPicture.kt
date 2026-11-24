@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import com.visualworkbench.android.precision.PrecisionDrawing
 import com.visualworkbench.shared.DocumentSnapshot
 import com.visualworkbench.shared.Rect
@@ -193,6 +194,20 @@ internal fun <T> pictureStep(held: PictureBasis<T>?, layers: DryLayers?, next: P
     return if (layers.inkOnTop(added, next.hidden)) PictureStep.Append(from) else PictureStep.Rebuild(PictureChange.Objects)
 }
 
+/** Whether a picture that has to be made again is made for this frame. It
+ * is, unless the scene is changing from frame to frame, as it does while the
+ * page is panned, zoomed or turned and while the paired computer moves an
+ * object: then each frame would make a picture that the next one throws away.
+ * Such a frame is drawn whole, as every frame used to be, and the picture is
+ * made once the scene has stopped changing. [sameAsLastFrame]: the frame
+ * before wanted this very picture. [sinceChangeMs]: how long ago a frame last
+ * wanted another picture than the one before it. */
+internal fun pictureMadeNow(sameAsLastFrame: Boolean, sinceChangeMs: Long): Boolean =
+    sameAsLastFrame || sinceChangeMs < 0 || sinceChangeMs >= PICTURE_STREAK_MS
+
+/** Changes closer together than this are one movement. */
+internal const val PICTURE_STREAK_MS = 100L
+
 /** How often each thing happened, for the on-device tests and nothing else. */
 internal class PictureCounts {
     /** Pictures made from every object, pictures a stroke was added to, frames
@@ -213,16 +228,24 @@ internal class PictureComparison(val kept: Bitmap, val whole: Bitmap)
  * progress, the overlays and the magnifier. When it returns false nothing was
  * drawn and the caller draws the whole scene as it always could.
  *
+ * While the scene changes from frame to frame (a pan, a zoom, a turn, an
+ * object moved from the paired computer) no picture is made for each frame:
+ * those frames are drawn whole, and the picture is made when the movement
+ * ends ([pictureMadeNow]).
+ *
  * Memory: one screen-sized picture while the page rests. While strokes are
  * being added a second buffer is kept to draw the next state into, and at most
  * two more wait a moment to be released; [REST_MS] after the last change the
  * renderer and its spare buffers are given up and only the picture stays.
- * Everything goes at [forget] and [discard].
+ * Everything goes at [forget] and [discard], and nothing is made after
+ * [discard].
  *
- * Owned by one render session. [draw], [compare] and [forget] run on its
- * drawing thread. [requestDrop] may be called from any thread. [discard] runs
- * on the main thread only after the drawing thread has stopped for the
- * session, which is why the references are volatile. */
+ * Owned by one render session. [draw] and [compare] run on its drawing
+ * thread, and so does everything this posts to that thread. [requestDrop] may
+ * be called from any thread. [discard] runs on the main thread once the
+ * session has been released; a message of this class still waiting on the
+ * drawing thread may run beside it, so every entry holds this object's lock,
+ * which nothing else ever contends for. */
 internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
     private class Held(val picture: PictureSurface.Picture, val basis: PictureBasis<DrawObject>, val layers: DryLayers)
 
@@ -230,22 +253,41 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
      * picture is: a highlighter stroke asks for it at every frame. */
     private class Judged(val objects: List<DrawObject>, val hidden: Set<String>, val layerIds: List<String>, val layers: DryLayers)
 
-    @Volatile private var surface: PictureSurface? = null
-    @Volatile private var held: Held? = null
-    @Volatile private var judged: Judged? = null
-    @Volatile private var handler: Handler? = null
-    @Volatile private var dropAsked = false
-    @Volatile private var layerIdsOf: DocumentSnapshot? = null
-    @Volatile private var layerIds: List<String> = emptyList()
+    private var surface: PictureSurface? = null
+    private var held: Held? = null
+    private var judged: Judged? = null
+    private var layerIdsOf: DocumentSnapshot? = null
+    private var layerIds: List<String> = emptyList()
     private var failures = 0
+    private var discarded = false
     /** Pictures replaced and not yet released. */
     private val replaced = ArrayList<PictureSurface.Picture>(2)
-    private val rest = Runnable { surface?.close(); surface = null }
-    private val drop = Runnable { if (dropAsked) { dropAsked = false; forget() } }
+    /** The picture the last frame wanted and did not get, the scene it is
+     * drawn from, and when a frame last wanted another picture than the one before it. */
+    private var wanted: PictureBasis<DrawObject>? = null
+    private var wantedScene: CanvasScene? = null
+    private var changedMs = 0L
+    @Volatile private var handler: Handler? = null
+    @Volatile private var dropAsked = false
+    private val rest = Runnable { synchronized(this) { surface?.close(); surface = null } }
+    private val drop = Runnable { synchronized(this) { if (dropAsked) { dropAsked = false; forget() } } }
+    /** The movement has ended and no frame has come since: the picture is made for the next one. */
+    private val settle = Runnable {
+        synchronized(this) {
+            val basis = wanted; val scene = wantedScene; val post = handler
+            wanted = null; wantedScene = null
+            if (!discarded && basis != null && scene != null && post != null && failures < MAX_FAILURES)
+                replace(post, basis, judge(scene, basis.layerIds), counts.rebuilt) { EditorDrawing.drawStack(it, scene) }
+        }
+    }
 
     /** [steady]: no saved object is hidden for an erasure in progress.
-     * [resizing]: the session owes the redraw of an in-place resize. */
-    fun draw(canvas: Canvas, scene: CanvasScene, steady: Boolean, resizing: Boolean): Boolean {
+     * [resizing]: the session owes the redraw of an in-place resize.
+     * [first]: the session has not shown a frame yet. Its first frame is drawn
+     * whole, so that a new canvas appears no later than it used to; the
+     * picture is made right after, before a pen can need it. */
+    @Synchronized fun draw(canvas: Canvas, scene: CanvasScene, steady: Boolean, resizing: Boolean, first: Boolean): Boolean {
+        if (discarded) return false
         if (dropAsked) { dropAsked = false; forget() }
         val width = scene.camera.viewportWidth.toInt(); val height = scene.camera.viewportHeight.toInt()
         val refusal = pictureRefusal(canvas.isHardwareAccelerated, canvas.width, canvas.height, width, height, resizing,
@@ -264,7 +306,21 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         }
         val next = PictureBasis(width, height, scene.matrix, scene.camera.scale, scene.background, scene.smoothBackground, ids, scene.hidden, scene.objects)
         val now = held
-        val picture = when (val step = pictureStep(now?.basis, now?.layers, next) { it.item }) {
+        val step = pictureStep(now?.basis, now?.layers, next) { it.item }
+        if (step is PictureStep.Rebuild) {
+            val uptime = SystemClock.uptimeMillis()
+            val same = wanted?.let { pictureStep(it, layers, next) { drawn -> drawn.item } == PictureStep.Keep } == true
+            val made = !first && pictureMadeNow(same, if (changedMs == 0L) -1 else uptime - changedMs)
+            if (!same) changedMs = uptime
+            if (!made) {
+                // Drawn whole for now; made when the next frame wants the same, or when none comes.
+                wanted = next; wantedScene = scene
+                post.removeCallbacks(settle); post.postDelayed(settle, PICTURE_SETTLE_MS)
+                counts.whole.incrementAndGet(); return false
+            }
+        }
+        post.removeCallbacks(settle); wanted = null; wantedScene = null
+        val picture = when (step) {
             PictureStep.Keep -> checkNotNull(now).also { if (it.basis.objects !== next.objects) held = Held(it.picture, next, it.layers) }.picture
             is PictureStep.Append -> {
                 val before = checkNotNull(now).picture.bitmap
@@ -302,7 +358,8 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
     }
 
     /** Draws the next picture and makes it the one held. Null: it could not
-     * be drawn, nothing is held any more and the frame is drawn whole. */
+     * be drawn (nothing is held any more), or there was no room for it (the
+     * picture held stays as it was); the frame is drawn whole. */
     private fun replace(post: Handler, basis: PictureBasis<DrawObject>, layers: DryLayers, count: AtomicLong, draw: (Canvas) -> Unit): PictureSurface.Picture? {
         post.removeCallbacks(rest)
         val target = surface?.takeIf { !it.closed && it.width == basis.width && it.height == basis.height }
@@ -312,7 +369,7 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         // show them. Without room for another, this frame is drawn whole.
         if (!target.room) { post.postDelayed(rest, REST_MS); counts.whole.incrementAndGet(); return null }
         val made = target.render(draw) ?: return failed()
-        val old = held
+        val old = held?.picture
         held = Held(made, basis, layers.copy())
         failures = 0; count.incrementAndGet()
         // A frame drawn before this one may still be waiting to be handed to
@@ -320,7 +377,7 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         // over by a message already in this thread's queue, so a message added
         // now runs after all of them: only then may the old buffer be drawn
         // into again.
-        if (old != null) { replaced.add(old.picture); post.post { replaced.remove(old.picture); old.picture.release() } }
+        if (old != null) { replaced.add(old); post.post { synchronized(this) { replaced.remove(old); old.release() } } }
         post.postDelayed(rest, REST_MS)
         return made
     }
@@ -333,7 +390,7 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
 
     /** On-device tests only, right after [draw] returned true for [scene]: the
      * frame as it was just drawn, and the same scene drawn whole. */
-    fun compare(scene: CanvasScene): PictureComparison? {
+    @Synchronized fun compare(scene: CanvasScene): PictureComparison? {
         val now = held ?: return null
         val pictures = try { PictureSurface(now.basis.width, now.basis.height) } catch (error: RuntimeException) { return null }
         try {
@@ -354,26 +411,30 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
         handler?.post(drop)
     }
 
-    /** Drawing thread: nothing is held any more. Frames already drawn with
-     * the picture keep it until they have been shown. */
-    fun forget() {
-        handler?.removeCallbacks(rest)
+    /** Nothing is held any more. Frames already drawn with the picture keep
+     * it until they have been shown: giving it up never changes its pixels. */
+    @Synchronized fun forget() {
+        handler?.let { it.removeCallbacks(rest); it.removeCallbacks(settle) }
+        wanted = null; wantedScene = null
         surface?.close(); surface = null
         held?.picture?.release(); held = null
         replaced.forEach { it.release() }; replaced.clear()
         judged = null; layerIdsOf = null; layerIds = emptyList()
     }
 
-    /** Main thread, after the drawing thread has stopped for this session. */
-    fun discard() {
-        handler?.removeCallbacksAndMessages(null); handler = null
-        dropAsked = false
+    /** Main thread, once the session has been released: everything is given
+     * up, and nothing is made from here on. */
+    @Synchronized fun discard() {
+        discarded = true; dropAsked = false
         forget()
+        handler?.removeCallbacksAndMessages(null); handler = null
     }
 
     private companion object {
         /** After this long without a change the renderer and its spare buffers go. */
         const val REST_MS = 1_500L
+        /** After this long without a frame, a picture a movement left unmade is made. */
+        const val PICTURE_SETTLE_MS = 120L
         /** A session whose pictures keep failing to draw stops trying. */
         const val MAX_FAILURES = 3
     }

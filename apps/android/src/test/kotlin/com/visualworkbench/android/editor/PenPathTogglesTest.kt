@@ -21,14 +21,16 @@ class PenPathTogglesTest {
         }
         assertEquals(PenPathToggles(), PenPathToggles.decode(mapOf("notASwitch" to true, "" to true)))
     }
-    /** The two canvas switches whose behaviour became the app's only path are
-     * gone. A phone that had them switched on keeps its other settings: the
-     * stored names are read past, and the next save leaves them out. */
+    /** The canvas switches whose behaviour became the app's only path are
+     * gone, and no canvas switch is left. A phone that had them switched on
+     * keeps its other settings: the stored names are read past, and the next
+     * save leaves them out. */
     @Test fun a_stored_switch_that_no_longer_exists_is_ignored_without_error() {
-        val removed = listOf("canvasQuickRefresh", "canvasInkBeforeSave")
+        val removed = listOf("canvasQuickRefresh", "canvasInkBeforeSave", "canvasInkOnly")
         assertTrue(PenPathToggle.entries.none { it.key in removed })
+        assertTrue(PenPathToggle.entries.none { it.key.startsWith("canvas") })
         assertEquals(PenPathToggles(), PenPathToggles.decode(removed.associateWith { true }))
-        val kept = PenPathToggle.CanvasInkOnly
+        val kept = PenPathToggle.RemoteUnbufferedPen
         val decoded = PenPathToggles.decode(removed.associateWith { true } + (kept.key to true))
         assertEquals(PenPathToggles().with(kept, true), decoded)
         assertEquals(mapOf(kept.key to true), decoded.encode())

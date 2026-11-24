@@ -13,6 +13,7 @@ import android.media.Image
 import android.media.ImageReader
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import java.time.Duration
 
 /** Draws pictures the graphics processor keeps. Each [render] plays drawing
@@ -81,16 +82,23 @@ internal class PictureSurface(val width: Int, val height: Int) {
             drawnMs = SystemClock.uptimeMillis()
             // The commands hold the picture drawn before and the document's paths.
             node.discardDisplayList()
-            if (result and NOT_DRAWN != 0) { close(); return null }
-            val image = reader.acquireNextImage() ?: run { close(); return null }
+            if (result and NOT_DRAWN != 0) return failed("the renderer put the frame off (sync result $result)")
+            val image = reader.acquireNextImage() ?: return failed("no picture came out of the renderer")
             out++
             val bitmap = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !finished(image)) null
                 else image.hardwareBuffer?.let { buffer -> try { Bitmap.wrapHardwareBuffer(buffer, SRGB) } finally { buffer.close() } }
             } catch (error: RuntimeException) { null }
-            if (bitmap == null) { returned(image); close(); return null }
+            if (bitmap == null) { returned(image); return failed("the picture was not finished or could not be read") }
             return Picture(bitmap, image, this)
-        } catch (error: RuntimeException) { close(); return null }
+        } catch (error: RuntimeException) { return failed(error.javaClass.simpleName) }
+    }
+
+    /** Fixed words and numbers only; the canvas falls back to drawing whole scenes. */
+    private fun failed(why: String): Picture? {
+        Log.w(TAG, "kept picture not drawn: $why")
+        close()
+        return null
     }
 
     /** Waits for the graphics processor to finish the picture, where the
@@ -116,6 +124,7 @@ internal class PictureSurface(val width: Int, val height: Int) {
     }
 
     private companion object {
+        const val TAG = "VW_CANVAS"
         /** The picture shown, up to two waiting to be released, and the one being drawn. */
         const val MAX_PICTURES = 4
         const val MIN_GAP_MS = 3L
