@@ -100,8 +100,13 @@ class CanvasCostInstrumentedTest {
     }
 
     /** Puts [count] pen strokes into the closed project through the core,
-     * spread evenly over the whole page and all of one shape, so that every
-     * one of them is drawn when the page is. */
+     * spread evenly over the page and all of one shape, so that every one of
+     * them is drawn when the whole page is. The band the measured strokes are
+     * drawn in ([BAND_TOP] to [BAND_BOTTOM] of the page's height) is left
+     * empty on both pages: the pen's loupe draws the page around the nib
+     * magnified, and what it costs follows how many strokes lie there, which
+     * is then the same on both pages. What is compared is what the rest of
+     * the page costs. */
     private fun fillPage(id: String, count: Int): Unit = runBlocking {
         val project = core.open(projectPath(id))
         try {
@@ -117,7 +122,11 @@ class CanvasCostInstrumentedTest {
                 val stroke = project.beginStroke(StrokeOptions(core.newId(now.toULong()), core.newId(now.toULong()), core.newId(now.toULong()),
                     documentId, layer.id, info.deviceId, info.nextLamport, now, "pen", 3.0, 0x1b2a3affu))
                 try {
-                    val x = 20.0 + (w - 80.0) * (index % columns) / columns; val y = 20.0 + (h - 60.0) * (index / columns) / rows
+                    val x = 20.0 + (w - 80.0) * (index % columns) / columns
+                    // Rows over the page's height without the band, in page order.
+                    val above = h * BAND_TOP - 40.0; val below = h * (1 - BAND_BOTTOM) - 60.0
+                    val along = (above + below) * (index / columns) / rows
+                    val y = if (along < above) 20.0 + along else h * BAND_BOTTOM + 20.0 + (along - above)
                     val samples = 12
                     stroke.append(SampleBatch(1uL, DoubleArray(samples) { x + 3.2 * it }, DoubleArray(samples) { y + 6.0 + 6.0 * sin(it * 0.9 + index) },
                         UIntArray(samples) { (it * 8).toUInt() }, FloatArray(samples) { .35f + it * .04f }))
@@ -299,6 +308,9 @@ class CanvasCostInstrumentedTest {
         const val STROKE_MS = 64L
         const val GAP_MS = 450L
         const val FACTOR = 2.0
+        /** The band of the page, as fractions of its height, that the measured strokes are drawn in. */
+        const val BAND_TOP = 0.2
+        const val BAND_BOTTOM = 0.7
         val KEYS = listOf("canvas_draw_time", "canvas_frame_ready", "canvas_ink_drawn", "canvas_first_ink", "canvas_save", "canvas_refresh",
             "canvas_saved_draw", "canvas_saved_ready")
     }

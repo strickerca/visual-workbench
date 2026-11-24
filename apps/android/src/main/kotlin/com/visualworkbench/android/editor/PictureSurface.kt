@@ -41,8 +41,10 @@ internal class PictureSurface(val width: Int, val height: Int) {
         fun release() {
             if (released) return
             released = true
+            livePictures.decrementAndGet()
             bitmap.recycle(); owner.returned(image)
         }
+        init { livePictures.incrementAndGet() }
     }
 
     private val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, MAX_PICTURES,
@@ -55,6 +57,7 @@ internal class PictureSurface(val width: Int, val height: Int) {
         private set
 
     init {
+        liveSurfaces.incrementAndGet()
         try {
             // Not opaque: the picture keeps alpha, and is cleared before each render.
             renderer.isOpaque = false
@@ -136,18 +139,22 @@ internal class PictureSurface(val width: Int, val height: Int) {
     fun close() {
         if (closed) return
         closed = true
+        liveSurfaces.decrementAndGet()
         try { renderer.stop(); renderer.destroy() } catch (error: RuntimeException) { /* Already gone. */ }
         try { reader.close() } catch (error: RuntimeException) { /* Already gone. */ }
         node.discardDisplayList()
     }
 
-    private companion object {
-        const val TAG = "VW_CANVAS"
+    companion object {
+        /** On-device tests only: surfaces not yet closed and pictures not yet released, in this process. */
+        internal val liveSurfaces = java.util.concurrent.atomic.AtomicInteger()
+        internal val livePictures = java.util.concurrent.atomic.AtomicInteger()
+        private const val TAG = "VW_CANVAS"
         /** The picture shown, up to two waiting to be released, and the one being drawn. */
-        const val MAX_PICTURES = 4
-        const val FENCE_WAIT_MS = 500L
-        const val NOT_DRAWN = HardwareRenderer.SYNC_LOST_SURFACE_REWARD_IF_FOUND or HardwareRenderer.SYNC_CONTEXT_IS_STOPPED or
+        private const val MAX_PICTURES = 4
+        private const val FENCE_WAIT_MS = 500L
+        private const val NOT_DRAWN = HardwareRenderer.SYNC_LOST_SURFACE_REWARD_IF_FOUND or HardwareRenderer.SYNC_CONTEXT_IS_STOPPED or
             HardwareRenderer.SYNC_FRAME_DROPPED
-        val SRGB: ColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
+        private val SRGB: ColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
     }
 }
