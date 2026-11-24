@@ -1,6 +1,8 @@
 package com.visualworkbench.android.editor
 
 import com.visualworkbench.android.diagnostics.PenRefusal
+import com.visualworkbench.shared.CoreFailure
+import com.visualworkbench.shared.CoreFailureKind
 import com.visualworkbench.shared.DocumentSnapshot
 import com.visualworkbench.shared.EraserInputRoute
 import com.visualworkbench.shared.WorkbenchDocumentChanges
@@ -9,6 +11,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -93,6 +96,33 @@ internal suspend fun <N : Any, S> inkThenSaveInOrder(lock: Mutex, ink: suspend (
     val saving = async(start = CoroutineStart.UNDISPATCHED) { lock.withLock { save(inked.await()) } }
     val finished = ink()
     if (finished == null) { saving.cancel(); null } else { inked.complete(finished); saving.await() }
+}
+
+/** How long a stroke waits, in its turn, for a project that answers that it is
+ * too busy: to begin a stroke the core could not begin at pen-down, and to
+ * save a finished one. The project's queue holds 16 requests and every
+ * pen-down adds one, so during a stall it can be full when a stroke's turn
+ * comes; it empties in milliseconds once the project runs again. A finished
+ * stroke is the user's work, so its save waits the longer of the two. */
+internal const val BEGIN_PATIENCE_MS = 750L
+internal const val SAVE_PATIENCE_MS = 4_000L
+
+/** Runs [attempt] again for as long as it fails because the project is too
+ * busy ([CoreFailureKind.Backpressure]; nothing was begun or saved by it):
+ * after 8 ms, then after twice as long each time up to a quarter of a second,
+ * and for [patienceMs] of waiting in all. When that is used up the refusal is
+ * thrown, as every other failure is at once. */
+internal suspend fun <T> retryWhileBusy(patienceMs: Long, attempt: suspend () -> T): T {
+    var waited = 0L
+    var pause = 8L
+    while (true) {
+        try { return attempt() }
+        catch (error: CoreFailure) {
+            if (error.kind != CoreFailureKind.Backpressure || waited >= patienceMs) throw error
+            val next = minOf(pause, patienceMs - waited)
+            delay(next); waited += next; pause = minOf(pause * 2, 256L)
+        }
+    }
 }
 
 /** The document as it is now. The project is told which strokes [held]

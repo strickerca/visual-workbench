@@ -845,7 +845,11 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         val token=rotation.begin(handle.pivot,point)?:return false
         rotationGesture=token;rotationDisplay=handle.copy(point=point);rotationPhysical=physical;publish();return true
     }
-    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)}
+    private fun bindWorkflows(){rotation.reconciled();info?.let{repository.observeLamport(it.nextLamport)};bindControls()}
+    /** Binds the layer, tone and frame controls and the document list to the
+     * document shown, at the sequence of the newest announced change. An
+     * announcement fences them until this is done for its sequence. */
+    private fun bindControls(){
         if(streamDraftOnly)return
         workflowAttachment()?.let(workflows::bind)
         val current=project;val doc=document
@@ -2310,7 +2314,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
                 textDraft = if (text != null) TextDraft(hit.objectId, text.anchor, text.text, text.font, text.size) else TextDraft(null, first)
             }
             extendMappedTool(listOf(sample)); publish()
-            if (run != null) diagnostics.pen.penDown(null)
+            // Drawn only if the stroke took its first sample: one that the core
+            // refused to begin, or that ended at once, has said why and is counted so.
+            if (run != null) diagnostics.pen.penDown(if (gesture?.stroke === run) null else PenRefusal.Failed)
         } catch (error: Exception) {
             // A stroke already begun is not left waiting for a pen that will never reach it.
             run?.let { begun -> begun.canceled.set(true); cancelNative(begun.native); begun.queue.close(); begun.drawing = null }
@@ -2548,17 +2554,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
      * was asked of it before; that is waited for, not reported. Null: the
      * stroke was cancelled meanwhile. */
     private suspend fun beginInTurn(current: WorkbenchProject, run: StrokeRun): WorkbenchStroke? {
-        if (run.canceled.get() || run.epoch != epoch) return null
-        var native: WorkbenchStroke? = null
-        var attempt = 0
-        while (native == null) {
-            try { native = current.beginStroke(run.options) }
-            catch (error: CoreFailure) {
-                if (error.kind != CoreFailureKind.Backpressure || attempt == 7) throw error
-                delay(8L shl minOf(attempt++, 5))
-                if (run.canceled.get() || run.epoch != epoch) return null
-            }
-        }
+        val native = retryWhileBusy(BEGIN_PATIENCE_MS) {
+            if (run.canceled.get() || run.epoch != epoch) null else current.beginStroke(run.options)
+        } ?: return null
         run.native = native
         if (run.canceled.get()) { cancelNative(native); return null }
         return native
@@ -2603,7 +2601,13 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
     /** Saves a finished stroke and shows it as saved; a stroke that was
      * cancelled instead is cancelled natively. Runs under the mutation lock,
      * and from the save to the document that shows it under the refresh lock,
-     * so no other read of the document can come between the two. */
+     * so no other read of the document can come between the two.
+     *
+     * A project too busy to take the save has saved nothing and is asked
+     * again ([retryWhileBusy]): with many strokes waiting, its queue can be
+     * full when this stroke's turn comes. The stroke stays on screen as ink
+     * meanwhile. A save still refused after that fails as any save does: it
+     * is reported, never dropped without a word. */
     private suspend fun saveStroke(current: WorkbenchProject, run: StrokeRun, native: WorkbenchStroke) {
         if (!(run.finished && !run.canceled.get() && run.epoch == epoch)) { cancelNative(native); return }
         // Predictions are replaced by canonical real contours before commit.
@@ -2612,7 +2616,9 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             // One trip off the main thread: the save, and the path of the one
             // stroke it hands back.
             val (saved, drawn) = withContext(Dispatchers.Default) {
-                val saved = (native as? WorkbenchStrokeSaves)?.save() ?: StrokeSave(native.commit(), null)
+                val saved = retryWhileBusy(SAVE_PATIENCE_MS) {
+                    (native as? WorkbenchStrokeSaves)?.save() ?: StrokeSave(native.commit(), null)
+                }
                 saved to saved.added?.let { EditorDrawing.objectPath(it.item) }
             }
             run.committed = true
@@ -2748,7 +2754,27 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             if (token != epoch || project !== current || disposing ||
                 !documentRefresh.accepts(fetched.ticket,document,fetched.snapshot)) null
             else Refreshed.Read(fetched.snapshot, prepared)
-        }, adopt = { loaded -> if (loaded is Refreshed.Read) adoptDocument(current, loaded.snapshot, loaded.drawing) })
+        }, adopt = { loaded -> when (loaded) {
+            is Refreshed.Read -> adoptDocument(current, loaded.snapshot, loaded.drawing)
+            Refreshed.Shown -> rebindShown()
+        } })
+    }
+    /** The project announced a change and stands at the revision already
+     * shown, so nothing was read. What the announcement itself set aside is
+     * put back, as the adoption of a read would: it fenced the layer, tone
+     * and frame controls and the document list until the document of its
+     * sequence is bound, and it may have overtaken a composed picture of the
+     * page that was still being made. Nothing else the announcement touches
+     * waits for an adoption: selections and erasers are bound by the scene it
+     * publishes, peer previews are fetched again by their own loop, a tiled
+     * original is fenced by revision, and the format information and a plain
+     * picture are kept past an announced change. An unconfirmed rotation is
+     * not cleared here: that is for a document that was read or saved. */
+    private suspend fun rebindShown() {
+        val doc = document ?: return
+        bindControls()
+        if (!giantMode && !giantDisplayRequired(doc) &&
+            (composedReload.pending || (doc.hasToneAdjustments && !composedCurrent(doc)))) loadBackground()
     }
     /** The information about a document's original names the revision it was
      * read for and otherwise only its source, which no stroke changes. After

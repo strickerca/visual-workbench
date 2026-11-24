@@ -108,6 +108,52 @@ class EditorSyncInstrumentedTest {
         }
     }
 
+    /** The stroke is shown from its own save; the announcement of that save
+     * by the project arrives afterwards. Nothing is read for it, and the
+     * controls the announcement fenced are bound to the document again. The
+     * synthetic project has no layer, tone or frame lists: a control that is
+     * bound asks for its list and ends with an issue, a control still waiting
+     * for its document keeps loading. */
+    @Test fun aSaveAnnouncedAfterItsStrokeIsShownReadsNothingAndBindsTheControlsAgain() = runBlocking {
+        fixture { editor, core, _ ->
+            val project = core.current
+            withContext(Dispatchers.Main) { project.addsStrokes = true; editor.workflows.controls.active(true) }
+            waitUntil { !editor.workflows.controls.state.value.loading }
+            val reads = withContext(Dispatchers.Main) { project.reads }
+            withContext(Dispatchers.Main) {
+                editor.beginTool(sample(10.0, 10.0, 5000), StylusCapabilities(true, false, false, false, false, false))
+                editor.extendTool(listOf(sample(20.0, 20.0, 5010)))
+                editor.finishTool(listOf(sample(30.0, 30.0, 5020)))
+            }
+            waitUntil { editor.pending == 0 && project.added != null &&
+                editor.document?.render?.items?.map { it.objectId } == listOf(project.added?.objectId) }
+            waitUntil { !editor.workflows.controls.state.value.loading }
+            val asked = withContext(Dispatchers.Main) {
+                assertEquals("The stroke was shown from its save, without a read", reads, project.reads)
+                assertEquals(project.shown, editor.document?.render?.revision)
+                project.infoReads
+            }
+            // Only now does the project announce the save.
+            withContext(Dispatchers.Main) { project.announce(1uL) }
+            // The refresh the announcement queued has asked where the project stands.
+            waitUntil { project.infoReads > asked }
+            waitUntil { !editor.workflows.controls.state.value.loading }
+            withContext(Dispatchers.Main) {
+                assertEquals("The announcement of a stroke already shown reads nothing", reads, project.reads)
+                val shown = checkNotNull(editor.document); val revision = shown.render.revision
+                assertEquals(project.shown, revision)
+                assertEquals(WorkflowBinding(revision.projectId, shown.documentId, revision.hostSeq, revision.stateHash),
+                    editor.workflows.navigator.state.value.binding)
+                assertTrue(editor.imageFrames.active(true)); assertTrue(editor.workflows.tones.active(true))
+            }
+            waitUntil { !editor.imageFrames.state.value.loading && !editor.workflows.tones.state.value.loading }
+            withContext(Dispatchers.Main) {
+                assertTrue(editor.imageFrames.active(false)); assertTrue(editor.workflows.tones.active(false))
+                editor.workflows.controls.active(false)
+            }
+        }
+    }
+
     @Test fun backgroundCancelsPreviewAndProjectSwapClosesLinkBeforeProject() = runBlocking {
         fixture { editor, core, link ->
             connect(editor)
@@ -427,7 +473,7 @@ class EditorSyncInstrumentedTest {
         else Transform(camera.scale, 0.0, 0.0, camera.scale, camera.viewportWidth / 2 - camera.center.x * camera.scale, camera.viewportHeight / 2 - camera.center.y * camera.scale)
         override fun mapPoints(camera: Camera, inverse: Boolean, points: List<Point>): List<Point> = cameraMatrix(camera, inverse).let { t -> points.map { Point(it.x * t.a + t.e, it.y * t.d + t.f) } }
     }
-    private class FakeProject(options: CreateProject, private val events: MutableList<String>) : WorkbenchProject, WorkbenchDocumentsProject {
+    private class FakeProject(options: CreateProject, private val events: MutableList<String>) : WorkbenchProject, WorkbenchDocumentsProject, WorkbenchAddedStrokes {
         var pdf=false;private var page=0u
         private fun pages()=List(2){DocumentPage(it.toUInt(),100.0,100.0,listOf(0.0,0.0,100.0,100.0),0u,"$layer-page-$it")}
         override suspend fun documentDescriptor(documentId:String):EditableDescriptor?=if(pdf)EditableDescriptor(documentId,"a".repeat(64),EditableKind.Pdf,pages(),revision)else null
@@ -451,7 +497,29 @@ class EditorSyncInstrumentedTest {
         var stroke: FakeStroke? = null
         var lastEdit: Pair<EditOptions, List<EditCommand>>? = null
         var closed = false
-        override suspend fun info() = revision
+        /** With this on, the save of a stroke hands back what it added, and
+         * the editor may show it without a read. Off: the save returns a
+         * revision only, as in every other test here. */
+        var addsStrokes = false
+        var reads = 0
+        var infoReads = 0
+        var added: RenderItem? = null
+        val shown: ProjectInfo get() = revision
+        override suspend fun info(): ProjectInfo { infoReads++; return revision }
+        fun saved(options: StrokeOptions): StrokeSave {
+            val previous = revision
+            revision = previous.copy(hostSeq = previous.hostSeq + 1uL, stateHash = "stroke-${previous.hostSeq + 1uL}", canUndo = true)
+            val item = RenderItem(options.objectId, options.layerId, 1.0, "normal", Rect(0.0, 0.0, 10.0, 10.0), Contours(longArrayOf(), longArrayOf(), uintArrayOf()),
+                Transform(), ObjectStyle(options.rgba, options.width), Shape.Stroke(options.family), false)
+            items = items + item; added = item
+            return StrokeSave(revision, AddedStroke(previous, item, ByteArray(32), 1024uL))
+        }
+        override fun withAddedStroke(held: DocumentSnapshot, saved: StrokeSave): DocumentSnapshot? {
+            val stroke = saved.added ?: return null
+            return if (held.render.revision == stroke.previous) held.copy(render = RenderList(saved.revision, held.render.items + stroke.item)) else null
+        }
+        /** The announcement of what the project holds now, whenever the test delivers it. */
+        suspend fun announce(sequence: ULong) { changes.emit(ProjectChange(sequence, ChangeKind.Committed, revision)) }
         suspend fun change(sequence: ULong, color: UInt, overlapping: Boolean = false) {
             revision = revision.copy(stateHash = "state-$sequence")
             items = listOf(RenderItem("synthetic-object", layer, 1.0, "normal", Rect(0.0, 0.0, 10.0, 10.0), Contours(longArrayOf(), longArrayOf(), uintArrayOf()),
@@ -464,12 +532,14 @@ class EditorSyncInstrumentedTest {
             changes.emit(ProjectChange(sequence, ChangeKind.Committed, revision))
         }
         override suspend fun document(documentId: String): DocumentSnapshot {
+            reads++
             val value = if(pdf)documentPage(documentId,page)else DocumentSnapshot(documentId, "Synthetic", 100u, 100u, 8u, listOf(LayerInfo(layer, "Marks", true, false, 1.0, "normal")), RenderList(revision, items))
             val hook = nextRead; nextRead = null
             return hook?.invoke(value) ?: value
         }
         override suspend fun background(documentId: String, memoryBudgetBytes: ULong, assumeUntaggedSrgb: Boolean) = BackgroundImage(100u, 100u, ByteArray(40_000) { -1 }, "synthetic-asset", 8u, byteArrayOf())
-        override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke = FakeStroke(revision, events).also { stroke = it }
+        override suspend fun beginStroke(options: StrokeOptions): WorkbenchStroke =
+            if (addsStrokes) AddingStroke(this, options) else FakeStroke(revision, events).also { stroke = it }
         override suspend fun edit(options: EditOptions, commands: List<EditCommand>): ProjectInfo { lastEdit = options to commands; return revision }
         override suspend fun undoRedo(options: EditOptions, redo: Boolean) = revision
         override suspend fun render(documentId: String, rectangle: Rect?) = RenderList(revision, items)
@@ -482,6 +552,17 @@ class EditorSyncInstrumentedTest {
         override suspend fun append(batch: SampleBatch): InkUpdate { count += batch.x.size.toULong(); return InkUpdate(batch.sequence, 0uL, count, Contours(longArrayOf(), longArrayOf(), uintArrayOf())) }
         override suspend fun predict(batch: SampleBatch) = InkUpdate(batch.sequence, 0uL, count, Contours(longArrayOf(), longArrayOf(), uintArrayOf()))
         override suspend fun commit(): ProjectInfo { committed = true; events += "commit"; return revision }
+        override fun cancel() = Unit
+        override suspend fun dispose() = Unit
+    }
+    /** A stroke whose save hands back the stroke it added, as the native one does. */
+    private class AddingStroke(private val project: FakeProject, private val options: StrokeOptions) : WorkbenchStroke, WorkbenchStrokeSaves {
+        private var count = 0uL
+        override suspend fun append(batch: SampleBatch): InkUpdate { count += batch.x.size.toULong(); return InkUpdate(batch.sequence, 0uL, count, Contours(longArrayOf(), longArrayOf(), uintArrayOf())) }
+        override suspend fun predict(batch: SampleBatch) = InkUpdate(batch.sequence, 0uL, count, Contours(longArrayOf(), longArrayOf(), uintArrayOf()))
+        // The synthetic project is confined to the main thread, like the editor.
+        override suspend fun save(): StrokeSave = withContext(Dispatchers.Main) { project.saved(options) }
+        override suspend fun commit(): ProjectInfo = save().revision
         override fun cancel() = Unit
         override suspend fun dispose() = Unit
     }

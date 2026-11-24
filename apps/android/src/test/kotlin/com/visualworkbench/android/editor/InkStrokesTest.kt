@@ -217,6 +217,44 @@ class InkStrokesTest {
         assertEquals("next", inkThenSaveInOrder(lock, ink = { "next" }, save = { it }))
     }
 
+    @Test fun a_save_the_busy_project_refuses_is_asked_again_and_never_given_up_silently(): Unit = runBlocking {
+        // The project's queue is full twice, then it takes the save.
+        var asked = 0
+        assertEquals("saved", retryWhileBusy(1_000) {
+            if (++asked <= 2) throw CoreFailure(CoreFailureKind.Backpressure)
+            "saved"
+        })
+        assertEquals(3, asked)
+        // A project that stays too busy: the refusal itself is thrown once the
+        // patience is used up, so the caller reports it. Waits of 8, 16 and 16 ms.
+        asked = 0
+        val started = System.nanoTime()
+        try { retryWhileBusy<String>(40) { asked++; throw CoreFailure(CoreFailureKind.Backpressure) }; fail("a save that was never taken was given up silently") }
+        catch (error: CoreFailure) { assertEquals(CoreFailureKind.Backpressure, error.kind) }
+        assertEquals(4, asked)
+        assertTrue("it waited between the attempts", (System.nanoTime() - started) / 1_000_000 >= 35)
+        // No patience: asked once.
+        asked = 0
+        try { retryWhileBusy<String>(0) { asked++; throw CoreFailure(CoreFailureKind.Backpressure) }; fail("refusal swallowed") }
+        catch (error: CoreFailure) { assertEquals(1, asked) }
+        // Any other failure is not a busy project and is thrown at once.
+        for (kind in CoreFailureKind.entries) if (kind != CoreFailureKind.Backpressure) {
+            asked = 0
+            try { retryWhileBusy<String>(1_000) { asked++; throw CoreFailure(kind) }; fail("failure swallowed") }
+            catch (error: CoreFailure) { assertEquals(kind, error.kind) }
+            assertEquals(kind.name, 1, asked)
+        }
+        asked = 0
+        try { retryWhileBusy<String>(1_000) { asked++; throw IllegalStateException("other") }; fail("failure swallowed") }
+        catch (error: IllegalStateException) { assertEquals(1, asked) }
+        // A stroke cancelled while it waited to begin answers null and is not asked for again.
+        asked = 0
+        assertNull(retryWhileBusy<String?>(1_000) { asked++; null })
+        assertEquals(1, asked)
+        // The save may wait longer than the begin, and both are bounded.
+        assertTrue(BEGIN_PATIENCE_MS in 500..1_000); assertTrue(SAVE_PATIENCE_MS in 2_000..5_000)
+    }
+
     @Test fun a_refresh_asks_for_changes_and_only_reads_everything_where_the_project_cannot(): Unit = runBlocking {
         var calls = mutableListOf<String>()
         assertSame(changed, readDocument(project(calls, changes = true), "doc", held))

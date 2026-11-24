@@ -96,6 +96,7 @@
     "com.visualworkbench.android.EditorSurfaceInstrumentedTest#everyDrawingToolPersistsAndCancellationCreatesNoObject",
     "com.visualworkbench.android.EditorSurfaceInstrumentedTest#textSelectionMoveResizeEraserUndoAndActivityRecreationUseRealCore",
     "com.visualworkbench.android.EditorSurfaceInstrumentedTest#textSelectionMoveResizeEraserUndoAndActivityRecreationWithLifecycleLog",
+    "com.visualworkbench.android.EditorSyncInstrumentedTest#aSaveAnnouncedAfterItsStrokeIsShownReadsNothingAndBindsTheControlsAgain",
     "com.visualworkbench.android.EditorSyncInstrumentedTest#backgroundCancelsPreviewAndProjectSwapClosesLinkBeforeProject",
     "com.visualworkbench.android.EditorSyncInstrumentedTest#delayedPeerQueryCannotPublishAcrossOfflineAndReconnectStatusGenerations",
     "com.visualworkbench.android.EditorSyncInstrumentedTest#delayedPeerQueryCannotRestoreAnOverlayAfterAnAuthoritativeRefresh",
