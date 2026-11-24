@@ -15,10 +15,15 @@ import com.visualworkbench.android.editor.CanvasSurface
 import com.visualworkbench.android.editor.EditorDrawing
 import com.visualworkbench.android.editor.EditorTool
 import com.visualworkbench.android.editor.WorkbenchScreen
+import com.visualworkbench.shared.Contours
+import com.visualworkbench.shared.DocumentSnapshot
+import com.visualworkbench.shared.EditorWorkflowPanel
 import com.visualworkbench.shared.Point
+import com.visualworkbench.shared.RenderList
 import com.visualworkbench.shared.SampleBatch
 import com.visualworkbench.shared.Shape
 import com.visualworkbench.shared.StrokeOptions
+import com.visualworkbench.shared.WorkflowBinding
 import com.visualworkbench.shared.workbenchCore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -34,6 +39,11 @@ import java.util.concurrent.atomic.AtomicReference
  * native project; the strokes are counted in the project itself after it has
  * been closed. Synthetic pen events only: this proves nothing about a pen's
  * hardware, pressure or feel.
+ *
+ * Every test also checks what the editor was left with once saving had
+ * settled: the document it held must be, item for item and at the same
+ * revision, the document a read of the project returns, and its layer
+ * controls must load for that document.
  *
  * The two tests that count saved strokes use nothing but what the app has
  * always had, so this file can be run unchanged against an older build to
@@ -75,11 +85,63 @@ class PenStrokeBurstInstrumentedTest {
         return File(File(context.filesDir, "projects"), id).canonicalPath
     }
 
-    /** The strokes the closed project holds, read from the core. */
-    private fun savedStrokes(id: String): Int = runBlocking {
+    /** The document the closed project holds, read from the core. */
+    private fun savedDocument(id: String): DocumentSnapshot = runBlocking {
         val project = core.open(projectPath(id))
-        try { project.document(project.info().documentIds.first()).render.items.count { it.shape is Shape.Stroke } }
+        try { project.document(project.info().documentIds.first()) }
         finally { project.close() }
+    }
+
+    /** Null when [held], the document the editor showed, is the document
+     * [read] from the project: the same revision, frame and layers, and the
+     * same items in the same drawing order, outlines included. Otherwise the
+     * first difference. */
+    private fun difference(held: DocumentSnapshot?, read: DocumentSnapshot): String? {
+        if (held == null) return "the editor held no document"
+        val a = held.render.revision; val b = read.render.revision
+        if (a.projectId != b.projectId || a.hostSeq != b.hostSeq || a.stateHash != b.stateHash)
+            return "held revision ${a.hostSeq}/${a.stateHash}, the project is at ${b.hostSeq}/${b.stateHash}"
+        val frame = RenderList(a, emptyList())
+        if (held.copy(render = frame) != read.copy(render = frame)) return "the title, size or layers differ"
+        val heldIds = held.render.items.map { it.objectId }; val readIds = read.render.items.map { it.objectId }
+        if (heldIds != readIds) {
+            val at = heldIds.zip(readIds).indexOfFirst { (x, y) -> x != y }.let { if (it < 0) minOf(heldIds.size, readIds.size) else it }
+            return "held ${heldIds.size} items, a read lists ${readIds.size}; they differ from place $at on"
+        }
+        val empty = Contours(longArrayOf(), longArrayOf(), uintArrayOf())
+        for ((index, pair) in held.render.items.zip(read.render.items).withIndex()) {
+            val (x, y) = pair
+            if (x.copy(contours = empty) != y.copy(contours = empty) || !x.contours.x.contentEquals(y.contours.x) ||
+                !x.contours.y.contentEquals(y.contours.y) || !x.contours.ends.contentEquals(y.contours.ends))
+                return "item $index (${x.objectId}) is not the item a read returns"
+        }
+        return null
+    }
+
+    /** Opens the layer controls and waits for the list of the document that is
+     * shown. Null when it loads; otherwise what was seen instead. Controls
+     * left waiting for a document that never comes keep loading. */
+    private fun layerControlsIssue(scenario: ActivityScenario<MainActivity>): String? {
+        val deadline = SystemClock.uptimeMillis() + 30_000
+        var seen = "the layer controls could not be opened"
+        var bound = false
+        while (!bound && SystemClock.uptimeMillis() < deadline) {
+            scenario.onActivity { activity ->
+                val editor = activity.editor; val workflows = editor.workflows
+                if (workflows.panel.value != EditorWorkflowPanel.Layers) workflows.activate(EditorWorkflowPanel.Layers, true)
+                if (workflows.panel.value == EditorWorkflowPanel.Layers) {
+                    val state = workflows.controls.state.value
+                    val shown = editor.document; val revision = shown?.render?.revision
+                    val expected = if (shown == null || revision == null) null
+                        else WorkflowBinding(revision.projectId, shown.documentId, revision.hostSeq, revision.stateHash)
+                    bound = !state.loading && state.snapshot != null && state.snapshot?.binding == expected
+                    seen = "loading=${state.loading} listed=${state.snapshot != null} for_the_document_shown=${state.snapshot?.binding == expected} issue=${state.issue}"
+                } else seen = "the layer controls did not open: ${editor.message}"
+            }
+            if (!bound) SystemClock.sleep(25)
+        }
+        scenario.onActivity { it.editor.workflows.activate(EditorWorkflowPanel.Layers, false) }
+        return if (bound) null else seen
     }
 
     /** Puts [count] short strokes into the closed project through the core,
@@ -146,9 +208,10 @@ class PenStrokeBurstInstrumentedTest {
     }
 
     /** A new blank page in the real app, [filled] strokes put into it through
-     * the core, then [body] with the page open; afterwards the page is closed
-     * and [closed] gets the project's id. The project is deleted at the end. */
-    private fun withPage(filled: Int, body: (ActivityScenario<MainActivity>) -> Unit, closed: (String) -> Unit) {
+     * the core, then [body] with the page open and [settled] once every
+     * stroke is saved; afterwards the page is closed and [closed] gets the
+     * id of the project. The project is deleted at the end. */
+    private fun withPage(filled: Int, body: (ActivityScenario<MainActivity>) -> Unit, settled: (ActivityScenario<MainActivity>) -> Unit, closed: (String) -> Unit) {
         var owned: String? = null
         var storageClosed = false
         try {
@@ -168,10 +231,12 @@ class PenStrokeBurstInstrumentedTest {
                         scenario.onActivity { assertEquals(filled, it.editor.document?.render?.items?.size) }
                     }
                     body(scenario)
-                } finally {
-                    scenario.onActivity { it.editor.cancelTool() }
                     // Every stroke taken is saved before the page can close.
                     await(scenario, "strokes-saved", timeoutMs = 180_000) { it.editor.pending == 0 && !it.editor.busy }
+                    settled(scenario)
+                } finally {
+                    scenario.onActivity { it.editor.cancelTool(); it.editor.workflows.activate(EditorWorkflowPanel.Layers, false) }
+                    await(scenario, "strokes-saved-to-close", timeoutMs = 180_000) { it.editor.pending == 0 && !it.editor.busy }
                     scenario.onActivity { if (it.editor.screen != WorkbenchScreen.Projects) it.editor.navigate(WorkbenchScreen.Projects) }
                     await(scenario, "page-closed", timeoutMs = 120_000) { it.editor.screen == WorkbenchScreen.Projects && !it.editor.busy }
                     storageClosed = true
@@ -186,31 +251,51 @@ class PenStrokeBurstInstrumentedTest {
         }
     }
 
-    /** Draws [count] strokes onto a page that already holds [filled], and
-     * returns how many of them the closed project holds. */
-    private fun strokesSaved(filled: Int, count: Int, strokeMs: Long, gapMs: Long, opened: (ActivityScenario<MainActivity>) -> Unit = {}): Int {
-        var saved = -1
-        withPage(filled, body = { scenario -> drawStrokes(scenario, count, strokeMs, gapMs); opened(scenario) },
-            closed = { id -> saved = savedStrokes(id) - filled })
-        return saved
+    /** What a burst left behind: how many of its strokes the closed project
+     * holds; how the document the editor held differs from a read of the
+     * project (null: not at all); and what the layer controls showed instead
+     * of the list of that document (null: they loaded it). */
+    private class Burst(val saved: Int, val heldDiffers: String?, val controls: String?)
+
+    /** Draws [count] strokes onto a page that already holds [filled]. */
+    private fun burst(filled: Int, count: Int, strokeMs: Long, gapMs: Long, drawn: (ActivityScenario<MainActivity>) -> Unit = {}): Burst {
+        var held: DocumentSnapshot? = null
+        var controls: String? = null
+        var read: DocumentSnapshot? = null
+        withPage(filled, body = { scenario -> drawStrokes(scenario, count, strokeMs, gapMs); drawn(scenario) },
+            settled = { scenario ->
+                controls = layerControlsIssue(scenario)
+                scenario.onActivity { held = it.editor.document }
+            },
+            closed = { id -> read = savedDocument(id) })
+        val saved = checkNotNull(read)
+        return Burst(saved.render.items.count { it.shape is Shape.Stroke } - filled, difference(held, saved), controls)
+    }
+
+    /** The count first, so that a failure always says how many strokes were
+     * saved; then what the editor held and its controls. */
+    private fun assertAllSaved(what: String, count: Int, burst: Burst) {
+        assertEquals("Saved ${burst.saved} of $count $what", count, burst.saved)
+        assertNull("Saved ${burst.saved} of $count $what, but the document the editor held is not the one a read returns: ${burst.heldDiffers}", burst.heldDiffers)
+        assertNull("Saved ${burst.saved} of $count $what, but the layer controls were not bound to the document shown: ${burst.controls}", burst.controls)
     }
 
     @Test fun fourHundredRapidStrokesOnAFreshPageAreAllSaved() {
         val count = 400
-        val saved = strokesSaved(filled = 0, count = count, strokeMs = 40, gapMs = 50)
-        assertEquals("Saved $saved of $count rapid strokes (40 ms long, 50 ms apart) on a fresh page", count, saved)
+        assertAllSaved("rapid strokes (40 ms long, 50 ms apart) on a fresh page", count,
+            burst(filled = 0, count = count, strokeMs = 40, gapMs = 50))
     }
 
     @Test fun strokesAtAWritingPaceOnAPageOfTwelveHundredStrokesAreAllSaved() {
         val count = 80
-        val saved = strokesSaved(filled = 1_200, count = count, strokeMs = 70, gapMs = 150)
-        assertEquals("Saved $saved of $count strokes (70 ms long, 150 ms apart) on a page that held 1,200", count, saved)
+        assertAllSaved("strokes (70 ms long, 150 ms apart) on a page that held 1,200", count,
+            burst(filled = 1_200, count = count, strokeMs = 70, gapMs = 150))
     }
 
     @Test fun noPenDownForInkIsRefusedWhileEarlierStrokesAreBeingSaved() {
         val count = 150
         var accepted = -1L; var refused = -1L; var report = ""
-        val saved = strokesSaved(filled = 0, count = count, strokeMs = 40, gapMs = 50) { scenario ->
+        val burst = burst(filled = 0, count = count, strokeMs = 40, gapMs = 50) { scenario ->
             scenario.onActivity { activity ->
                 // Read by name, so that this file also compiles against a build
                 // that does not count pen-downs; there this test fails.
@@ -223,9 +308,10 @@ class PenStrokeBurstInstrumentedTest {
                 report = metrics.report(emptyList())
             }
         }
+        val saved = burst.saved
         assertTrue("This build does not count refused pen-downs. Saved $saved of $count strokes", accepted >= 0)
         assertEquals("Pen-downs for ink were refused; saved $saved of $count strokes. $report", 0L, refused)
         assertEquals("Not every pen-down became a stroke; saved $saved of $count strokes. $report", count.toLong(), accepted)
-        assertEquals("Saved $saved of $count strokes although none was refused. $report", count, saved)
+        assertAllSaved("rapid strokes although none was refused. $report", count, burst)
     }
 }
