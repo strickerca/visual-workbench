@@ -283,6 +283,28 @@ class TouchedAreaTest {
         for (at in 1 until held.size) assertTrue(requireNotNull(dense.keyOf(held[at - 1])) < requireNotNull(dense.keyOf(held[at])))
         assertTrue(dense.renumbered > 0)
     }
+    /** Runs of objects put in together into a gap only a few steps of a
+     * double wide: every key is still above the one before it, so that what is
+     * found comes in list order and each object once. */
+    @Test fun objects_put_in_together_into_a_tiny_gap_still_get_keys_in_order() {
+        var serial = 0
+        // All on one spot: every area finds all of them.
+        fun fresh() = item("t${serial++}", bounds = Rect(10.0, 10.0, 5.0, 5.0))
+        var held = List(3) { fresh() }
+        val index = SavedIndex<RenderItem>(100.0, 100.0, { it.bounds }, { true }, { it.objectId }).apply { reset(held) }
+        repeat(240) { round ->
+            // Into the same place each time, right after the second object:
+            // one at a time (the room halves), and every third time six at once.
+            val next = held.toMutableList().apply { repeat(if (round % 3 == 2) 6 else 1) { add(2 + it, fresh()) } }
+            index.follow(next, requireNotNull(objectsDiff(held, next, 1_024)))
+            held = next
+            for (at in 1 until held.size) assertTrue("round $round at $at", requireNotNull(index.keyOf(held[at - 1])) < requireNotNull(index.keyOf(held[at])))
+            val found = requireNotNull(index.near(Rect(0.0, 0.0, 100.0, 100.0), 0.0))
+            assertEquals(held.size, found.size)
+            for (at in held.indices) assertSame(held[at], found[at])
+        }
+        assertTrue(index.renumbered > 0)
+    }
     // endregion
 
     // region What a gesture changes

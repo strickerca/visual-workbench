@@ -125,6 +125,7 @@
     "com.visualworkbench.android.GestureInstrumentedTest#longPressAndHoverDoNotStartDrawing",
     "com.visualworkbench.android.GestureInstrumentedTest#multiFingerTapsRouteUndoRedoAndPinchIsNotAnUndo",
     "com.visualworkbench.android.KeptPictureInstrumentedTest#aChangeOfViewMakesThePictureAgain",
+    "com.visualworkbench.android.KeptPictureInstrumentedTest#changesBesideAMarkerShapesAndTextDrawAgainOnlyWhatTheyTouch",
     "com.visualworkbench.android.KeptPictureInstrumentedTest#framesWhileAnObjectIsMovedTurnedOrErasedAreDrawnOverThePictureAsTheWholeScene",
     "com.visualworkbench.android.KeptPictureInstrumentedTest#strokesDrawnWithThePenAreAddedToThePictureOnceAndTheFrameStaysTheWholeScene",
     "com.visualworkbench.android.KeptPictureInstrumentedTest#thePictureIsMadeAgainAfterRecreationRotationLeavingAndAMemoryWarning",

@@ -367,14 +367,13 @@ internal class PictureComparison(val kept: Bitmap, val whole: Bitmap, val matrix
 
 /** The kept picture of one render session, and the frames drawn from it.
  *
- * [draw] draws a whole frame when the scene allows it. For a scene with no
- * gesture in it, it brings the picture up to the saved scene first (nothing to
- * do, a stroke to add, or all of it again) and then draws the surround, the
- * page, the picture, the ink in progress, the overlays and the magnifier. A
- * change that touched a part of the page (undo, an erasure, a move, a
- * change from the paired computer) is drawn over the picture in that frame,
- * and into the picture by a message right behind it, so that no frame waits
- * for a picture to be drawn off screen. For a scene with a gesture in it
+ * [draw] draws a whole frame when the scene allows it: the surround, the page,
+ * the picture, the ink in progress, the overlays and the magnifier. Strokes
+ * just saved, and a change that touched a part of the page (undo, an erasure,
+ * a move, a change from the paired computer), are drawn over the picture in
+ * that frame, and into the picture by a message right behind it, so that no
+ * frame waits for a picture to be drawn off screen; a picture that has to be
+ * made again from every object is made first. For a scene with a gesture in it
  * (objects being moved or turned, objects hidden while erased) it leaves the
  * picture as it is and draws, over it, the part of the screen the gesture
  * changes. When it returns false nothing was drawn and the caller draws the
@@ -494,6 +493,20 @@ internal class KeptPicture(val counts: PictureCounts = PictureCounts()) {
             return drawFrame(canvas, scene, now.picture, area, index)
         }
         val step = pictureStep(now?.basis, now?.layers, next, ::diffOf, index::find) { it.item }
+        if (step is PictureStep.Append && now != null) {
+            // Strokes just saved are drawn over the picture in this frame, as
+            // a part drawn again, and into the picture by a message right
+            // behind it. Only when they cover too much of the screen, or what
+            // they draw cannot be placed, are they drawn into it first.
+            val area = TouchedArea(width, height)
+            var placed = true
+            for (at in step.from until next.objects.size) if (!addDrawn(area, next.objects[at].item, next.matrix, null)) { placed = false; break }
+            if (placed && !area.large) {
+                wanted = next; wantedScene = scene
+                post.removeCallbacks(settle); post.post(settle)
+                return drawFrame(canvas, scene, now.picture, area, index)
+            }
+        }
         if (step is PictureStep.Patch && !step.area.isEmpty && now != null) {
             // The part that changed is drawn over the picture held, in this
             // frame; the picture itself is brought up to date by a message

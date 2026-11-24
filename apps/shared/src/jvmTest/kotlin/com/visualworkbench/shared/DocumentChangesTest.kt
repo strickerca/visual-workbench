@@ -149,4 +149,96 @@ class DocumentChangesTest {
             drainNativeTransfers(); CoreSmokeContract.disposeDirectory(directory)
         }
     }
+
+    /** Objects that are not strokes come whole at every read. One that did not
+     * change is the caller's very instance, as an unchanged stroke is, so that
+     * a caller tells every object that changed by identity; one that changed is
+     * another instance, and the document is the plain read either way. */
+    @Test fun unchangedObjectsOfEveryKindKeepTheCallersInstances(): Unit = runBlocking {
+        val f = fixture(); val core = workbenchCore()
+        val directory = Files.createTempDirectory("vw-ffi-smoke-").toFile()
+        val now = f.getProperty("time_ms").toLong(); val device = f.getProperty("device_id")
+        val documentId = f.getProperty("id2"); val layerId = f.getProperty("id3")
+        val project = core.create(CreateProject(File(directory, "project").absolutePath, f.getProperty("id1"), documentId, layerId,
+            device, "Every kind", f.getProperty("source_png_hex").bytes(), now))
+        try {
+            val changes = project as WorkbenchDocumentChanges
+            var clock = now.toULong()
+            fun id(): String = core.newId(++clock)
+            suspend fun lamport(): ULong = project.info().nextLamport
+            suspend fun stroke(shift: Double): String {
+                val objectId = id()
+                val native = project.beginStroke(StrokeOptions(id(), id(), objectId, documentId, layerId, device, lamport(), now + 1, "pen", 4.0, 0x203040ffu))
+                try {
+                    native.append(SampleBatch(1uL, doubleArrayOf(10.0 + shift, 20.0 + shift, 30.0 + shift), doubleArrayOf(12.0, 24.0, 18.0),
+                        uintArrayOf(0u, 8u, 16u), floatArrayOf(0.5f, 0.75f, 1f)))
+                    native.commit()
+                } finally { native.dispose() }
+                return objectId
+            }
+            suspend fun edit(vararg commands: EditCommand) { project.edit(EditOptions(id(), documentId, device, lamport(), now + 2), commands.toList()) }
+            fun item(snapshot: DocumentSnapshot, objectId: String) = snapshot.render.items.single { it.objectId == objectId }
+
+            val pen = stroke(0.0)
+            val box = id(); val arrow = id(); val text = id()
+            edit(EditCommand.Create(box, layerId, Shape.Rectangle(Rect(4.0, 5.0, 20.0, 10.0)), ObjectStyle(0x203040ffu, 2.0, fill = 0x8ecae6ffu)),
+                EditCommand.Create(arrow, layerId, Shape.Arrow(listOf(Point(2.0, 3.0), Point(40.0, 30.0))), ObjectStyle(0xc0392bffu, 3.0)),
+                EditCommand.Create(text, layerId, Shape.Text(Point(6.0, 40.0), "Label", "Inter", 14.0), ObjectStyle(0x1f7a4dffu, 1.0)))
+            // A numbered marker, placed as the instruction list places one.
+            val marker = id()
+            run {
+                val info = project.info()
+                val plan = instructionWorkflows(project).prepare(WorkflowBinding(info.projectId, documentId, info.hostSeq, info.stateHash),
+                    WorkflowMetadata(id(), device, info.nextLamport, now + 3), InstructionCommand.PlaceMarker(marker, id(), layerId, Point(30.0, 20.0), null,
+                        emptyList(), ObjectStyle(0x2456c8ffu, 2.0), InstructionRole.Change, "Check this", InstructionEntryMethod.PhoneKeyboard))
+                try { plan.commit() } finally { plan.close() }
+            }
+            var held = checkNotNull(changes.documentChanges(documentId, null))
+            assertSameDocument(project.document(documentId), held)
+            val others = listOf(box, arrow, text, marker)
+            assertTrue(item(held, marker).shape is Shape.Marker)
+
+            // A stroke added, then one moved: every other object is the instance held.
+            val added = stroke(5.0)
+            var next = checkNotNull(changes.documentChanges(documentId, held))
+            assertSameDocument(project.document(documentId), next)
+            for (objectId in others + pen) assertSame(objectId, item(held, objectId), item(next, objectId))
+            held = next
+            edit(EditCommand.SetTransform(added, Transform(e = 4.0, f = 2.0)))
+            next = checkNotNull(changes.documentChanges(documentId, held))
+            assertSameDocument(project.document(documentId), next)
+            for (objectId in others + pen) assertSame(objectId, item(held, objectId), item(next, objectId))
+            assertNotSame(item(held, added), item(next, added))
+            held = next
+
+            // The rectangle restyled: it alone is another instance.
+            edit(EditCommand.SetStyle(box, ObjectStyle(0xe08a00ffu, 2.0, fill = 0x8ecae6ffu)))
+            next = checkNotNull(changes.documentChanges(documentId, held))
+            assertSameDocument(project.document(documentId), next)
+            assertNotSame(item(held, box), item(next, box))
+            assertEquals(0xe08a00ffu, item(next, box).style.rgba)
+            for (objectId in listOf(arrow, text, marker, pen, added)) assertSame(objectId, item(held, objectId), item(next, objectId))
+            held = next
+
+            // The marker moved: it alone is another instance.
+            val placed = item(held, marker).transform
+            edit(EditCommand.SetTransform(marker, Transform(e = 9.0, f = 1.0)))
+            next = checkNotNull(changes.documentChanges(documentId, held))
+            assertSameDocument(project.document(documentId), next)
+            assertNotSame(item(held, marker), item(next, marker))
+            for (objectId in listOf(box, arrow, text, pen, added)) assertSame(objectId, item(held, objectId), item(next, objectId))
+            held = next
+
+            // Undo of the move: the marker as it was, in yet another instance, and the rest kept.
+            project.undoRedo(EditOptions(id(), documentId, device, lamport(), now + 4), redo = false)
+            next = checkNotNull(changes.documentChanges(documentId, held))
+            assertSameDocument(project.document(documentId), next)
+            assertNotSame(item(held, marker), item(next, marker))
+            assertEquals(placed, item(next, marker).transform)
+            for (objectId in listOf(box, arrow, text, pen, added)) assertSame(objectId, item(held, objectId), item(next, objectId))
+        } finally {
+            project.close()
+            drainNativeTransfers(); CoreSmokeContract.disposeDirectory(directory)
+        }
+    }
 }

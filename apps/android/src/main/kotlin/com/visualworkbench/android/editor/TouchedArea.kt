@@ -271,6 +271,10 @@ internal class SavedIndex<T : Any>(val pageWidth: Double, val pageHeight: Double
             // which have keys; were one missing, all keys are given out again.
             val low = if (first == 0) null else keys[next[first - 1]] ?: run { crowded = true; null }
             val high = if (last == next.size - 1) null else keys[next[last + 1]] ?: run { crowded = true; null }
+            // Each key above the one before it (the low neighbour's, then the
+            // last one given) and below the high neighbour's; when the room
+            // between them is too small for that, all keys are given out again.
+            var before = low
             for (k in 0 until count) {
                 val key = when {
                     low == null && high == null -> k.toDouble()
@@ -278,8 +282,9 @@ internal class SavedIndex<T : Any>(val pageWidth: Double, val pageHeight: Double
                     low == null -> high - count + k
                     else -> low + (high - low) * (k + 1) / (count + 1)
                 }
-                if ((low != null && !(key > low)) || (high != null && !(key < high))) crowded = true
+                if ((before != null && !(key > before)) || (high != null && !(key < high))) crowded = true
                 place(next[first + k], key)
+                before = key
             }
             i = j + 1
         }

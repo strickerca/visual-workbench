@@ -30,6 +30,10 @@ import com.visualworkbench.shared.DocumentControlCommand
 import com.visualworkbench.shared.EditCommand
 import com.visualworkbench.shared.EditOptions
 import com.visualworkbench.shared.EraserChoice
+import com.visualworkbench.shared.InstructionCommand
+import com.visualworkbench.shared.InstructionEntryMethod
+import com.visualworkbench.shared.InstructionRole
+import com.visualworkbench.shared.instructionWorkflows
 import com.visualworkbench.shared.LayerControlUpdate
 import com.visualworkbench.shared.ObjectStyle
 import com.visualworkbench.shared.Rect
@@ -753,6 +757,131 @@ class KeptPictureInstrumentedTest {
                 }
             }.start()
         }
+    }
+
+    /** What [fillMixed] put in: how many objects, the strokes, and the other objects. */
+    private class Mixed(val count: Int, val strokes: List<String>, val box: String, val otherBox: String, val arrow: String, val text: String, val marker: String)
+
+    /** Puts a page of one layer into the closed project through the core:
+     * eight straight pen strokes on the left, two filled rectangles on the
+     * right, an arrow and a text below them, and a numbered marker placed as
+     * the instruction list places one. None of the other objects is a stroke:
+     * each read of the document sends them whole. */
+    private fun fillMixed(id: String): Mixed = runBlocking {
+        val project = core.open(projectPath(id))
+        try {
+            var info = project.info()
+            val documentId = info.documentIds.first()
+            val doc = project.document(documentId)
+            val layer = doc.layers.first { it.visible && !it.locked && it.blend == "normal" }
+            val w = doc.width.toDouble(); val h = doc.height.toDouble()
+            fun at(x: Double, y: Double) = Point(w * x, h * y)
+            val strokes = (0 until 8).map { k ->
+                val now = System.currentTimeMillis()
+                val objectId = core.newId(now.toULong())
+                val run = project.beginStroke(StrokeOptions(core.newId(now.toULong()), core.newId(now.toULong()), objectId, documentId, layer.id,
+                    info.deviceId, info.nextLamport, now, "pen", 7.0, listOf(0x1b2a3affu, 0xc0392bffu, 0x1f7a4dffu, 0x2456c8ffu)[k % 4]))
+                try {
+                    val from = at(0.1, 0.15 + 0.05 * k); val to = at(0.45, 0.16 + 0.05 * k); val samples = 16
+                    run.append(SampleBatch(1uL, DoubleArray(samples) { from.x + (to.x - from.x) * it / (samples - 1) },
+                        DoubleArray(samples) { from.y + (to.y - from.y) * it / (samples - 1) }, UIntArray(samples) { (it * 8).toUInt() }, FloatArray(samples) { .6f }))
+                    info = run.commit()
+                } finally { run.dispose() }
+                objectId
+            }
+            val now = System.currentTimeMillis()
+            val box = core.newId(now.toULong()); val otherBox = core.newId(now.toULong() + 1uL)
+            val arrow = core.newId(now.toULong() + 2uL); val text = core.newId(now.toULong() + 3uL)
+            info = project.edit(EditOptions(core.newId(now.toULong()), documentId, info.deviceId, info.nextLamport, now), listOf(
+                EditCommand.Create(box, layer.id, Shape.Rectangle(Rect(w * 0.55, h * 0.15, w * 0.3, h * 0.12)), ObjectStyle(0x2456c8ffu, 4.0, fill = 0x8ecae6ffu)),
+                EditCommand.Create(otherBox, layer.id, Shape.Rectangle(Rect(w * 0.55, h * 0.35, w * 0.3, h * 0.1)), ObjectStyle(0xc0392bffu, 3.0, fill = 0xf5b7b1ffu)),
+                EditCommand.Create(arrow, layer.id, Shape.Arrow(listOf(at(0.1, 0.62), at(0.45, 0.75))), ObjectStyle(0x8e44adffu, 5.0)),
+                EditCommand.Create(text, layer.id, Shape.Text(at(0.55, 0.62), "Label", "Inter", h * 0.04), ObjectStyle(0x1f7a4dffu, 1.0))))
+            val marker = core.newId(System.currentTimeMillis().toULong())
+            val plan = instructionWorkflows(project).prepare(WorkflowBinding(info.projectId, documentId, info.hostSeq, info.stateHash),
+                WorkflowMetadata(core.newId(System.currentTimeMillis().toULong()), info.deviceId, info.nextLamport, System.currentTimeMillis()),
+                InstructionCommand.PlaceMarker(marker, core.newId(System.currentTimeMillis().toULong()), layer.id, at(0.7, 0.82), null, emptyList(),
+                    ObjectStyle(0x2456c8ffu, 3.0), InstructionRole.Change, "Check this", InstructionEntryMethod.PhoneKeyboard))
+            try { plan.commit() } finally { plan.close() }
+            Mixed(strokes.size + 5, strokes, box, otherBox, arrow, text, marker)
+        } finally { project.close() }
+    }
+
+    @Test fun changesBesideAMarkerShapesAndTextDrawAgainOnlyWhatTheyTouch() = withPage(::fillMixed, { it.count }) { scenario, mixed ->
+        val page = pageSize(scenario)
+        fun at(x: Double, y: Double) = Point(page.x * x, page.y * y)
+        scenario.onActivity { assertTrue("The marker is on the page", shown(it, mixed.marker)?.shape is Shape.Marker) }
+        compare(scenario, "opened", REBUILT)
+        choose(scenario, EditorTool.Pen, 8.0, 0xff7a1420)
+        compare(scenario, "pen-chosen", REBUILT)
+
+        /** [change] (which waits until the editor shows it), then a comparison:
+         * a part of the picture was drawn again, and the picture was not made
+         * again, although the marker, the rectangles, the arrow and the text
+         * came whole in the read that showed the change. */
+        fun drawnAgain(phase: String, change: () -> Unit) {
+            val before = counts(scenario)
+            change()
+            await(scenario, "drawn-again-$phase") { settled(it) && requireNotNull(canvas(it.window.decorView)).pictureCounts.patched.get() > before.patched }
+            compare(scenario, phase, PATCHED)
+            val after = counts(scenario)
+            assertEquals("$phase must not make the picture again. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+        }
+        fun objects(): Int { var size = 0; scenario.onActivity { size = it.editor.scene?.objects?.size ?: -1 }; return size }
+
+        stroke(scenario, "stroke", at(0.12, 0.56), at(0.44, 0.58))
+        compare(scenario, "stroke", ADDED)
+        val size = objects()
+        drawnAgain("undo") {
+            scenario.onActivity { it.editor.undo() }
+            await(scenario, "undone") { settled(it) && it.editor.scene?.objects?.size == size - 1 }
+        }
+        // Part of a stroke erased. (The whole-object eraser cannot be used on
+        // a page with a numbered marker: its search builds a path for every
+        // object, and has none for a marker.)
+        scenario.onActivity { it.editor.chooseEraser(EraserChoice.Stroke) }
+        SystemClock.sleep(400); await(scenario, "stroke-eraser") { settled(it) && it.editor.erasers.state.value.ready }
+        drawnAgain("erase-part") {
+            contact(scenario, line(at(0.3, 0.13), at(0.3, 0.17), steps = 6))
+            await(scenario, "erased") { settled(it) && shown(it, mixed.strokes[0]) == null }
+        }
+        scenario.onActivity { it.editor.chooseTool(EditorTool.Select) }
+        SystemClock.sleep(400); await(scenario, "select-tool", predicate = ::settled)
+        deselect(scenario, at(0.93, 0.97))
+        val moved = requireNotNull(shown(scenario, mixed.strokes[3]))
+        drawnAgain("move") {
+            val grip = centre(moved)
+            contact(scenario, line(grip, Point(grip.x + page.x * 0.03, grip.y + page.y * 0.02), steps = 8))
+            await(scenario, "moved") { settled(it) && it.editor.scene?.transformed?.isEmpty() == true && shown(it, mixed.strokes[3])?.transform != moved.transform }
+        }
+        val remote = requireNotNull(shown(scenario, mixed.strokes[5]))
+        val remoteTarget = EditorDrawing.compose(Transform(e = page.x * 0.04, f = page.y * 0.01), remote.transform)
+        drawnAgain("computer-move") {
+            outside(scenario) { listOf(EditCommand.SetTransform(mixed.strokes[5], remoteTarget)) }
+            await(scenario, "computer-moved") { settled(it) && shown(it, mixed.strokes[5])?.transform == remoteTarget }
+        }
+        // A rectangle itself changed: drawn again where it lies.
+        drawnAgain("rectangle-restyled") {
+            outside(scenario) { listOf(EditCommand.SetStyle(mixed.box, ObjectStyle(0xe08a00ffu, 6.0, fill = 0xfad7a0ffu))) }
+            await(scenario, "rectangle-restyled") { settled(it) && shown(it, mixed.box)?.style?.rgba == 0xe08a00ffu }
+        }
+        // The marker itself moved: its label is laid out on the phone and its
+        // box does not tell where that lies, so the whole picture is made again.
+        run {
+            val before = counts(scenario)
+            val placed = requireNotNull(shown(scenario, mixed.marker))
+            val target = EditorDrawing.compose(Transform(e = -page.x * 0.1, f = -page.y * 0.03), placed.transform)
+            outside(scenario) { listOf(EditCommand.SetTransform(mixed.marker, target)) }
+            await(scenario, "marker-moved") { settled(it) && shown(it, mixed.marker)?.transform == target }
+            await(scenario, "made-again-for-the-marker") { requireNotNull(canvas(it.window.decorView)).pictureCounts.rebuilt.get() > before.rebuilt }
+            compare(scenario, "marker-moved", PATCHED)
+        }
+        // The marker, the rectangles, the arrow and the text read again with no change of their own.
+        drawnAgain("after-the-marker") {
+            outside(scenario) { listOf(EditCommand.Delete(mixed.strokes[7])) }
+            await(scenario, "deleted-after-the-marker") { settled(it) && shown(it, mixed.strokes[7]) == null }
+        }
+        assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
     }
 
     @Test fun undoRedoErasingMovingTurningDeletingRestylingAndTheComputerDrawAgainOnlyWhatTheyTouch() = withPage(::fillLayered, { it.count }) { scenario, layered ->
