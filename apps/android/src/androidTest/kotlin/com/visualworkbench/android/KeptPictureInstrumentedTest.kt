@@ -2,6 +2,7 @@
 package com.visualworkbench.android
 
 import android.app.Instrumentation
+import android.app.KeyguardManager
 import android.content.ComponentCallbacks2
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -11,6 +12,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import android.view.InputDevice
@@ -408,6 +410,7 @@ class KeptPictureInstrumentedTest {
         var owned: String? = null
         var storageClosed = false
         var preferences: EditorPreferences? = null
+        screenOnAndUnlocked()
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 await(scenario, "startup") { !it.editor.busy }
@@ -454,6 +457,21 @@ class KeptPictureInstrumentedTest {
             // The differences found, where `am instrument` prints them.
             instrumentation.sendStatus(0, Bundle().apply { putString(Instrumentation.REPORT_KEY_STREAMRESULT, "\n$notes") })
         }
+    }
+
+    /** The canvas is shown, and so drawn, only on a screen that is on and
+     * unlocked. A screen that went dark is woken, by a key event (no setting
+     * is changed); one that stays locked ends the test at once with what is
+     * wrong, rather than with a canvas that never had a surface. The app keeps
+     * the screen on while it is shown. */
+    private fun screenOnAndUnlocked() {
+        val power = context.getSystemService(PowerManager::class.java)
+        val keyguard = context.getSystemService(KeyguardManager::class.java)
+        if (!power.isInteractive) instrumentation.uiAutomation.executeShellCommand("input keyevent KEYCODE_WAKEUP").close()
+        val deadline = SystemClock.uptimeMillis() + 5_000
+        while ((!power.isInteractive || keyguard.isKeyguardLocked) && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
+        assertTrue("The phone's screen is off or locked (interactive=${power.isInteractive} locked=${keyguard.isKeyguardLocked}), " +
+            "so the canvas cannot be shown: unlock the phone and run the test again.", power.isInteractive && !keyguard.isKeyguardLocked)
     }
 
     private fun choose(scenario: ActivityScenario<MainActivity>, tool: EditorTool, width: Double, argb: Long) {

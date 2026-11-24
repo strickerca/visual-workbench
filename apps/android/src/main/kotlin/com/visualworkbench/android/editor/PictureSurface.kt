@@ -138,6 +138,12 @@ internal class PictureSurface(val width: Int, val height: Int, private val maxHe
     var retried = 0
         private set
 
+    /** On-device tests only: so many of the coming renders are taken as not
+     * having come out on their first try, as when the platform renderer skips
+     * a frame, so that the way such a render is made again on a new target is
+     * run whatever the platform does. Zero everywhere else. */
+    @Volatile internal var notDrawnForTest = 0
+
     /** Draws one picture. Null when it could not be drawn; the surface is then
      * closed. Pictures made before stay good. */
     fun render(draw: (Canvas) -> Unit): Picture? {
@@ -145,6 +151,7 @@ internal class PictureSurface(val width: Int, val height: Int, private val maxHe
         var used = target ?: return null
         try {
             var image = used.frame(draw)
+            if (image != null && notDrawnForTest > 0) { notDrawnForTest--; image.close(); image = null }
             if (image == null) {
                 // Put off or skipped: the renderer may still draw it later, so
                 // this target is done with. The pictures it made stay readable.
