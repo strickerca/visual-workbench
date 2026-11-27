@@ -27,8 +27,14 @@ import com.visualworkbench.android.editor.KeptPicture
 import com.visualworkbench.android.editor.PictureSurface
 import com.visualworkbench.android.editor.WorkbenchScreen
 import com.visualworkbench.android.precision.PrecisionDrawing
+import com.visualworkbench.shared.DocumentControlCommand
 import com.visualworkbench.shared.EditCommand
 import com.visualworkbench.shared.EditOptions
+import com.visualworkbench.shared.LayerControlUpdate
+import com.visualworkbench.shared.ObjectStyle
+import com.visualworkbench.shared.Rect
+import com.visualworkbench.shared.Shape
+import com.visualworkbench.shared.documentControlWorkflows
 import com.visualworkbench.shared.VectorEraseEdit
 import com.visualworkbench.shared.VectorEraseTarget
 import com.visualworkbench.shared.WorkflowBinding
@@ -72,7 +78,15 @@ import kotlin.math.sqrt
  *   frame drawn meanwhile (the one that brings the picture up to date);
  * - while a stroke is being moved: the time to draw one frame, drawn as the
  *   canvas draws it (from its kept picture where it can, whole where it
- *   cannot) and finished by the graphics processor.
+ *   cannot) and finished by the graphics processor;
+ * - zoomed three times onto the strokes, while the page is panned, pinched
+ *   out and turned: the saved frames drawn meanwhile, the same frames drawn as
+ *   the canvas draws them and finished, and (reported) from the fingers
+ *   lifting, and from a fit, to a frame that is the whole scene again;
+ * - on pages of 200 and 4,000 strokes (the most the layers panel takes) with
+ *   a highlighter's multiply layer over them: strokes beneath it and in it,
+ *   ink in progress in each drawn as the canvas draws it, and the frame that
+ *   shows the layer hidden, shown and made fainter.
  *
  * The page of five thousand may take at most [FACTOR] times as long as the
  * page of two hundred, plus a small fixed allowance for timer resolution and
@@ -199,14 +213,19 @@ class CanvasCostInstrumentedTest {
      * [moveFrameMs] and [moveRecordMs]: each frame of a stroke being moved,
      * drawn and finished, and the part of that spent recording it. */
     private class Cost(val page: Int, val strokes: Int, val timings: Map<String, Timing>, val shownMs: List<Long>, val report: String,
-                       val changes: Map<Change, Changed>, val moveFrameMs: List<Double>, val moveRecordMs: List<Double>) {
+                       val changes: Map<Change, Changed>, val moveFrameMs: List<Double>, val moveRecordMs: List<Double>,
+                       val views: Map<Gesture, Viewed>, val viewFrames: Map<Gesture, Pair<List<Double>, Double>>, val layered: Layered?) {
         val shownMedian: Double get() = shownMs.sorted().let { if (it.isEmpty()) Double.NaN else it[it.size / 2].toDouble() }
         val shownWorst: Long get() = shownMs.maxOrNull() ?: -1
         fun p50(key: String): Double? = timings[key]?.p50
         override fun toString(): String = "page of $page strokes, $strokes drawn: pen-up to saved scene drawn median=${shownMedian} ms worst=$shownWorst ms (n=${shownMs.size}); " +
             KEYS.joinToString("; ") { key -> "$key ${timings[key] ?: "not measured by this build"}" } +
             "\n  " + Change.entries.joinToString("\n  ") { "${it.name}: ${changes[it] ?: "not measured"}" } +
-            "\n  live move frame p50=${median(moveFrameMs)} ms max=${moveFrameMs.maxOrNull()} ms, recorded p50=${median(moveRecordMs)} ms (n=${moveFrameMs.size})"
+            "\n  live move frame p50=${median(moveFrameMs)} ms max=${moveFrameMs.maxOrNull()} ms, recorded p50=${median(moveRecordMs)} ms (n=${moveFrameMs.size})" +
+            "\n  " + Gesture.entries.joinToString("\n  ") { "${it.name}: ${views[it] ?: "not measured"}" } +
+            "\n  " + viewFrames.entries.joinToString("\n  ") { (gesture, measured) ->
+                "probe ${gesture.name.lowercase()} frame p50=${median(measured.first)} ms max=${measured.first.maxOrNull()} ms, drawing thread per frame ${measured.second} ms" } +
+            (if (layered == null) "" else "\n  $layered")
     }
 
     /** Whether the canvas has drawn the newest scene it was given as a saved
@@ -221,12 +240,13 @@ class CanvasCostInstrumentedTest {
      * open page and measures each. Every event is posted for its own moment
      * before the first is due; after each pen-up the main thread looks once a
      * millisecond for the stroke to be saved and the saved scene to be drawn. */
-    private fun drawAndMeasure(scenario: ActivityScenario<MainActivity>, count: Int, strokeMs: Long, gapMs: Long, expectedBefore: Int): List<Long> {
+    private fun drawAndMeasure(scenario: ActivityScenario<MainActivity>, count: Int, strokeMs: Long, gapMs: Long, expectedBefore: Int,
+                               tool: EditorTool = EditorTool.Pen): List<Long> {
         val done = CountDownLatch(count)
         val shown = java.util.Collections.synchronizedList(ArrayList<Long>())
         val steps = (strokeMs / 8).toInt().coerceAtLeast(2)
         scenario.onActivity { activity ->
-            val editor = activity.editor; editor.chooseTool(EditorTool.Pen)
+            val editor = activity.editor; editor.chooseTool(tool)
             val surface = requireNotNull(canvas(activity.window.decorView))
             val scene = requireNotNull(editor.scene)
             val w = scene.document.width.toDouble(); val h = scene.document.height.toDouble()
@@ -530,9 +550,319 @@ class CanvasCostInstrumentedTest {
     }
     private class AtomicHolder<T> { @Volatile var value: T? = null }
 
+    // Views and layers. The page is zoomed in first, so that a pan brings
+    // strokes into view and a pinch or turn changes what is drawn of them.
+
+    /** The view gestures measured on each page, in the order they are made. */
+    private enum class Gesture { Pan, Pinch, Turn, Fit }
+
+    /** One kind of view gesture, each time it was made: the saved frames drawn
+     * while it went on (drawn, and drawn and ready, by the pen timings), how
+     * many there were, and from its end to a frame that is the whole scene
+     * exactly with nothing left to do ([settleMs]). */
+    private class Viewed(val drawP50: List<Double>, val drawMax: List<Double>, val readyP50: List<Double>, val readyMax: List<Double>,
+                         val frames: List<Int>, val settleMs: List<Long>) {
+        val draw: Double get() = median(drawP50)
+        val ready: Double get() = median(readyP50)
+        val settle: Double get() = median(settleMs.map { it.toDouble() })
+        override fun toString() = "frame draw p50=${draw} ms (max ${drawMax.joinToString("/")}), ready p50=${ready} ms (max ${readyMax.joinToString("/")}), " +
+            "frames ${frames.joinToString("/")}; end to settled exact frame median=${settle} ms (each ${settleMs.joinToString("/")})"
+    }
+
+    /** Whether the frame on screen is drawn from nothing older or softer than
+     * the scene: on a build whose frames during a pan or pinch are drawn whole
+     * there is no other kind, and this is always so. A build that draws them
+     * from pictures moved or scaled says, in [com.visualworkbench.android.editor.PictureCounts],
+     * whether the last frame was one of those. */
+    private fun pictureSettled(surface: CanvasSurface): Boolean {
+        val counts = surface.pictureCounts
+        val field = SOFT_FIELD ?: return true
+        return !(field.get(counts) as java.util.concurrent.atomic.AtomicBoolean).get()
+    }
+
+    /** Makes [steps] calls of [act], one every [STEP_MS] as touch input
+     * comes, between a navigation contact going down and up, as fingers
+     * make them; then times from the contact going up to the canvas having
+     * drawn the newest scene exactly, looked for once a millisecond. */
+    private fun timeGesture(scenario: ActivityScenario<MainActivity>, phase: String, into: MutableMap<Gesture, Viewed>, gesture: Gesture,
+                            steps: Int, contact: Boolean, act: (EditorController, Int) -> Unit) {
+        await(scenario, "ready-for-$phase", predicate = ::canvasReady)
+        SystemClock.sleep(PAUSE_MS)
+        val finished = CountDownLatch(1)
+        var took = -1L
+        var report = ""
+        var drawn = 0L
+        scenario.onActivity { activity ->
+            val editor = activity.editor
+            val surface = requireNotNull(canvas(activity.window.decorView))
+            val main = Handler(Looper.getMainLooper())
+            editor.diagnostics.pen.clear()
+            val framesBefore = surface.pictureCounts.let { it.frames.get() + it.whole.get() }
+            if (contact) editor.navigationContact(true)
+            val first = SystemClock.uptimeMillis() + 50
+            for (k in 0 until steps) main.postAtTime({ act(editor, k) }, first + k * STEP_MS)
+            main.postAtTime({
+                if (contact) editor.navigationContact(false)
+                // The frames of the gesture itself, before anything after it.
+                report = editor.diagnostics.pen.report(emptyList())
+                drawn = surface.pictureCounts.let { it.frames.get() + it.whole.get() } - framesBefore
+                val ended = SystemClock.uptimeMillis()
+                val look = object : Runnable {
+                    override fun run() {
+                        val now = SystemClock.uptimeMillis()
+                        if (!editor.busy && savedSceneDrawn(surface.lifeState()) && pictureSettled(surface)) { took = now - ended; finished.countDown() }
+                        else if (now - ended > CHANGE_TIMEOUT_MS) finished.countDown()
+                        else main.postDelayed(this, 1)
+                    }
+                }
+                main.post(look)
+            }, first + steps * STEP_MS)
+        }
+        assertTrue("$phase: not looked for in time", finished.await(steps * STEP_MS + CHANGE_TIMEOUT_MS + 5_000, TimeUnit.MILLISECONDS))
+        if (took < 0) {
+            var detail = ""
+            scenario.onActivity { activity -> detail = "canvas=${canvas(activity.window.decorView)?.lifeState()} pictures=${canvas(activity.window.decorView)?.pictureCounts}" }
+            fail("$phase: no settled frame within $CHANGE_TIMEOUT_MS ms: $detail")
+        }
+        val read = timings(report)
+        val draw = read["canvas_saved_draw"]; val ready = read["canvas_saved_ready"]
+        val earlier = into[gesture]
+        into[gesture] = Viewed((earlier?.drawP50 ?: emptyList()) + (draw?.p50 ?: Double.NaN), (earlier?.drawMax ?: emptyList()) + (draw?.max ?: Double.NaN),
+            (earlier?.readyP50 ?: emptyList()) + (ready?.p50 ?: Double.NaN), (earlier?.readyMax ?: emptyList()) + (ready?.max ?: Double.NaN),
+            (earlier?.frames ?: emptyList()) + drawn.toInt(), (earlier?.settleMs ?: emptyList()) + took)
+    }
+
+    /** Zooms in on the strokes below the band, then pans across them, pinches
+     * out, turns and fits the page, [VIEW_ROUNDS] times each. */
+    private fun measureViews(scenario: ActivityScenario<MainActivity>): Map<Gesture, Viewed> {
+        val measured = LinkedHashMap<Gesture, Viewed>()
+        tool(scenario) { it.chooseTool(EditorTool.Pen) }
+        repeat(VIEW_ROUNDS) { round ->
+            var middle = Point(0.0, 0.0); var below = Point(0.0, 0.0)
+            scenario.onActivity { activity ->
+                val scene = requireNotNull(activity.editor.scene)
+                middle = Point(scene.camera.viewportWidth / 2, scene.camera.viewportHeight / 2)
+                below = EditorDrawing.map(scene.matrix, Point(scene.document.width.toDouble() * 0.5, scene.document.height.toDouble() * 0.85))
+            }
+            // Unmeasured: three times closer, on the strokes below the band.
+            scenario.onActivity { it.editor.pinch(below.x, below.y, middle.x, middle.y, 3.0, 0.0) }
+            await(scenario, "zoomed-in-$round") { canvasReady(it) && savedSceneDrawn(requireNotNull(canvas(it.window.decorView)).lifeState()) }
+            SystemClock.sleep(400)
+            timeGesture(scenario, "pan-$round", measured, Gesture.Pan, PAN_STEPS, contact = true) { editor, k ->
+                editor.pan(if (k < PAN_STEPS / 2) -9.0 else 7.0, if (k < PAN_STEPS / 2) -5.0 else -6.0) }
+            timeGesture(scenario, "pinch-$round", measured, Gesture.Pinch, PINCH_STEPS, contact = true) { editor, _ ->
+                editor.pinch(middle.x, middle.y, middle.x, middle.y, 0.985, 0.0) }
+            timeGesture(scenario, "turn-$round", measured, Gesture.Turn, PINCH_STEPS, contact = true) { editor, _ ->
+                editor.pinch(middle.x, middle.y, middle.x + 1.0, middle.y, 1.0, 0.012) }
+            timeGesture(scenario, "fit-$round", measured, Gesture.Fit, 1, contact = false) { editor, _ -> editor.fit() }
+        }
+        return measured
+    }
+
+    /** Frames of the page being panned and pinched, drawn as the canvas draws
+     * them (as [liveMoveFrames]), each timed until the graphics processor has
+     * finished it, and the time the drawing thread spent per frame in all,
+     * with whatever the frames left it to do between them. */
+    private fun liveViewFrames(scenario: ActivityScenario<MainActivity>): Map<Gesture, Pair<List<Double>, Double>> {
+        await(scenario, "ready-to-probe-views", predicate = ::canvasReady)
+        var scene: CanvasScene? = null
+        scenario.onActivity { scene = it.editor.scene }
+        val base = requireNotNull(scene)
+        val width = base.camera.viewportWidth.toInt(); val height = base.camera.viewportHeight.toInt()
+        val zoomed = EditorDrawing.compose(Transform(a = 3.0, d = 3.0, e = -width.toDouble(), f = -height * 1.4), base.matrix)
+        val thread = HandlerThread("vw-cost-views").apply { start() }
+        val handler = Handler(thread.looper)
+        val surface = AtomicHolder<PictureSurface>(); val picture = AtomicHolder<KeptPicture>()
+        fun onThread(work: () -> Unit) {
+            val done = CountDownLatch(1); var error: Throwable? = null
+            handler.post { try { work() } catch (t: Throwable) { error = t } finally { done.countDown() } }
+            assertTrue("The drawing thread did not answer", done.await(60, TimeUnit.SECONDS))
+            error?.let { throw it }
+        }
+        fun frame(drawn: CanvasScene): Double {
+            var took = 0L
+            onThread {
+                val start = System.nanoTime()
+                val made = requireNotNull(surface.value).render { canvas ->
+                    if (!requireNotNull(picture.value).draw(canvas, drawn, true, false, false)) PrecisionDrawing.draw(canvas, drawn)
+                }
+                took = System.nanoTime() - start
+                assertNotNull("A probe frame was not drawn", made)
+                made?.release()
+            }
+            return took / 1e6
+        }
+        val result = LinkedHashMap<Gesture, Pair<List<Double>, Double>>()
+        try {
+            onThread { surface.value = PictureSurface(width, height); picture.value = KeptPicture() }
+            for (gesture in listOf(Gesture.Pan, Gesture.Pinch)) {
+                val start = base.copy(revision = base.revision + 1, matrix = zoomed)
+                frame(start); frame(start)
+                // As at rest after the zoom: whatever the first frames left to do is done.
+                SystemClock.sleep(600)
+                val times = ArrayList<Double>()
+                val begun = System.nanoTime()
+                for (step in 1..PROBE_FRAMES) {
+                    val matrix = if (gesture == Gesture.Pan) EditorDrawing.compose(Transform(e = -9.0 * step, f = -5.0 * step), zoomed)
+                        else EditorDrawing.compose(Transform(a = Math.pow(0.985, step.toDouble()), d = Math.pow(0.985, step.toDouble()),
+                            e = width / 2.0 * (1 - Math.pow(0.985, step.toDouble())), f = height / 2.0 * (1 - Math.pow(0.985, step.toDouble()))), zoomed)
+                    val took = frame(base.copy(revision = base.revision + 1 + step, matrix = matrix))
+                    if (step > PROBE_WARM_UP) times += took
+                }
+                // Everything the frames posted to the drawing thread is done before the clock stops.
+                onThread { }
+                val perFrame = (System.nanoTime() - begun) / 1e6 / PROBE_FRAMES
+                result[gesture] = times to perFrame
+            }
+        } finally {
+            onThread { picture.value?.discard(); surface.value?.close() }
+            thread.quitSafely(); thread.join(5_000)
+        }
+        return result
+    }
+
+    /** Puts a highlighter's multiply layer over the page, with wide bands
+     * across all of it, as the paired computer would: a layer the pen's
+     * strokes now lie beneath. Returns the layer's id. */
+    private fun addHighlightLayer(scenario: ActivityScenario<MainActivity>, page: Point): String {
+        val layer = core.newId(System.currentTimeMillis().toULong())
+        var before = 0
+        scenario.onActivity { before = it.editor.scene?.objects?.size ?: -1 }
+        scenario.onActivity { activity ->
+            outside(activity) { project, documentId, _ ->
+                val controls = documentControlWorkflows(project)
+                suspend fun control(command: DocumentControlCommand) {
+                    val info = project.info(); val now = System.currentTimeMillis()
+                    val plan = controls.prepare(WorkflowBinding(info.projectId, documentId, info.hostSeq, info.stateHash),
+                        WorkflowMetadata(core.newId(now.toULong()), info.deviceId, info.nextLamport, now), command)
+                    try { plan.commit() } finally { plan.close() }
+                }
+                control(DocumentControlCommand.CreateAnnotationLayer(layer, "Highlight"))
+                control(DocumentControlCommand.UpdateLayer(LayerControlUpdate(layer, blend = "multiply")))
+                val info = project.info(); val now = System.currentTimeMillis()
+                project.edit(EditOptions(core.newId(now.toULong()), documentId, info.deviceId, info.nextLamport, now),
+                    (0 until HIGHLIGHT_BANDS).map { k ->
+                        EditCommand.Create(core.newId(now.toULong() + k.toULong()), layer, Shape.Rectangle(Rect(page.x * 0.05, page.y * (0.04 + 0.12 * k), page.x * 0.9, page.y * 0.05)),
+                            ObjectStyle(0xf4d03fffu, 0.0, fill = listOf(0xf4d03fffu, 0x58d68dffu, 0x85c1e9ffu)[k % 3]))
+                    })
+            }
+        }
+        await(scenario, "highlight-layer-shown", timeoutMs = 120_000) { canvasReady(it) && it.editor.scene?.objects?.size == before + HIGHLIGHT_BANDS }
+        return layer
+    }
+
+    /** What strokes beneath a layer, highlighter strokes and changes to a
+     * layer's visibility and opacity cost on one page. */
+    private class Layered(val lowerShown: List<Long>, val lowerTimings: Map<String, Timing>, val highShown: List<Long>, val highTimings: Map<String, Timing>,
+                          val changes: Map<String, Changed>, val inkFrames: Map<String, List<Double>>) {
+        override fun toString() = "strokes beneath the highlight layer: pen-up to saved scene drawn median=${median(lowerShown.map { it.toDouble() })} ms " +
+            "(n=${lowerShown.size}); " + LAYER_KEYS.joinToString("; ") { "$it ${lowerTimings[it] ?: "not measured"}" } +
+            "\n  highlighter strokes: pen-up to saved scene drawn median=${median(highShown.map { it.toDouble() })} ms (n=${highShown.size}); " +
+            LAYER_KEYS.joinToString("; ") { "$it ${highTimings[it] ?: "not measured"}" } +
+            "\n  " + changes.entries.joinToString("\n  ") { "${it.key}: ${it.value}" } +
+            "\n  " + inkFrames.entries.joinToString("\n  ") { "probe ink frame ${it.key}: p50=${median(it.value)} ms max=${it.value.maxOrNull()} ms" }
+    }
+
+    /** Frames with a stroke in progress in [layer] (composited as [paint]
+     * says), drawn as the canvas draws them (as [liveMoveFrames]), each timed
+     * until the graphics processor has finished it. */
+    private fun liveInkFrames(scenario: ActivityScenario<MainActivity>, layer: String, paint: RenderItem?): List<Double> {
+        await(scenario, "ready-to-probe-ink", predicate = ::canvasReady)
+        var scene: CanvasScene? = null
+        scenario.onActivity { scene = it.editor.scene }
+        val base = requireNotNull(scene)
+        val page = Point(base.document.width.toDouble(), base.document.height.toDouble())
+        // The newest stroke in the band, as ink in progress in that layer.
+        val stroke = base.objects.last { it.item.shape is Shape.Stroke && it.item.bounds.y > page.y * BAND_TOP && it.item.bounds.y < page.y * BAND_BOTTOM }
+        val ink = stroke.copy(item = stroke.item.copy(objectId = "probe-ink", layerId = layer, layerOpacity = paint?.layerOpacity ?: 1.0,
+            layerBlend = paint?.layerBlend ?: "normal"))
+        val width = base.camera.viewportWidth.toInt(); val height = base.camera.viewportHeight.toInt()
+        val thread = HandlerThread("vw-cost-ink").apply { start() }
+        val handler = Handler(thread.looper)
+        val surface = AtomicHolder<PictureSurface>(); val picture = AtomicHolder<KeptPicture>()
+        fun onThread(work: () -> Unit) {
+            val done = CountDownLatch(1); var error: Throwable? = null
+            handler.post { try { work() } catch (t: Throwable) { error = t } finally { done.countDown() } }
+            assertTrue("The drawing thread did not answer", done.await(60, TimeUnit.SECONDS))
+            error?.let { throw it }
+        }
+        val times = ArrayList<Double>()
+        try {
+            onThread { surface.value = PictureSurface(width, height); picture.value = KeptPicture() }
+            for (step in 0..PROBE_FRAMES) {
+                val drawn = base.copy(revision = base.revision + 1 + step, provisional = listOf(ink))
+                var took = 0L
+                onThread {
+                    val start = System.nanoTime()
+                    val made = requireNotNull(surface.value).render { canvas ->
+                        if (!requireNotNull(picture.value).draw(canvas, drawn, true, false, false)) PrecisionDrawing.draw(canvas, drawn)
+                    }
+                    took = System.nanoTime() - start
+                    made?.release()
+                }
+                // The first frames make the pictures.
+                if (step > PROBE_WARM_UP) times += took / 1e6
+            }
+        } finally {
+            onThread { picture.value?.discard(); surface.value?.close() }
+            thread.quitSafely(); thread.join(5_000)
+        }
+        return times
+    }
+
+    private fun measureLayers(scenario: ActivityScenario<MainActivity>): Layered {
+        var page = Point(0.0, 0.0)
+        scenario.onActivity { val doc = requireNotNull(it.editor.document); page = Point(doc.width.toDouble(), doc.height.toDouble()) }
+        val layer = addHighlightLayer(scenario, page)
+        fun strokes(tool: EditorTool): Pair<List<Long>, Map<String, Timing>> {
+            tool(scenario) { it.chooseTool(tool) }
+            var before = 0
+            scenario.onActivity { before = it.editor.document?.render?.items?.size ?: -1; it.editor.diagnostics.pen.clear() }
+            val shown = drawAndMeasure(scenario, LAYER_STROKES, STROKE_MS, GAP_MS, before, tool)
+            await(scenario, "layer-strokes-saved-$tool", timeoutMs = 120_000) { it.editor.pending == 0 && !it.editor.busy }
+            var report = ""
+            scenario.onActivity { report = it.editor.diagnostics.pen.report(emptyList()) }
+            return shown to timings(report)
+        }
+        val (lowerShown, lowerTimings) = strokes(EditorTool.Pen)
+        val (highShown, highTimings) = strokes(EditorTool.Highlighter)
+        tool(scenario) { it.chooseTool(EditorTool.Pen) }
+        val changes = LinkedHashMap<String, Changed>()
+        fun layerChange(phase: String, key: String, update: LayerControlUpdate, done: (MainActivity) -> Boolean) {
+            val into = HashMap<Change, Changed>()
+            timeChange(scenario, phase, into, Change.Edit, { activity ->
+                outside(activity) { project, documentId, info ->
+                    val now = System.currentTimeMillis()
+                    val plan = documentControlWorkflows(project).prepare(WorkflowBinding(info.projectId, documentId, info.hostSeq, info.stateHash),
+                        WorkflowMetadata(core.newId(now.toULong()), info.deviceId, info.nextLamport, now), DocumentControlCommand.UpdateLayer(update))
+                    try { plan.commit() } finally { plan.close() }
+                }
+            }, done)
+            val one = requireNotNull(into[Change.Edit]); val earlier = changes[key]
+            changes[key] = Changed((earlier?.shownMs ?: emptyList()) + one.shownMs, (earlier?.frameMs ?: emptyList()) + one.frameMs, (earlier?.pictures ?: emptyList()) + one.pictures)
+        }
+        fun inLayer(activity: MainActivity): Int = activity.editor.scene?.objects?.count { it.item.layerId == layer } ?: -1
+        repeat(ROUNDS) { round ->
+            layerChange("hide-$round", "LayerHidden", LayerControlUpdate(layer, visible = false)) { inLayer(it) == 0 }
+            layerChange("show-$round", "LayerShown", LayerControlUpdate(layer, visible = true)) { inLayer(it) > 0 }
+            layerChange("opacity-$round", "LayerOpacity", LayerControlUpdate(layer, opacity = 0.6)) { act ->
+                act.editor.scene?.objects?.firstOrNull { it.item.layerId == layer }?.item?.layerOpacity?.let { kotlin.math.abs(it - 0.6) < 1e-3 } == true }
+            layerChange("opacity-back-$round", "LayerOpacity", LayerControlUpdate(layer, opacity = 1.0)) { act ->
+                act.editor.scene?.objects?.firstOrNull { it.item.layerId == layer }?.item?.layerOpacity?.let { kotlin.math.abs(it - 1.0) < 1e-3 } == true }
+        }
+        var base = ""; var highlight: RenderItem? = null
+        scenario.onActivity { activity ->
+            val doc = requireNotNull(activity.editor.document)
+            base = doc.layers.first { it.visible && !it.locked && it.blend == "normal" }.id
+            highlight = activity.editor.scene?.objects?.firstOrNull { it.item.layerId == layer }?.item
+        }
+        val inkFrames = linkedMapOf("beneath" to liveInkFrames(scenario, base, null), "highlighter" to liveInkFrames(scenario, layer, highlight))
+        return Layered(lowerShown, lowerTimings, highShown, highTimings, changes, inkFrames)
+    }
+
     /** A new blank page with [filled] strokes put into it through the core,
      * then the run of strokes on it and the changes, measured. The project is deleted. */
-    private fun cost(filled: Int): Cost {
+    private fun cost(filled: Int, strokes: Boolean = true, layers: Boolean = true): Cost {
         var owned: String? = null
         var storageClosed = false
         var result: Cost? = null
@@ -562,13 +892,21 @@ class CanvasCostInstrumentedTest {
                     var before = 0
                     scenario.onActivity { before = it.editor.document?.render?.items?.size ?: -1; it.editor.diagnostics.pen.clear() }
                     assertEquals("Not every warm-up stroke was saved", filled + WARM_UP, before)
+                    // A page measured only for its layers: the layers panel takes at most 4,096 objects.
+                    if (!strokes) {
+                        result = Cost(filled, 0, emptyMap(), emptyList(), "", emptyMap(), emptyList(), emptyList(), emptyMap(), emptyMap(), measureLayers(scenario))
+                        return@use
+                    }
                     val shown = drawAndMeasure(scenario, STROKES, STROKE_MS, GAP_MS, before)
                     await(scenario, "strokes-saved", timeoutMs = 120_000) { it.editor.pending == 0 && !it.editor.busy }
                     var report = ""; var after = 0
                     scenario.onActivity { report = it.editor.diagnostics.pen.report(emptyList()); after = it.editor.document?.render?.items?.size ?: -1 }
                     val changes = measureChanges(scenario)
                     val (moveFrames, moveRecords) = liveMoveFrames(scenario)
-                    result = Cost(filled, after - before, timings(report), shown, report, changes, moveFrames, moveRecords)
+                    val views = measureViews(scenario)
+                    val viewFrames = liveViewFrames(scenario)
+                    val layered = if (layers) measureLayers(scenario) else null
+                    result = Cost(filled, after - before, timings(report), shown, report, changes, moveFrames, moveRecords, views, viewFrames, layered)
                 } finally {
                     scenario.onActivity { it.editor.cancelTool(); it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
                     await(scenario, "saved-to-close", timeoutMs = 180_000) { it.editor.pending == 0 && !it.editor.busy }
@@ -588,21 +926,22 @@ class CanvasCostInstrumentedTest {
 
     @Test fun aStrokeCostsTheSameOnAPageOfTwoHundredStrokesAndOnOneOfFiveThousand() {
         val light = cost(LIGHT)
-        val busy = cost(BUSY)
-        val numbers = "\n$light\n$busy\n"
+        val busy = cost(BUSY, layers = false)
+        val layered = cost(LAYERED_BUSY, strokes = false)
+        val numbers = "\n$light\n$busy\n$layered\n"
         Log.i(TAG, numbers)
         instrumentation.sendStatus(0, Bundle().apply { putString(Instrumentation.REPORT_KEY_STREAMRESULT, numbers) })
         assertEquals("Not every stroke was saved on the page of $LIGHT.$numbers", STROKES, light.strokes)
         assertEquals("Not every stroke was saved on the page of $BUSY.$numbers", STROKES, busy.strokes)
         assertTrue("Too few strokes were seen to settle to compare the pages.$numbers", light.shownMs.size >= STROKES * 3 / 4 && busy.shownMs.size >= STROKES * 3 / 4)
 
-        /** The page of five thousand may take [FACTOR] times the page of two hundred, plus [allowance] ms. */
-        fun within(what: String, lightMs: Double?, busyMs: Double?, allowance: Double, required: Boolean = true) {
+        /** The busier page ([busyPage] strokes) may take [FACTOR] times the page of two hundred, plus [allowance] ms. */
+        fun within(what: String, lightMs: Double?, busyMs: Double?, allowance: Double, required: Boolean = true, busyPage: Int = BUSY) {
             if (lightMs == null || busyMs == null || lightMs.isNaN() || busyMs.isNaN()) {
                 if (required) fail("This build did not measure: $what.$numbers")
                 return
             }
-            assertTrue("$what grows with the page: $busyMs ms with $BUSY strokes on it, $lightMs ms with $LIGHT " +
+            assertTrue("$what grows with the page: $busyMs ms with $busyPage strokes on it, $lightMs ms with $LIGHT " +
                 "(allowed: $FACTOR times as long plus $allowance ms).$numbers", busyMs <= lightMs * FACTOR + allowance)
         }
         within("The time to draw one ink frame (canvas_draw_time, median)", light.p50("canvas_draw_time"), busy.p50("canvas_draw_time"), 0.3)
@@ -617,12 +956,48 @@ class CanvasCostInstrumentedTest {
         }
         within("One frame of a stroke being moved, drawn and finished (median)", median(light.moveFrameMs), median(busy.moveFrameMs), 1.0)
         within("One frame of a stroke being moved, recorded (median)", median(light.moveRecordMs), median(busy.moveRecordMs), 0.3)
+        // Views: the frames while the page moves are what is checked; the
+        // time from the end of a gesture to its settled frame is reported (a
+        // pinch, a turn and a fit draw every stroke in view once more, at the
+        // new scale, which grows with the strokes in view).
+        for (gesture in listOf(Gesture.Pan, Gesture.Pinch, Gesture.Turn)) {
+            within("${gesture.name}: one saved frame while the page moves, drawn and ready (canvas_saved_ready, median of medians)",
+                light.views[gesture]?.ready, busy.views[gesture]?.ready, 2.0)
+            within("${gesture.name}: one saved frame while the page moves, drawn (canvas_saved_draw, median of medians)",
+                light.views[gesture]?.draw, busy.views[gesture]?.draw, 0.3)
+        }
+        for (gesture in listOf(Gesture.Pan, Gesture.Pinch)) {
+            within("${gesture.name}: one frame of the moving page, drawn and finished (probe, median)",
+                light.viewFrames[gesture]?.first?.let(::median), busy.viewFrames[gesture]?.first?.let(::median), 1.0)
+            within("${gesture.name}: the drawing thread's time per frame of the moving page, with what the frames left it (probe)",
+                light.viewFrames[gesture]?.second, busy.viewFrames[gesture]?.second, 2.0)
+        }
+        // Layers: strokes beneath another layer and in a highlighter's
+        // multiply layer, and a layer hidden, shown or made fainter, on pages
+        // of 200 and of 4,000 strokes (the most the layers panel takes).
+        val few = requireNotNull(light.layered); val many = requireNotNull(layered.layered)
+        within("Beneath a layer: one ink frame drawn (canvas_draw_time, median)", few.lowerTimings["canvas_draw_time"]?.p50,
+            many.lowerTimings["canvas_draw_time"]?.p50, 0.3, busyPage = LAYERED_BUSY)
+        within("Beneath a layer: from the pen lifting to the saved scene drawn (median)", median(few.lowerShown.map { it.toDouble() }),
+            median(many.lowerShown.map { it.toDouble() }), 5.0, busyPage = LAYERED_BUSY)
+        within("Highlighter: one ink frame drawn (canvas_draw_time, median)", few.highTimings["canvas_draw_time"]?.p50,
+            many.highTimings["canvas_draw_time"]?.p50, 0.3, required = false, busyPage = LAYERED_BUSY)
+        for (where in listOf("beneath", "highlighter")) {
+            within("Ink in progress $where: one frame, drawn and finished (probe, median)", few.inkFrames[where]?.let(::median),
+                many.inkFrames[where]?.let(::median), 1.0, busyPage = LAYERED_BUSY)
+        }
+        within("Highlighter: from the pen lifting to the saved scene drawn (median)", median(few.highShown.map { it.toDouble() }),
+            median(many.highShown.map { it.toDouble() }), 5.0, busyPage = LAYERED_BUSY)
+        for (key in listOf("LayerHidden", "LayerShown", "LayerOpacity")) {
+            within("$key: the saved frame that shows it (longest canvas_saved_draw, median)", few.changes[key]?.frame, many.changes[key]?.frame, 1.0, busyPage = LAYERED_BUSY)
+        }
     }
 
     private companion object {
         const val TAG = "VW_CANVAS_COST"
         const val LIGHT = 200
         const val BUSY = 5_000
+        const val LAYERED_BUSY = 4_000
         const val WARM_UP = 4
         const val STROKES = 24
         const val STROKE_MS = 64L
@@ -638,6 +1013,19 @@ class CanvasCostInstrumentedTest {
         /** Frames of a moving stroke drawn, and how many of the first are not counted. */
         const val PROBE_FRAMES = 40
         const val PROBE_WARM_UP = 5
+        /** View gestures: input every [STEP_MS], as a 120 Hz screen gives it, so many steps each, this many times. */
+        const val STEP_MS = 8L
+        const val PAN_STEPS = 48
+        const val PINCH_STEPS = 32
+        const val VIEW_ROUNDS = 2
+        /** Bands in the highlighter's layer, strokes drawn beneath it and with the highlighter. */
+        const val HIGHLIGHT_BANDS = 8
+        const val LAYER_STROKES = 12
+        val LAYER_KEYS = listOf("canvas_draw_time", "canvas_frame_ready", "canvas_saved_draw", "canvas_saved_ready")
+        /** Present on a build whose frames can be drawn from pictures moved or scaled. */
+        val SOFT_FIELD: java.lang.reflect.Field? = try {
+            com.visualworkbench.android.editor.PictureCounts::class.java.getDeclaredField("soft").apply { isAccessible = true }
+        } catch (error: NoSuchFieldException) { null }
         val KEYS = listOf("canvas_draw_time", "canvas_frame_ready", "canvas_ink_drawn", "canvas_first_ink", "canvas_save", "canvas_refresh",
             "canvas_saved_draw", "canvas_saved_ready")
         fun median(values: List<Double>): Double = values.filter { !it.isNaN() }.sorted().let { if (it.isEmpty()) Double.NaN else it[it.size / 2] }

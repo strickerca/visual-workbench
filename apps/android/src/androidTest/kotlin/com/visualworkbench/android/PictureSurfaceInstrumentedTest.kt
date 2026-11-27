@@ -20,11 +20,14 @@ import java.util.concurrent.atomic.AtomicReference
 /** Every picture a [PictureSurface] hands back is the one just drawn, never
  * an earlier one the platform renderer drew late. Pictures are drawn one after
  * another as fast as the renderer takes them, each a solid colour of its own,
- * so that the renderer takes many of them for a second frame within one display
- * frame and skips them, which sends the render to a new target. Each picture
- * is read back and must show its own colour; pictures held while later ones
- * are drawn must still show theirs when they are given back. Off screen, on
- * the renderer that draws the canvas; nothing here involves the app's UI. */
+ * so that the renderer takes some of them for a second frame within one
+ * display frame and skips them, which sends the render to a new target. That
+ * path is also taken on purpose for a few renders of each part
+ * ([PictureSurface.notDrawnForTest]), so that it is run however the platform
+ * paces its frames. Each picture is read back and must show its own colour;
+ * pictures held while later ones are drawn, also across a change of target,
+ * must still show theirs when they are given back. Off screen, on the renderer
+ * that draws the canvas; nothing here involves the app's UI. */
 @RunWith(AndroidJUnit4::class)
 class PictureSurfaceInstrumentedTest {
     private val instrumentation: Instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -67,6 +70,9 @@ class PictureSurfaceInstrumentedTest {
             try {
                 var index = 0
                 var retriedBefore = 0
+                // Renders sent to a new target on purpose, whatever the platform skips besides.
+                var forced = 0
+                fun force(count: Int) { surface.notDrawnForTest = count; forced += count }
                 fun render(): Drawn {
                     val at = index++
                     val made = surface.render { it.drawColor(colour(at)) }
@@ -79,6 +85,7 @@ class PictureSurfaceInstrumentedTest {
 
                 // Two at a time, the second at once after the first: the renderer
                 // takes the second for the same display frame.
+                force(2)
                 repeat(40) {
                     val first = render(); val second = render()
                     check(first, "pairs"); check(second, "pairs")
@@ -90,6 +97,7 @@ class PictureSurfaceInstrumentedTest {
                 // Three held while more are drawn, two at once each time: the reader
                 // is as full as it may be when the newest image is taken.
                 val held = ArrayDeque<Drawn>()
+                force(2)
                 repeat(30) {
                     while (held.size < 2) held.addLast(render().also { check(it, "filling") })
                     val third = render(); val fourth = render()
@@ -103,15 +111,17 @@ class PictureSurfaceInstrumentedTest {
                 retriedBefore = surface.retried
 
                 // At an ordinary pace: one at a time, a display frame or more apart.
+                force(1)
                 repeat(20) {
                     SystemClock.sleep(20)
                     val one = render(); check(one, "paced"); one.picture.release()
                 }
                 notes.append("paced: 20 renders, ${surface.retried - retriedBefore} made again\n")
-                notes.append("total: $index renders, ${surface.retried} made again on a new target, " +
+                notes.append("total: $index renders, ${surface.retried} made again on a new target ($forced of them on purpose), " +
                     "${PictureSurface.duplicates.get() - duplicatesBefore} older images found behind the newest\n")
-                // The skip this guards against must actually have happened.
-                assertTrue("No render was made again on a new target, so the skipped-frame path was not run.\n$notes", surface.retried > 0)
+                // The skipped-frame path was run, at least as often as it was asked for.
+                assertEquals("Renders asked to be made again that were not.\n$notes", 0, surface.notDrawnForTest)
+                assertTrue("Fewer renders were made again on a new target than were sent there on purpose.\n$notes", surface.retried >= forced)
             } finally { surface.close() }
         }
         Log.i(TAG, notes.toString())

@@ -308,44 +308,79 @@ class TouchedAreaTest {
     // endregion
 
     // region What a gesture changes
-    private val layers = listOf("notes", "top")
-    private fun basis(objects: List<RenderItem>, hidden: Set<String> = emptySet()) =
-        PictureBasis(1000, 1000, Transform(), 1.0, null, true, layers, hidden, objects)
-    private fun area(held: List<RenderItem>, next: List<RenderItem>, transformed: Map<String, Transform> = emptyMap(),
-                     heldHidden: Set<String> = emptySet(), hidden: Set<String> = emptySet()): TouchedArea? =
-        touchedArea(basis(held, heldHidden), DryLayers(layers, held, heldHidden), basis(next, hidden), transformed,
-            requireNotNull(objectsDiff(held, next, 1_024)), { id -> next.firstOrNull { it.objectId == id } }) { it }
+    private fun area(vararg drawn: Pair<RenderItem, Transform?>, extra: Double = 0.0): TouchedArea? {
+        val area = TouchedArea(1000, 1000)
+        for ((item, preview) in drawn) if (!addDrawn(area, item, Transform(), preview, extra)) return null
+        return area
+    }
 
     @Test fun a_stroke_being_moved_touches_where_it_was_and_where_it_is() {
         val stroke = item("s", bounds = Rect(100.0, 100.0, 20.0, 10.0))
-        val other = item("o", bounds = Rect(600.0, 600.0, 10.0, 10.0))
-        val moved = requireNotNull(area(listOf(stroke, other), listOf(stroke, other), mapOf("s" to Transform(e = 300.0))))
+        val moved = requireNotNull(area(stroke to null, stroke to Transform(e = 300.0)))
         assertEquals(setOf(PixelBox(98, 98, 122, 112), PixelBox(398, 98, 422, 112)), moved.boxes.toSet())
-        // Not moved yet: nothing touched.
-        assertTrue(requireNotNull(area(listOf(stroke), listOf(stroke), mapOf("s" to Transform()))).isEmpty)
+        // Not moved yet: only where it lies.
+        assertEquals(listOf(PixelBox(98, 98, 122, 112)), requireNotNull(area(stroke to Transform())).boxes)
     }
-    @Test fun objects_hidden_while_erased_or_shown_again_touch_where_they_lie() {
+    @Test fun over_pictures_drawn_softer_a_change_reaches_further() {
         val stroke = item("s", bounds = Rect(100.0, 100.0, 20.0, 10.0))
-        val hiddenNow = requireNotNull(area(listOf(stroke), listOf(stroke), hidden = setOf("s")))
-        assertEquals(listOf(PixelBox(98, 98, 122, 112)), hiddenNow.boxes)
-        val back = requireNotNull(area(listOf(stroke), listOf(stroke), heldHidden = setOf("s")))
-        assertEquals(listOf(PixelBox(98, 98, 122, 112)), back.boxes)
+        assertEquals(listOf(PixelBox(95, 95, 125, 115)), requireNotNull(area(stroke to null, extra = 3.0)).boxes)
     }
     @Test fun what_cannot_be_drawn_by_parts_is_not_placed() {
-        val a = item("a"); val marker = item("m", shape = Shape.Marker(1u, Point(0.0, 0.0), null))
-        // A marker being moved.
-        assertNull(area(listOf(a, marker), listOf(a, marker), mapOf("m" to Transform(e = 5.0))))
-        // A stroke shown in a layer the document does not list, or composited otherwise than its layer.
-        assertNull(area(listOf(a), listOf(a, item("u", layer = "unlisted"))))
-        assertNull(area(listOf(a), listOf(a, item("t", opacity = 0.5))))
-        // A layer that drew nothing takes the first object shown in it; a second one composited otherwise does not fit.
-        assertNotNull(area(listOf(a), listOf(a, item("h", layer = "top", blend = "multiply"))))
-        assertNull(area(listOf(a), listOf(a, item("h", layer = "top", blend = "multiply"), item("p", layer = "top"))))
-        // A hidden object shown again composited otherwise than its layer.
-        val faint = item("t", opacity = 0.5)
-        assertNull(area(listOf(a, faint), listOf(a, faint), heldHidden = setOf("t")))
-        val plain = item("p")
-        assertNotNull(area(listOf(a, plain), listOf(a, plain), heldHidden = setOf("p")))
+        val marker = item("m", shape = Shape.Marker(1u, Point(0.0, 0.0), null))
+        assertNull(area(marker to Transform(e = 5.0)))
+        assertNull(area(marker to null))
+        assertNull(area(item("r", shape = Shape.Result("asset", "result")) to null))
+        assertNull(area(item("n", bounds = Rect(Double.NaN, 0.0, 1.0, 1.0)) to null))
+    }
+    // endregion
+
+    // region A part drawn again cuts no object
+    @Test fun a_part_drawn_again_grows_until_it_cuts_no_object() {
+        val changed = item("c", bounds = Rect(100.0, 100.0, 20.0, 20.0))
+        val crossing = item("x", bounds = Rect(110.0, 110.0, 100.0, 10.0))
+        val further = item("y", bounds = Rect(200.0, 105.0, 50.0, 50.0))
+        val apart = item("z", bounds = Rect(600.0, 600.0, 10.0, 10.0))
+        val all = listOf(changed, crossing, further, apart)
+        val area = TouchedArea(1000, 1000)
+        assertTrue(addDrawn(area, changed, Transform(), null))
+        // Every object near a box is looked at; the one it cuts joins it, and then the one that one now cuts.
+        closeArea(area, Transform(), { box -> all.filter { boundsMayTouch(it.bounds, Rect(box.left.toDouble(), box.top.toDouble(),
+            (box.right - box.left).toDouble(), (box.bottom - box.top).toDouble()), 0.0) } }, { it }, { null })
+        assertEquals(listOf(PixelBox(98, 98, 252, 157)), area.boxes)
+        // One that lies within, or apart, does not grow it.
+        val inside = TouchedArea(1000, 1000).apply { add(0.0, 0.0, 500.0, 500.0) }
+        closeArea(inside, Transform(), { all }, { it }, { null })
+        assertEquals(listOf(PixelBox(0, 0, 500, 500)), inside.boxes)
+        // An object being moved counts where it is drawn now: here it reaches in from the top left.
+        val moving = TouchedArea(1000, 1000).apply { add(400.0, 400.0, 420.0, 420.0) }
+        closeArea(moving, Transform(), { listOf(apart) }, { it }, { Transform(e = -205.0, f = -205.0) })
+        assertEquals(listOf(PixelBox(393, 393, 420, 420)), moving.boxes)
+        // What cannot be told about makes the whole screen touched.
+        val unknown = TouchedArea(1000, 1000).apply { add(10.0, 10.0, 20.0, 20.0) }
+        closeArea(unknown, Transform(), { null }, { it: RenderItem -> it }, { null })
+        assertTrue(unknown.large)
+        // A marker is drawn as it is: it does not grow the part.
+        val marker = item("m", bounds = Rect(0.0, 0.0, 900.0, 900.0), shape = Shape.Marker(1u, Point(5.0, 5.0), null))
+        val withMarker = TouchedArea(1000, 1000).apply { add(10.0, 10.0, 20.0, 20.0) }
+        closeArea(withMarker, Transform(), { listOf(marker) }, { it }, { null })
+        assertEquals(listOf(PixelBox(10, 10, 20, 20)), withMarker.boxes)
+    }
+
+    @Test fun where_an_object_is_drawn_on_the_screen() {
+        val stroke = item("s", bounds = Rect(10.0, 20.0, 30.0, 40.0))
+        assertArrayEquals(doubleArrayOf(18.0, 38.0, 82.0, 122.0), requireNotNull(drawnBox(stroke, Transform(a = 2.0, d = 2.0), null)), 1e-9)
+        assertArrayEquals(doubleArrayOf(7.0, 17.0, 43.0, 63.0), requireNotNull(drawnBox(stroke, Transform(), null, extra = 1.0)), 1e-9)
+        assertNull(drawnBox(item("m", shape = Shape.Marker(1u, Point(0.0, 0.0), null)), Transform(), null))
+    }
+
+    @Test fun the_common_start_and_end_may_count_objects_alike_as_the_same() {
+        val a = item("a"); val b = item("b"); val c = item("c")
+        val again = listOf(a.copy(layerOpacity = 0.5), b.copy(layerOpacity = 0.5), c)
+        assertEquals(4, requireNotNull(objectsDiff(listOf(a, b, c), again, 1_024)).size)
+        assertTrue(requireNotNull(objectsDiff(listOf(a, b, c), again, 1_024) { x, y -> x.objectId == y.objectId }).isEmpty)
+        // Beyond the common start and end, objects are told apart by identity.
+        val middle = requireNotNull(objectsDiff(listOf(a, b, c), listOf(a, c, b.copy(layerOpacity = 0.5)), 1_024) { x, y -> x.objectId == y.objectId })
+        assertFalse(middle.isEmpty)
     }
     // endregion
 }

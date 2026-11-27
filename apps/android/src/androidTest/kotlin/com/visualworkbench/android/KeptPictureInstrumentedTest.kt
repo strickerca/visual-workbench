@@ -2,6 +2,7 @@
 package com.visualworkbench.android
 
 import android.app.Instrumentation
+import android.app.KeyguardManager
 import android.content.ComponentCallbacks2
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -11,6 +12,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import android.view.InputDevice
@@ -66,43 +68,54 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import kotlin.math.sin
 
-/** The canvas draws its frames from a kept picture of the saved page, and a
- * finished stroke is drawn into that picture once. These tests hold it to the
- * whole-scene drawing it replaces, on the real surface of the real app with a
- * real native project.
+/** The canvas draws its frames from kept pictures of the saved page, one for
+ * each layer that draws, composited with each layer's opacity and blend, and a
+ * finished stroke is drawn into its layer's picture once. These tests hold it
+ * to the whole-scene drawing it replaces, on the real surface of the real app
+ * with a real native project.
  *
  * A comparison asks the canvas, on its drawing thread and for the very scene
  * it has just put on screen, to draw the frame twice off screen with the
- * renderer that draws the canvas: once as it was drawn, from the kept picture
- * the session holds at that moment, and once whole from every object. The two
- * are compared pixel by pixel. A frame that follows a picture made from every
- * object must be the whole scene exactly ([REBUILT]). Once strokes have been
- * added to the picture ([ADDED]), the edge pixels of those strokes may differ
- * by rounding: a whole scene blends a stroke into its layer and the layer into
- * the page, the picture blends the stroke into what is already there, so a
+ * renderer that draws the canvas: once as it was drawn, from the kept
+ * pictures the session holds at that moment, and once whole from every
+ * object. The two are compared pixel by pixel. A frame of a one-layer page
+ * that follows pictures made from every object must be the whole scene
+ * exactly ([REBUILT]). Once strokes have been added to a picture ([ADDED]),
+ * the edge pixels of those strokes may differ by rounding: a whole scene
+ * draws a stroke with everything else, the picture draws it alone, so a
  * colour channel may be one step off. Measured on the S23 (Android 17): at
  * most two pixels of a page differed by more, up to 59 steps, at the
  * anti-aliased edge of an added pen stroke; the renderer does not always
  * smooth the same outline the same way when it is drawn alone and when it is
  * drawn with everything else. [ADDED] allows [COARSE_PIXELS] such pixels, each
- * off by at most [COARSE_STEPS] (a quarter of full coverage). The differences
- * found are written to the log and into the instrumentation's output.
+ * off by at most [COARSE_STEPS] (a quarter of full coverage). On a page of
+ * several layers each layer's picture is drawn alone, and the same bound holds
+ * for every frame ([LAYERED]). The differences found are written to the log
+ * and into the instrumentation's output.
  *
- * A change to the page draws again only the part of the picture it touched,
- * and while an object is moved or turned each frame draws that part over the
- * picture ([PATCHED]: the same bound as [ADDED]). These are checked on a page
- * of three layers (one translucent, one a highlighter's multiply layer) after
- * undo, redo, erasing a whole stroke and part of one, a move, a turn, a
- * deletion, a restyle and edits the paired computer would make, and while the
- * pen is down moving, turning and erasing. Scenes the editor does not make
- * here (objects hidden while they are erased) are drawn by a kept picture of
- * the test's own, as the canvas draws them, and compared the same way.
+ * A change to the page draws again only the part of the pictures it touched,
+ * grown until it cuts no stroke, and while an object is moved or turned each
+ * frame draws that part over the pictures ([PATCHED]: the same bound as
+ * [ADDED]). These are checked on a page of three layers (one translucent, one
+ * a highlighter's multiply layer) after undo, redo, erasing a whole stroke and
+ * part of one, a move, a turn, a deletion, a restyle and edits the paired
+ * computer would make, and while the pen is down moving, turning and erasing.
+ * Strokes in the lowest, the highlighter's and the translucent layer, and ink
+ * in progress in each, are drawn into or over their own layer's picture; a
+ * layer hidden, shown, made fainter, given another blend or put elsewhere
+ * only composites the pictures otherwise (a layer shown draws its own picture
+ * once). After a pan, a pinch, a turn, a fit and a zoom far out and far in,
+ * once the view rests, the frame is the whole scene again; a pan with
+ * everything on the screen whole only moves the pictures, and every frame of
+ * it is the whole scene. Scenes the editor does not make here (objects hidden
+ * while they are erased) are drawn by kept pictures of the test's own, as the
+ * canvas draws them, and compared the same way.
  *
- * The tests also read how often a picture was made from every object, how
- * often a stroke was added to one and how often a part of one was drawn
- * again, so that "drawn into it once", "only what changed" and "made again
- * when it would be wrong" are counted, not assumed; and they look at the
- * composited screen after a pen-up for the stroke that was just drawn.
+ * The tests also read how often pictures were made from every object, how
+ * often a stroke was added to one, a part of one drawn again or one layer's
+ * picture drawn whole, so that "drawn into it once", "only what changed" and
+ * "made again when it would be wrong" are counted, not assumed; and they look
+ * at the composited screen after a pen-up for the stroke that was just drawn.
  *
  * Synthetic pen events only: nothing here judges a pen's feel. */
 @RunWith(AndroidJUnit4::class)
@@ -128,7 +141,7 @@ class KeptPictureInstrumentedTest {
             detail = "busy=${editor.busy} pending=${editor.pending} message=${editor.message} blocked=${editor.blockingMessage} " +
                 "screen=${editor.screen} items=${editor.document?.render?.items?.size} selected=${editor.selected} " +
                 "transformed=${editor.scene?.transformed?.keys} tool=${editor.tool} pictures=${canvas(activity.window.decorView)?.pictureCounts} " +
-                "canvas=${canvas(activity.window.decorView)?.lifeState()}"
+                "canvas=${canvas(activity.window.decorView)?.lifeState()} pen=${editor.diagnostics.pen.report(emptyList()).lines().filter { it.contains("refus") || it.contains("cancel") }}"
         }
         fail("Timed out in $phase: $detail\n$notes")
     }
@@ -272,6 +285,8 @@ class KeptPictureInstrumentedTest {
      * allows. */
     private fun compare(scenario: ActivityScenario<MainActivity>, phase: String, bound: Bound, settle: Boolean = true): Difference {
         if (settle) await(scenario, "settled-before-$phase", predicate = ::settled)
+        // After a pan, a pinch or a turn the pictures are drawn at the view once it rests; till then frames are softer.
+        await(scenario, "exact-before-$phase") { canvas(it.window.decorView)?.pictureCounts?.soft?.get() != true }
         val deadline = SystemClock.uptimeMillis() + 20_000
         var state = "never asked"
         while (SystemClock.uptimeMillis() < deadline) {
@@ -395,6 +410,7 @@ class KeptPictureInstrumentedTest {
         var owned: String? = null
         var storageClosed = false
         var preferences: EditorPreferences? = null
+        screenOnAndUnlocked()
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 await(scenario, "startup") { !it.editor.busy }
@@ -441,6 +457,21 @@ class KeptPictureInstrumentedTest {
             // The differences found, where `am instrument` prints them.
             instrumentation.sendStatus(0, Bundle().apply { putString(Instrumentation.REPORT_KEY_STREAMRESULT, "\n$notes") })
         }
+    }
+
+    /** The canvas is shown, and so drawn, only on a screen that is on and
+     * unlocked. A screen that went dark is woken, by a key event (no setting
+     * is changed); one that stays locked ends the test at once with what is
+     * wrong, rather than with a canvas that never had a surface. The app keeps
+     * the screen on while it is shown. */
+    private fun screenOnAndUnlocked() {
+        val power = context.getSystemService(PowerManager::class.java)
+        val keyguard = context.getSystemService(KeyguardManager::class.java)
+        if (!power.isInteractive) instrumentation.uiAutomation.executeShellCommand("input keyevent KEYCODE_WAKEUP").close()
+        val deadline = SystemClock.uptimeMillis() + 5_000
+        while ((!power.isInteractive || keyguard.isKeyguardLocked) && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
+        assertTrue("The phone's screen is off or locked (interactive=${power.isInteractive} locked=${keyguard.isKeyguardLocked}), " +
+            "so the canvas cannot be shown: unlock the phone and run the test again.", power.isInteractive && !keyguard.isKeyguardLocked)
     }
 
     private fun choose(scenario: ActivityScenario<MainActivity>, tool: EditorTool, width: Double, argb: Long) {
@@ -540,47 +571,103 @@ class KeptPictureInstrumentedTest {
         assertEquals("No picture failed to draw. $after\n$notes", 0L, after.failed)
     }
 
-    @Test fun aChangeOfViewMakesThePictureAgain() = withPage { scenario, _ ->
-        var page = Point(0.0, 0.0)
-        scenario.onActivity { val doc = requireNotNull(it.editor.document); page = Point(doc.width.toDouble(), doc.height.toDouble()) }
-        choose(scenario, EditorTool.Pen, 8.0, 0xff14326e)
-        compare(scenario, "opened", REBUILT)
+    /** One change of view through the editor's own entry points, between a
+     * navigation contact going down and up as fingers make them. */
+    private fun viewChange(scenario: ActivityScenario<MainActivity>, change: (EditorController, Point) -> Unit) {
+        scenario.onActivity { activity ->
+            val camera = requireNotNull(activity.editor.scene).camera
+            activity.editor.navigationContact(true)
+            change(activity.editor, Point(camera.viewportWidth / 2, camera.viewportHeight / 2))
+        }
+        // Frames of the moving view are drawn before the fingers lift.
+        SystemClock.sleep(80)
+        scenario.onActivity { it.editor.navigationContact(false) }
+    }
 
-        /** [change], then a comparison; the picture must have been made again. */
-        fun remade(phase: String, bound: Bound = REBUILT, change: () -> Unit) {
+    @Test fun settledFramesAfterPanPinchTurnFitAndAZoomAcrossLevelsAreTheWholeScene() = withPage(::fillLayered, { it.count }) { scenario, _ ->
+        val page = pageSize(scenario)
+        choose(scenario, EditorTool.Pen, 8.0, 0xff14326e)
+        compare(scenario, "opened", LAYERED)
+
+        /** [change] to the view, then a comparison once it has rested. [made]:
+         * the pictures were drawn again at the view; otherwise they were only
+         * moved, and no frame was softer meanwhile. */
+        fun viewed(phase: String, made: Boolean, contact: Boolean = true, change: (EditorController, Point) -> Unit) {
             val before = counts(scenario)
-            change()
-            compare(scenario, phase, bound)
+            var soft = 0L
+            scenario.onActivity { soft = requireNotNull(canvas(it.window.decorView)).pictureCounts.softFrames.get() }
+            if (contact) viewChange(scenario, change)
+            else scenario.onActivity { activity -> val camera = requireNotNull(activity.editor.scene).camera
+                change(activity.editor, Point(camera.viewportWidth / 2, camera.viewportHeight / 2)) }
+            compare(scenario, phase, LAYERED)
             val after = counts(scenario)
-            assertTrue("$phase must make the picture again. before: $before after: $after\n$notes", after.rebuilt > before.rebuilt)
+            var softAfter = 0L; var shifted = 0L
+            scenario.onActivity { val counted = requireNotNull(canvas(it.window.decorView)).pictureCounts; softAfter = counted.softFrames.get(); shifted = counted.shifted.get() }
+            note("phase=$phase soft_frames=${softAfter - soft} shifted=$shifted")
+            if (made) {
+                assertTrue("$phase must draw the pictures at the view once it rests. before: $before after: $after\n$notes", after.rebuilt > before.rebuilt)
+                assertTrue("$phase: frames while the view moved are drawn from the pictures moved or scaled. before: $before after: $after\n$notes", softAfter > soft)
+            } else {
+                assertEquals("$phase: the pictures are only moved. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+                assertEquals("$phase: every frame of the move is the whole scene. before: $before after: $after\n$notes", soft, softAfter)
+            }
         }
 
-        // The view: pan, zoom, a turn that is not a quarter turn, and back.
-        stroke(scenario, "before-view-changes", Point(page.x * 0.2, page.y * 0.2), Point(page.x * 0.7, page.y * 0.6))
-        compare(scenario, "before-view-changes", ADDED)
-        var middle = Point(0.0, 0.0)
-        scenario.onActivity { val camera = requireNotNull(it.editor.scene).camera; middle = Point(camera.viewportWidth / 2, camera.viewportHeight / 2) }
-        remade("panned") { scenario.onActivity { it.editor.pan(37.0, -21.0) } }
-        remade("zoomed") { scenario.onActivity { it.editor.pinch(middle.x, middle.y, middle.x, middle.y, 1.7, 0.0) } }
-        remade("turned") { scenario.onActivity { it.editor.pinch(middle.x, middle.y, middle.x, middle.y, 0.5, 0.4) } }
-        // In the turned view the page's edge runs across the pixels: a stroke out over it is added to the picture.
+        // A pan with the page, and everything on it, on the screen whole: the
+        // pictures move by whole pixels, nothing is drawn, and every frame is
+        // the whole scene exactly. (The page of three layers keeps every
+        // object within the page.)
+        viewed("panned-whole-page", made = false) { editor, _ -> editor.pan(19.0, -13.0); editor.pan(-4.4, 2.6); editor.pan(-0.6, 0.4) }
+        // Zoomed in three times: drawn smoothed while the fingers move, at the view once they lift.
+        viewed("zoomed", made = true) { editor, middle -> repeat(10) { editor.pinch(middle.x, middle.y, middle.x, middle.y, 1.117, 0.0) } }
+        // A pan while the screen cuts the page: moved meanwhile, drawn at the view once it rests.
+        viewed("panned-zoomed", made = true) { editor, _ -> repeat(12) { editor.pan(-11.0, 7.0) } }
+        viewed("turned", made = true) { editor, middle -> repeat(8) { editor.pinch(middle.x, middle.y, middle.x, middle.y, 1.0, 0.05) } }
+
+        // On the zoomed and turned view: a stroke is added to its layer's
+        // picture, and an undo draws a part of it again.
         run {
             val before = counts(scenario)
-            stroke(scenario, "over-the-turned-edge", Point(page.x * 0.6, page.y * 0.5), Point(page.x * 1.08, page.y * 0.45))
-            compare(scenario, "over-the-turned-edge", ADDED)
+            stroke(scenario, "zoomed-stroke", Point(page.x * 0.45, page.y * 0.45), Point(page.x * 0.55, page.y * 0.52))
+            compare(scenario, "zoomed-stroke", ADDED)
             val after = counts(scenario)
-            assertEquals("The stroke is added to the picture of the turned view. before: $before after: $after\n$notes", before.added + 1, after.added)
+            assertEquals("The stroke on the zoomed view is added to the picture. before: $before after: $after\n$notes", before.added + 1, after.added)
             assertEquals(before.rebuilt, after.rebuilt)
+            // Zoomed in, the part drawn again grows until it cuts no stroke; over
+            // strokes that cross one another it may cover half the screen, and
+            // then the layer's picture is drawn whole instead.
+            val layersBefore = layerDrawn(scenario)
+            scenario.onActivity { it.editor.undo() }
+            await(scenario, "undone-zoomed") { settled(it) && (requireNotNull(canvas(it.window.decorView)).pictureCounts.patched.get() > after.patched ||
+                layerDrawn(it) > layersBefore) }
+            compare(scenario, "zoomed-undo", PATCHED)
+            assertEquals(after.rebuilt, counts(scenario).rebuilt)
         }
-        remade("fitted", ADDED) { scenario.onActivity { it.editor.fit() } }
+        // Fit, a single change with no fingers: drawn at the view at once.
+        viewed("fitted", made = true, contact = false) { editor, _ -> editor.fit() }
+        // Across resolution levels: far out, the page small in the middle; then far in, past where it was.
+        viewed("zoomed-out-far", made = true) { editor, middle -> repeat(6) { editor.pinch(middle.x, middle.y, middle.x, middle.y, 0.72, 0.0) } }
+        viewed("zoomed-in-far", made = true) { editor, middle -> repeat(16) { editor.pinch(middle.x, middle.y, middle.x, middle.y, 1.27, 0.0) } }
+        viewed("fitted-again", made = true, contact = false) { editor, _ -> editor.fit() }
+        // A pan with the page on the screen whole: only moved. Then a stroke out
+        // past the screen's edge: the screen now cuts it, and a pan is drawn at
+        // the view once it rests.
+        viewed("panned-fitted", made = false) { editor, _ -> editor.pan(-9.0, 11.0) }
+        run {
+            val before = counts(scenario)
+            stroke(scenario, "past-the-edge", Point(page.x * 0.6, page.y * 0.5), Point(page.x * 1.2, page.y * 0.45))
+            compare(scenario, "past-the-edge", ADDED)
+            assertEquals(before.added + 1, counts(scenario).added)
+        }
+        viewed("panned-past-the-edge", made = true) { editor, _ -> editor.pan(9.0, -11.0) }
 
-        // The theme is the surround, drawn for every frame: the picture stands and the frame is still the whole scene.
+        // The theme is the surround, drawn for every frame: the pictures stand and the frame is still the whole scene.
         run {
             val before = counts(scenario)
             scenario.onActivity { it.editor.settings(it.editor.preferences.copy(darkTheme = !it.editor.preferences.darkTheme)) }
             compare(scenario, "other-theme", ADDED)
             val after = counts(scenario)
-            assertEquals("The theme is not part of the picture. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+            assertEquals("The theme is not part of the pictures. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
             scenario.onActivity { it.editor.settings(it.editor.preferences.copy(darkTheme = !it.editor.preferences.darkTheme)) }
             compare(scenario, "theme-back", ADDED)
         }
@@ -887,16 +974,19 @@ class KeptPictureInstrumentedTest {
     @Test fun undoRedoErasingMovingTurningDeletingRestylingAndTheComputerDrawAgainOnlyWhatTheyTouch() = withPage(::fillLayered, { it.count }) { scenario, layered ->
         val page = pageSize(scenario)
         fun at(x: Double, y: Double) = Point(page.x * x, page.y * y)
-        compare(scenario, "opened", REBUILT)
+        compare(scenario, "opened", LAYERED)
         choose(scenario, EditorTool.Pen, 8.0, 0xff7a1420)
-        compare(scenario, "pen-chosen", REBUILT)
+        compare(scenario, "pen-chosen", LAYERED)
 
         /** [change] (which waits until the editor shows it), then a comparison:
-         * a part of the picture was drawn again, and the picture was not made again. */
+         * a part of a layer's picture was drawn again, or a stroke added to it
+         * (a stroke that comes back by a redo is added to its layer again), and
+         * no picture was made again. */
         fun drawnAgain(phase: String, change: () -> Unit) {
             val before = counts(scenario)
             change()
-            await(scenario, "drawn-again-$phase") { settled(it) && requireNotNull(canvas(it.window.decorView)).pictureCounts.patched.get() > before.patched }
+            await(scenario, "drawn-again-$phase") { settled(it) && requireNotNull(canvas(it.window.decorView)).pictureCounts.let { counted ->
+                counted.patched.get() > before.patched || counted.added.get() > before.added } }
             compare(scenario, phase, PATCHED)
             val after = counts(scenario)
             assertEquals("$phase must not make the picture again. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
@@ -904,7 +994,7 @@ class KeptPictureInstrumentedTest {
         fun objects(): Int { var size = 0; scenario.onActivity { size = it.editor.scene?.objects?.size ?: -1 }; return size }
 
         // A pen stroke in the layer beneath the translucent and highlighter
-        // layers: it cannot go on top of the picture, and is drawn where it lies.
+        // layers: it is added to that layer's own picture.
         drawnAgain("stroke-beneath") { stroke(scenario, "stroke-beneath", at(0.08, 0.42), at(0.62, 0.47)) }
         var size = objects()
         drawnAgain("undo") {
@@ -981,7 +1071,7 @@ class KeptPictureInstrumentedTest {
         scenario.onActivity { it.editor.chooseTool(EditorTool.Select) }
         SystemClock.sleep(400); await(scenario, "select-tool", predicate = ::settled)
         deselect(scenario, at(0.93, 0.97))
-        compare(scenario, "opened", REBUILT)
+        compare(scenario, "opened", LAYERED)
 
         /** A comparison while the pen is still down: the frame was drawn over the picture, and the picture was not changed. */
         fun over(phase: String, before: Counts) {
@@ -1054,6 +1144,132 @@ class KeptPictureInstrumentedTest {
         assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
     }
 
+    /** A layer command run on the project the editor holds, without the
+     * editor, as the layers panel of the paired computer runs one. */
+    private fun control(scenario: ActivityScenario<MainActivity>, command: DocumentControlCommand) {
+        scenario.onActivity { activity ->
+            val project = EditorController::class.java.getDeclaredField("project").apply { isAccessible = true }.get(activity.editor) as WorkbenchProject
+            val documentId = requireNotNull(activity.editor.document).documentId
+            Thread {
+                runBlocking {
+                    val info = project.info(); val now = System.currentTimeMillis()
+                    val plan = documentControlWorkflows(project).prepare(WorkflowBinding(info.projectId, documentId, info.hostSeq, info.stateHash),
+                        WorkflowMetadata(core.newId(now.toULong()), info.deviceId, info.nextLamport, now), command)
+                    try { plan.commit() } finally { plan.close() }
+                }
+            }.start()
+        }
+    }
+
+    private fun layerDrawn(scenario: ActivityScenario<MainActivity>): Long {
+        var drawn = 0L
+        scenario.onActivity { drawn = layerDrawn(it) }
+        return drawn
+    }
+    private fun layerDrawn(activity: MainActivity): Long = requireNotNull(canvas(activity.window.decorView)).pictureCounts.layers.get()
+
+    @Test fun strokesOnALowerAHighlighterAndATranslucentLayerAreAddedToTheirOwnLayersPicture() = withPage(::fillLayered, { it.count }) { scenario, layered ->
+        val page = pageSize(scenario)
+        fun at(x: Double, y: Double) = Point(page.x * x, page.y * y)
+        compare(scenario, "opened", LAYERED)
+        choose(scenario, EditorTool.Pen, 8.0, 0xff7a1420)
+        compare(scenario, "pen-chosen", LAYERED)
+        var base = ""
+        scenario.onActivity { base = requireNotNull(it.editor.document).layers.first { layer -> layer.visible && !layer.locked && layer.blend == "normal" }.id }
+
+        /** A stroke from [from] to [to] with the chosen tool lands in [layer]:
+         * added to that layer's picture once, nothing drawn again or made again. */
+        fun added(phase: String, layer: String, from: Point, to: Point) {
+            val before = counts(scenario); val layersBefore = layerDrawn(scenario)
+            stroke(scenario, phase, from, to)
+            compare(scenario, phase, ADDED)
+            val after = counts(scenario)
+            var newest: RenderItem? = null
+            scenario.onActivity { activity -> newest = activity.editor.scene?.objects?.lastOrNull { it.item.layerId == layer }?.item }
+            assertNotNull("$phase: the stroke is in its layer\n$notes", newest)
+            assertEquals("$phase: drawn into its layer's picture once. before: $before after: $after\n$notes", before.added + 1, after.added)
+            assertEquals("$phase: no picture made again. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+            assertEquals("$phase: no part drawn again. before: $before after: $after\n$notes", before.patched, after.patched)
+            assertEquals("$phase: no layer's picture drawn whole\n$notes", layersBefore, layerDrawn(scenario))
+        }
+        /** Ink in progress in a layer beneath others or composited otherwise: drawn in its layer's place over the pictures. */
+        fun inkInProgress(phase: String, from: Point, to: Point) {
+            await(scenario, "ready-for-$phase", predicate = ::settled)
+            val before = counts(scenario)
+            contact(scenario, line(from, to), up = false)
+            await(scenario, "ink-$phase") { it.editor.scene?.provisional?.isNotEmpty() == true }
+            compare(scenario, phase, ADDED, settle = false)
+            assertTrue("$phase: the ink frame was drawn from the pictures. before: $before ${counts(scenario)}\n$notes", counts(scenario).frames > before.frames)
+            val held = items(scenario)
+            // The pen-down's events are dated up to 96 ms ahead; the pen lifts after the last of them, as time only goes forward.
+            SystemClock.sleep(150)
+            contact(scenario, listOf(to, to), down = false)
+            await(scenario, "saved-$phase") { settled(it) && it.editor.document?.render?.items?.size == held + 1 }
+        }
+
+        // The pen's layer lies beneath the translucent and the highlighter layers.
+        added("pen-beneath", base, at(0.08, 0.42), at(0.62, 0.47))
+        inkInProgress("ink-beneath", at(0.1, 0.85), at(0.55, 0.62))
+        // The highlighter draws in the multiply layer.
+        choose(scenario, EditorTool.Highlighter, 18.0, 0xfff4d03f)
+        added("highlighter", layered.highlight, at(0.06, 0.38), at(0.64, 0.4))
+        inkInProgress("ink-highlighter", at(0.08, 0.2), at(0.6, 0.25))
+        // With the pen's layer locked, the pen draws in the translucent layer.
+        control(scenario, DocumentControlCommand.UpdateLayer(LayerControlUpdate(base, locked = true)))
+        await(scenario, "base-locked") { settled(it) && it.editor.document?.layers?.firstOrNull { layer -> layer.id == base }?.locked == true }
+        choose(scenario, EditorTool.Pen, 12.0, 0xff1f7a4d)
+        added("pen-translucent", layered.faint, at(0.15, 0.12), at(0.4, 0.55))
+        inkInProgress("ink-translucent", at(0.3, 0.1), at(0.45, 0.58))
+        // Back to the lowest layer and to the highlighter: each stroke still goes into its own layer's picture.
+        control(scenario, DocumentControlCommand.UpdateLayer(LayerControlUpdate(base, locked = false)))
+        await(scenario, "base-unlocked") { settled(it) && it.editor.document?.layers?.firstOrNull { layer -> layer.id == base }?.locked == false }
+        added("pen-beneath-again", base, at(0.12, 0.72), at(0.58, 0.76))
+        choose(scenario, EditorTool.Highlighter, 18.0, 0xff58d68d)
+        added("highlighter-again", layered.highlight, at(0.06, 0.58), at(0.64, 0.6))
+        assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
+    }
+
+    @Test fun hidingShowingAndChangingALayersOpacityBlendOrPlaceOnlyCompositesItsPicture() = withPage(::fillLayered, { it.count }) { scenario, layered ->
+        compare(scenario, "opened", LAYERED)
+        choose(scenario, EditorTool.Pen, 8.0, 0xff7a1420)
+        compare(scenario, "pen-chosen", LAYERED)
+        fun shownIn(activity: MainActivity, layer: String) = activity.editor.scene?.objects?.count { it.item.layerId == layer } ?: -1
+
+        /** [command], and the wait until the editor shows it: the pictures are
+         * composited otherwise, and none is drawn again, in part or whole,
+         * except [drawn] layers' pictures drawn whole. */
+        fun composited(phase: String, command: DocumentControlCommand, drawn: Int = 0, done: (MainActivity) -> Boolean) {
+            val before = counts(scenario); val layersBefore = layerDrawn(scenario)
+            control(scenario, command)
+            await(scenario, "shown-$phase") { settled(it) && done(it) }
+            compare(scenario, phase, LAYERED)
+            val after = counts(scenario)
+            assertEquals("$phase: no picture made again. before: $before after: $after\n$notes", before.rebuilt, after.rebuilt)
+            assertEquals("$phase: no part drawn again. before: $before after: $after\n$notes", before.patched, after.patched)
+            assertEquals("$phase: no stroke added. before: $before after: $after\n$notes", before.added, after.added)
+            assertEquals("$phase: layers' pictures drawn whole\n$notes", layersBefore + drawn, layerDrawn(scenario))
+        }
+        composited("highlight-hidden", DocumentControlCommand.UpdateLayer(LayerControlUpdate(layered.highlight, visible = false))) { shownIn(it, layered.highlight) == 0 }
+        // A layer shown again: its objects come back from the core as new ones, and only its picture is drawn.
+        composited("highlight-shown", DocumentControlCommand.UpdateLayer(LayerControlUpdate(layered.highlight, visible = true)), drawn = 1) { shownIn(it, layered.highlight) > 0 }
+        composited("faint-fainter", DocumentControlCommand.UpdateLayer(LayerControlUpdate(layered.faint, opacity = 0.3))) { activity ->
+            activity.editor.scene?.objects?.firstOrNull { it.item.layerId == layered.faint }?.item?.layerOpacity?.let { kotlin.math.abs(it - 0.3) < 1e-3 } == true }
+        composited("faint-multiply", DocumentControlCommand.UpdateLayer(LayerControlUpdate(layered.faint, blend = "multiply"))) { activity ->
+            activity.editor.scene?.objects?.firstOrNull { it.item.layerId == layered.faint }?.item?.layerBlend == "multiply" }
+        composited("highlight-beneath-faint", DocumentControlCommand.PlaceLayer(layered.highlight, layered.faint)) { activity ->
+            activity.editor.document?.layers?.map { it.id }?.let { ids -> ids.indexOf(layered.highlight) in 0 until ids.indexOf(layered.faint) } == true }
+        composited("faint-plain-again", DocumentControlCommand.UpdateLayer(LayerControlUpdate(layered.faint, opacity = 1.0, blend = "normal"))) { activity ->
+            activity.editor.scene?.objects?.firstOrNull { it.item.layerId == layered.faint }?.item?.layerOpacity?.let { kotlin.math.abs(it - 1.0) < 1e-3 } == true }
+        // Strokes after all of it still go into their layer's picture.
+        val page = pageSize(scenario)
+        val before = counts(scenario)
+        stroke(scenario, "after-composites", Point(page.x * 0.08, page.y * 0.42), Point(page.x * 0.62, page.y * 0.47))
+        compare(scenario, "after-composites", ADDED)
+        assertEquals(before.added + 1, counts(scenario).added)
+        assertEquals(before.rebuilt, counts(scenario).rebuilt)
+        assertEquals("No picture failed to draw. ${counts(scenario)}\n$notes", 0L, counts(scenario).failed)
+    }
+
     /** Draws [layered]'s page as the editor shows it now into a [KeptPicture]
      * on a drawing thread of its own, then frames of scenes made from it, each
      * from the picture as the canvas would draw it and whole, and compares
@@ -1116,6 +1332,12 @@ class KeptPictureInstrumentedTest {
         const val TAG = "VW_KEPT_PICTURE"
         /** A frame that follows a picture made from every object is the whole scene. */
         val REBUILT = Bound(steps = 0, coarse = 0, coarseSteps = 0)
+        /** On a page of several layers, each layer's picture is drawn alone,
+         * and the renderer may smooth an outline drawn alone otherwise than one
+         * drawn with everything else, as for a stroke added to a picture
+         * ([ADDED]): measured on the S23, one or two pixels of a page, at the
+         * edge of a highlighter stroke. */
+        val LAYERED by lazy { ADDED }
         /** After strokes have been added to the picture: rounding at their edges. */
         const val COARSE_PIXELS = 8
         const val COARSE_STEPS = 64

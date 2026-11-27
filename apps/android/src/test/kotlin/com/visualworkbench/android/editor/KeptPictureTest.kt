@@ -5,115 +5,149 @@ import com.visualworkbench.shared.*
 import org.junit.Assert.*
 import org.junit.Test
 
-/** The rules of the kept picture: when a frame may be drawn from it, when it
- * stands as it is, when a finished stroke is drawn into it, when a part of it
- * is drawn again and when it has to be made again; and which saved objects a
- * part of the page may leave out. The drawing itself is framework code and is
- * judged on the device (KeptPictureInstrumentedTest). */
+/** The rules of the kept pictures: which layers have one, when a frame may
+ * be drawn from them, when a finished stroke is drawn into its layer's
+ * picture, when a part of one is drawn again and when one is drawn whole; how
+ * pictures lie in a frame while the view moves, and when they are drawn at the
+ * view again; and which saved objects a part of the page may leave out. The
+ * drawing itself is framework code and is judged on the device
+ * (KeptPictureInstrumentedTest). */
 class KeptPictureTest {
     private fun item(id: String, layer: String, opacity: Double = 1.0, blend: String = "normal", shape: Shape = Shape.Stroke("pen")) =
         RenderItem(id, layer, opacity, blend, Rect(0.0, 0.0, 1.0, 1.0), Contours(longArrayOf(), longArrayOf(), uintArrayOf()),
             Transform(), ObjectStyle(0x203040ffu, 4.0), shape, false)
-    private val layers = listOf("notes", "top")
 
-    // region What may be drawn on top of a picture
-    @Test fun ink_in_the_layer_drawn_last_with_plain_compositing_may_go_on_top() {
-        // Empty document, one layer with strokes, and the top one of two layers.
-        assertTrue(wetInkOnTop(listOf("notes"), emptyList(), listOf(item("w", "notes")), emptySet()))
-        assertTrue(wetInkOnTop(listOf("notes"), listOf(item("a", "notes"), item("b", "notes")), listOf(item("w", "notes")), emptySet()))
-        assertTrue(wetInkOnTop(layers, listOf(item("a", "notes"), item("b", "top")), listOf(item("w", "top")), emptySet()))
-        // A layer above that has nothing drawn does not cover the ink.
-        assertTrue(wetInkOnTop(layers, listOf(item("a", "notes")), listOf(item("w", "notes")), emptySet()))
-        // Hidden objects above are not drawn either.
-        assertTrue(wetInkOnTop(layers, listOf(item("a", "notes"), item("b", "top")), listOf(item("w", "notes")), setOf("b")))
-        // A layer the document does not list yet is drawn after every other one.
-        assertTrue(wetInkOnTop(layers, listOf(item("a", "notes"), item("b", "top")), listOf(item("w", "fresh")), emptySet()))
-        // Two strokes in flight in the same top layer.
-        assertTrue(wetInkOnTop(listOf("notes"), listOf(item("a", "notes")), listOf(item("w1", "notes"), item("w2", "notes")), emptySet()))
+    // region Layers: one picture each, composited for every frame
+    private fun stroke(id: String, layer: String, opacity: Double = 1.0, blend: String = "normal", contours: Contours = Contours(longArrayOf(0, 256, 0), longArrayOf(0, 0, 256), uintArrayOf(3u))) =
+        RenderItem(id, layer, opacity, blend, Rect(0.0, 0.0, 1.0, 1.0), contours, Transform(), ObjectStyle(0x203040ffu, 4.0), Shape.Stroke("pen"), false)
+
+    @Test fun each_layer_s_objects_are_listed_in_drawing_order_and_the_layers_as_the_scene_draws_them() {
+        val objects = listOf(item("a", "notes"), item("u", "unlisted"), item("b", "top"), item("c", "notes"), item("v", "later"), item("d", "top"))
+        val lists = layerLists(listOf("top", "notes", "empty"), objects) { it }
+        // The document's layers first, in its order; then the others by first use. An empty layer has no list.
+        assertEquals(listOf("top", "notes", "unlisted", "later"), lists.order)
+        assertEquals(listOf("b", "d"), lists.of("top").map { it.objectId })
+        assertEquals(listOf("a", "c"), lists.of("notes").map { it.objectId })
+        assertTrue(lists.of("empty").isEmpty())
+        assertEquals(setOf("top", "notes", "unlisted", "later"), lists.layers)
+        // How a layer is composited comes from its first drawn object.
+        assertEquals("c", firstDrawn(lists.of("notes"), setOf("a")) { it }?.objectId)
+        assertNull(firstDrawn(lists.of("notes"), setOf("a", "c")) { it })
     }
-    @Test fun ink_under_another_layer_needs_the_whole_scene() {
-        assertFalse(wetInkOnTop(layers, listOf(item("a", "notes"), item("b", "top")), listOf(item("w", "notes")), emptySet()))
-        // Also when the covering layer is one the document does not list.
-        assertFalse(wetInkOnTop(listOf("notes"), listOf(item("a", "notes"), item("b", "later")), listOf(item("w", "notes")), emptySet()))
-        // Ink spread over two layers is never taken apart.
-        assertFalse(wetInkOnTop(layers, emptyList(), listOf(item("w1", "notes"), item("w2", "top")), emptySet()))
-    }
-    @Test fun a_multiply_or_translucent_layer_needs_the_whole_scene() {
-        assertFalse(wetInkOnTop(listOf("notes"), emptyList(), listOf(item("w", "notes", blend = "multiply")), emptySet()))
-        assertFalse(wetInkOnTop(listOf("notes"), emptyList(), listOf(item("w", "notes", opacity = 0.99)), emptySet()))
-        // The layer is composited the way its first drawn object says, not the way the wet stroke says.
-        assertFalse(wetInkOnTop(listOf("notes"), listOf(item("a", "notes", blend = "multiply")), listOf(item("w", "notes")), emptySet()))
-        assertFalse(wetInkOnTop(listOf("notes"), listOf(item("a", "notes", opacity = 0.5)), listOf(item("w", "notes")), emptySet()))
-        assertTrue(wetInkOnTop(listOf("notes"), listOf(item("a", "notes")), listOf(item("w", "notes", blend = "multiply")), emptySet()))
-        // A hidden first object does not decide; the first drawn one does.
-        assertTrue(wetInkOnTop(listOf("notes"), listOf(item("a", "notes", opacity = 0.5), item("b", "notes")), listOf(item("w", "notes")), setOf("a")))
-        // Result pixels are drawn by their own route.
-        assertFalse(wetInkOnTop(listOf("notes"), emptyList(), listOf(item("w", "notes", shape = Shape.Result("asset", "result"))), emptySet()))
-        assertFalse(wetInkOnTop(listOf("notes"), listOf(item("a", "notes", shape = Shape.Result("asset", "result"))), listOf(item("w", "notes")), emptySet()))
-    }
-    @Test fun no_wet_ink_means_there_is_nothing_to_draw_on_top() {
-        assertFalse(wetInkOnTop(listOf("notes"), listOf(item("a", "notes")), emptyList(), emptySet()))
-        assertFalse(wetInkOnTop(listOf("notes"), listOf(item("a", "notes")), listOf(item("w", "notes")), setOf("w")))
-    }
-    @Test fun the_saved_part_is_worked_out_once_and_asked_for_every_frame() {
-        val saved = DryLayers(layers, listOf(item("a", "notes"), item("b", "top", opacity = 0.5)), emptySet())
-        assertFalse(saved.inkOnTop(listOf(item("w", "top")), emptySet()))
-        assertFalse(saved.inkOnTop(listOf(item("w", "notes")), emptySet()))
-        assertTrue(saved.inkOnTop(listOf(item("w", "fresh")), emptySet()))
-    }
-    /** After a stroke is saved the layer order is extended by that stroke, not
-     * worked out again from every object: the answers must be the same. */
-    @Test fun objects_added_at_the_end_give_the_same_answers_as_starting_over() {
-        val hidden = setOf("h")
-        val saved = listOf(item("a", "notes"), item("h", "top"), item("b", "notes"), item("c", "fresh", opacity = 0.5),
-            item("d", "top"), item("e", "later", blend = "multiply"), item("f", "notes"))
-        val probes = listOf("notes", "top", "fresh", "later", "unseen").flatMap { layer ->
-            listOf(listOf(item("w", layer)), listOf(item("w", layer, blend = "multiply")), listOf(item("w", layer), item("x", "notes")))
+
+    @Test fun each_layer_s_list_follows_the_page_s_list_by_what_changed() {
+        val ids = listOf("base", "faint", "high")
+        val base = (0 until 6).map { item("b$it", "base") }; val faint = (0 until 3).map { item("f$it", "faint") }; val high = (0 until 2).map { item("h$it", "high") }
+        val page = base + faint + high
+        val lists = layerLists(ids, page) { it }
+        assertEquals(listOf(LayerRun("base", 0, 6), LayerRun("faint", 6, 9), LayerRun("high", 9, 11)), lists.runs)
+        fun same(a: LayerLists<RenderItem>, b: LayerLists<RenderItem>) {
+            assertEquals(b.order, a.order); assertEquals(b.layers, a.layers); assertEquals(b.runs, a.runs)
+            for (layer in b.layers) assertEquals(b.of(layer), a.of(layer))
         }
-        for (split in 0..saved.size) {
-            val grown = DryLayers(layers, saved.take(split), hidden)
-            val held = grown.copy()
-            grown.add(saved.drop(split), hidden)
-            val whole = DryLayers(layers, saved, hidden)
-            val before = DryLayers(layers, saved.take(split), hidden)
-            for (probe in probes) {
-                assertEquals("split=$split probe=${probe.map { it.layerId }}", whole.inkOnTop(probe, hidden), grown.inkOnTop(probe, hidden))
-                // A copy taken before the objects were added still answers for what it was taken from.
-                assertEquals("split=$split probe=${probe.map { it.layerId }}", before.inkOnTop(probe, hidden), held.inkOnTop(probe, hidden))
-            }
+        // A stroke added to the lowest layer, one taken from the middle one, a layer hidden, a layer's objects read again.
+        for (next in listOf(base + item("n", "base") + faint + high, base + faint.drop(1) + high, base + faint, base + faint + high.map { it.copy(layerOpacity = 0.5) },
+                            base + faint + high + item("u", "unlisted"))) {
+            val followed = requireNotNull(followLayerLists(lists, page, next, ids, 1_024) { it })
+            same(followed, layerLists(ids, next) { it })
+            // A list followed again is followed from what it now holds.
+            val again = base + item("z", "base") + faint + high
+            followLayerLists(followed, next, again, ids, 1_024) { it }?.let { same(it, layerLists(ids, again) { it }) }
         }
+        // A layer's objects no longer together, or more changed than is followed: worked out again from every object.
+        assertNull(followLayerLists(lists, page, base + faint + high + item("b9", "base"), ids, 1_024) { it })
+        assertNull(followLayerLists(lists, page, page.map { it.copy(layerOpacity = 0.9) }, ids, 4) { it })
+        assertNull(layerLists(ids, listOf(item("a", "base"), item("b", "high"), item("c", "base"))) { it }.runs)
+        // The box around the objects only grows.
+        val grown = requireNotNull(followLayerLists(lists, page, page + item("far", "high").copy(bounds = Rect(500.0, 500.0, 10.0, 10.0)), ids, 1_024) { it })
+        assertEquals(Rect(0.0, 0.0, 510.0, 510.0), grown.bounds)
     }
-    /** After an undo, an erasure or a change from the computer the layer order
-     * is brought along by the objects taken away and put in: the answers must
-     * be those of starting over, or it must say that it cannot tell. */
-    @Test fun objects_taken_away_and_put_in_give_the_same_answers_as_starting_over() {
-        val random = java.util.Random(11)
-        val pool = listOf("notes", "top").flatMap { layer -> (0 until 6).map { item("$layer-$it", layer) } } +
-            (0 until 3).map { item("h-$it", "high", blend = "multiply") }
-        val ids = listOf("notes", "top", "high")
-        val probes = (ids + "unseen").flatMap { layer -> listOf(listOf(item("w", layer)), listOf(item("w", layer, blend = "multiply"))) }
-        repeat(300) {
-            val hidden = pool.filter { random.nextInt(8) == 0 }.map { it.objectId }.toSet()
-            val start = pool.filter { random.nextBoolean() }
-            val end = pool.filter { random.nextBoolean() }.shuffled(random)
-            val diff = requireNotNull(objectsDiff(start, end, 1_024))
-            val layersNow = DryLayers(ids, start, hidden)
-            assertTrue(layersNow.remove(diff.removed.map { start[it] }, hidden))
-            layersNow.add(diff.added.map { end[it] }, hidden)
-            val fresh = DryLayers(ids, end, hidden)
-            assertEquals(fresh.clean, layersNow.clean)
-            for (layer in ids) assertEquals(fresh.paintOf(layer) != null, layersNow.paintOf(layer) != null)
-            for (probe in probes) assertEquals("probe=${probe.map { it.layerId }}", fresh.inkOnTop(probe, hidden), layersNow.inkOnTop(probe, hidden))
-        }
-        // A layer whose objects are not composited alike, or one the document does not list left empty: it cannot tell.
-        assertFalse(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes", opacity = 0.5)), emptySet()).remove(listOf(item("a", "notes")), emptySet()))
-        assertFalse(DryLayers(ids, listOf(item("a", "notes"), item("u", "unlisted")), emptySet()).remove(listOf(item("u", "unlisted")), emptySet()))
-        assertTrue(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes")), emptySet()).remove(listOf(item("a", "notes")), emptySet()))
-        // What can be drawn by parts.
-        assertTrue(DryLayers(ids, pool, emptySet()).clean)
-        assertFalse(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes", opacity = 0.5)), emptySet()).clean)
-        assertFalse(DryLayers(ids, listOf(item("u", "unlisted")), emptySet()).clean)
-        assertTrue(DryLayers(ids, listOf(item("a", "notes"), item("b", "notes", opacity = 0.5)), setOf("b")).clean)
+
+    @Test fun every_layer_that_draws_has_its_own_picture_up_to_four_then_the_lowest_share_one_with_the_source() {
+        assertEquals(emptyList<SlotKey>(), slotLayout(emptyList(), 4))
+        assertEquals(listOf(SlotKey(listOf("a"), false)), slotLayout(listOf("a"), 4))
+        assertEquals(listOf("a", "b", "c", "d").map { SlotKey(listOf(it), false) }, slotLayout(listOf("a", "b", "c", "d"), 4))
+        // Six layers: the topmost three alone, the three beneath with the source pixels.
+        assertEquals(listOf(SlotKey(listOf("a", "b", "c"), true), SlotKey(listOf("d"), false), SlotKey(listOf("e"), false), SlotKey(listOf("f"), false)),
+            slotLayout(listOf("a", "b", "c", "d", "e", "f"), 4))
+        // However many layers draw, never more pictures than allowed.
+        for (count in 0..20) assertTrue(slotLayout((0 until count).map { "l$it" }, 4).size <= 4)
+    }
+
+    @Test fun an_object_read_again_with_its_layer_composited_otherwise_draws_the_same() {
+        val shape = item("r", "notes", shape = Shape.Rectangle(Rect(1.0, 2.0, 3.0, 4.0)))
+        // Another opacity, blend or lock: drawn alike in the layer's own picture.
+        assertTrue(sameDrawing(shape, shape.copy(layerOpacity = 0.4)))
+        assertTrue(sameDrawing(shape, shape.copy(layerBlend = "multiply", locked = true)))
+        assertTrue(sameDrawing(shape, shape.copy(contours = Contours(longArrayOf(), longArrayOf(), uintArrayOf()))))
+        // Anything that changes what is drawn does not.
+        assertFalse(sameDrawing(shape, shape.copy(objectId = "other")))
+        assertFalse(sameDrawing(shape, shape.copy(layerId = "top")))
+        assertFalse(sameDrawing(shape, shape.copy(transform = Transform(e = 1.0))))
+        assertFalse(sameDrawing(shape, shape.copy(style = ObjectStyle(0xff0000ffu, 4.0))))
+        assertFalse(sameDrawing(shape, shape.copy(shape = Shape.Rectangle(Rect(1.0, 2.0, 3.0, 5.0)))))
+        assertFalse(sameDrawing(shape, shape.copy(bounds = Rect(0.0, 0.0, 9.0, 9.0))))
+        // A stroke keeps its contours when its layer changes; other contours are another stroke.
+        val pen = stroke("s", "notes")
+        assertTrue(sameDrawing(pen, pen.copy(layerOpacity = 0.5)))
+        assertFalse(sameDrawing(pen, stroke("s", "notes")))
+    }
+
+    @Test fun a_stroke_in_any_layer_is_added_to_that_layer_s_picture() {
+        val a = item("a", "notes"); val b = item("b", "notes")
+        // Beneath other layers, in a multiply (highlighter) layer, in a translucent one: each layer's list grows at its end.
+        assertEquals(LayerStep.Append(2), layerStep(listOf(a, b), listOf(a, b, item("n", "notes")), 1_024) { it })
+        val high = item("h", "high", blend = "multiply")
+        assertEquals(LayerStep.Append(1), layerStep(listOf(high), listOf(high, item("n", "high", blend = "multiply")), 1_024) { it })
+        val faint = item("t", "faint", opacity = 0.55)
+        assertEquals(LayerStep.Append(1), layerStep(listOf(faint), listOf(faint, item("n", "faint", opacity = 0.55)), 1_024) { it })
+        // The first stroke of a layer, and strokes saved faster than frames are drawn.
+        assertEquals(LayerStep.Append(0), layerStep(emptyList(), listOf(a), 1_024) { it })
+        assertEquals(LayerStep.Append(1), layerStep(listOf(a), listOf(a, b, item("c", "notes")), 1_024) { it })
+    }
+
+    @Test fun a_layer_composited_otherwise_or_put_elsewhere_keeps_its_picture() {
+        val objects = (0 until 3_000).map { stroke("s$it", "notes") }
+        // Every object of the layer read again with another opacity: more than are followed one by one, yet the same drawing.
+        assertEquals(LayerStep.Same, layerStep(objects, objects.map { it.copy(layerOpacity = 0.3, layerBlend = "multiply") }, 1_024) { it })
+        // Nothing changed, the same list or an equal one.
+        assertEquals(LayerStep.Same, layerStep(objects, objects, 1_024) { it })
+        assertEquals(LayerStep.Same, layerStep(objects, objects.toList(), 1_024) { it })
+    }
+
+    @Test fun other_changes_draw_a_part_of_the_layer_again_and_too_many_draw_it_whole() {
+        val a = item("a", "notes"); val b = item("b", "notes"); val c = item("c", "notes")
+        fun changed(step: LayerStep) = assertTrue("expected a change, got $step", step is LayerStep.Changed)
+        // Undo, an erasure, an edit, an object put in beneath others, another order.
+        changed(layerStep(listOf(a, b, c), listOf(a, b), 1_024) { it })
+        changed(layerStep(listOf(a, b, c), listOf(a, b.copy(transform = Transform(e = 5.0)), c), 1_024) { it })
+        changed(layerStep(listOf(a, b), listOf(item("n", "notes"), a, b), 1_024) { it })
+        changed(layerStep(listOf(a, b, c), listOf(a, c, b), 1_024) { it })
+        changed(layerStep(listOf(a), emptyList(), 1_024) { it })
+        // More changed than is followed one by one.
+        val many = (0 until 50).map { item("m$it", "notes") }
+        assertEquals(LayerStep.Redraw, layerStep(many, many.map { it.copy(transform = Transform(e = 1.0)) }, 10) { it })
+    }
+
+    @Test fun what_each_picture_needs_follows_what_happened_to_its_layers() {
+        val notes = SlotKey(listOf("notes"), false); val top = SlotKey(listOf("top"), false)
+        val prefix = SlotKey(listOf("base", "notes"), true)
+        val held = setOf(notes, top, prefix)
+        val none = emptyMap<String, LayerStep>()
+        assertEquals(SlotWork.Keep, slotWork(notes, held, none, false, emptySet()))
+        // A layer shown, or one that drew nothing before: its picture is drawn.
+        assertEquals(SlotWork.Render, slotWork(SlotKey(listOf("fresh"), false), held, none, false, emptySet()))
+        assertEquals(SlotWork.Append, slotWork(notes, held, mapOf("notes" to LayerStep.Append(3)), false, emptySet()))
+        assertEquals(SlotWork.Patch, slotWork(notes, held, mapOf("notes" to LayerStep.Changed(ObjectsDiff(intArrayOf(0), IntArray(0)))), false, emptySet()))
+        assertEquals(SlotWork.Render, slotWork(notes, held, mapOf("notes" to LayerStep.Redraw), false, emptySet()))
+        // Another layer's change, the source pixels and a layer composited otherwise leave a layer's own picture alone.
+        assertEquals(SlotWork.Keep, slotWork(top, held, mapOf("notes" to LayerStep.Redraw), true, setOf("top")))
+        // A picture that holds several layers and the source pixels draws strokes in by parts, and is drawn again
+        // for another source, or for a layer of it composited otherwise.
+        assertEquals(SlotWork.Patch, slotWork(prefix, held, mapOf("notes" to LayerStep.Append(1)), false, emptySet()))
+        assertEquals(SlotWork.Render, slotWork(prefix, held, none, true, emptySet()))
+        assertEquals(SlotWork.Render, slotWork(prefix, held, none, false, setOf("base")))
+        assertEquals(SlotWork.Keep, slotWork(prefix, held, none, false, setOf("top")))
     }
     // endregion
 
@@ -157,138 +191,106 @@ class KeptPictureTest {
     }
     // endregion
 
-    // region Keep, add a stroke, draw a part again, or make again
-    private val view = Transform(a = 1.5, d = 1.5, e = 20.0, f = 40.0)
-    private val page = Any()
-    private fun basis(objects: List<RenderItem>, width: Int = 1080, height: Int = 2000, matrix: Transform = view, scale: Double = 1.5,
-        background: Any? = page, smooth: Boolean = true, layerIds: List<String> = layers, hidden: Set<String> = emptySet()) =
-        PictureBasis(width, height, matrix, scale, background, smooth, layerIds, hidden, objects)
-    private fun step(held: PictureBasis<RenderItem>?, next: PictureBasis<RenderItem>): PictureStep =
-        pictureStep(held, held?.let { DryLayers(it.layerIds, it.objects, it.hidden) }, next, { old, new -> objectsDiff(old, new, 1_024) },
-            { id -> next.objects.firstOrNull { it.objectId == id } }) { it }
-    private val a = item("a", "notes"); private val b = item("b", "top"); private val c = item("c", "top")
-    private val saved = listOf(a, b)
-    private fun patched(found: PictureStep): TouchedArea {
-        assertTrue("expected a part drawn again, got $found", found is PictureStep.Patch)
-        return (found as PictureStep.Patch).area
+    // region Views: pictures moved, scaled or turned, and drawn at the view once it rests
+    private val view = Transform(a = 1.5, d = 1.5, e = 20.25, f = 40.75)
+
+    @Test fun a_whole_pixel_pan_moves_the_pictures_and_is_exact_only_with_the_page_on_the_screen_whole() {
+        assertEquals(ViewMove.Same, viewMove(view, view, true, true))
+        assertEquals(ViewMove.Shift(37, -23, true), viewMove(view, view.copy(e = view.e + 37, f = view.f - 23), true, true))
+        // The screen's edge cuts the page before or after: moved, but drawn at the view once it rests.
+        assertEquals(ViewMove.Shift(37, -23, false), viewMove(view, view.copy(e = view.e + 37, f = view.f - 23), false, true))
+        assertEquals(ViewMove.Shift(37, -23, false), viewMove(view, view.copy(e = view.e + 37, f = view.f - 23), true, false))
+        // Arithmetic noise in a whole-pixel move still counts as whole; a part of a pixel does not.
+        assertEquals(ViewMove.Shift(5, 0, true), viewMove(view, view.copy(e = view.e + 5 + 1e-9), true, true))
+        assertEquals(ViewMove.Same, viewMove(view, view.copy(e = view.e + 1e-9), true, true))
+        assertTrue(viewMove(view, view.copy(e = view.e + 0.5), true, true) is ViewMove.Warp)
+        assertTrue(viewMove(view, view.copy(e = view.e + 5.01), true, true) is ViewMove.Warp)
     }
 
-    @Test fun with_no_picture_it_is_made() {
-        assertEquals(PictureStep.Rebuild(PictureChange.Missing), step(null, basis(saved)))
-        assertEquals(PictureStep.Rebuild(PictureChange.Missing), pictureStep(basis(saved), null, basis(saved), { _, _ -> ObjectsDiff.NONE }, { null }) { it })
+    @Test fun a_pinch_or_turn_draws_the_pictures_under_the_change_of_view() {
+        // Zoomed in twice about the point (100, 200) of the screen.
+        val zoomed = EditorDrawing.compose(Transform(a = 2.0, d = 2.0, e = -100.0, f = -200.0), view)
+        val move = viewMove(view, zoomed, true, true) as ViewMove.Warp
+        val expected = Transform(a = 2.0, d = 2.0, e = -100.0, f = -200.0)
+        for ((got, want) in listOf(move.toScreen.a to expected.a, move.toScreen.d to expected.d, move.toScreen.e to expected.e, move.toScreen.f to expected.f))
+            assertEquals(want, got, 1e-9)
+        // A turn is a warp too, and a view that cannot be inverted cannot be judged.
+        val turned = Transform(a = 0.0, b = 1.5, c = -1.5, d = 0.0, e = 20.0, f = 40.0)
+        assertTrue(viewMove(view, turned, true, true) is ViewMove.Warp)
+        assertNull(viewMove(Transform(a = 0.0, d = 0.0), view, true, true))
+        // Which views have to be drawn again once they rest.
+        assertTrue(softView(move)); assertTrue(softView(ViewMove.Shift(1, 1, false)))
+        assertFalse(softView(ViewMove.Shift(1, 1, true))); assertFalse(softView(ViewMove.Same))
+        // Where a warped picture lands: its four corners.
+        val corners = pictureCorners(expected, 100, 50)
+        assertArrayEquals(doubleArrayOf(-100.0, -200.0, 100.0, -200.0, 100.0, -100.0, -100.0, -100.0), corners, 1e-9)
     }
-    @Test fun the_same_saved_scene_keeps_the_picture() {
-        val held = basis(saved)
-        assertEquals(PictureStep.Keep, step(held, held))
-        assertEquals(PictureStep.Keep, step(held, basis(saved)))
-        // The same objects in another list, and an equal set of hidden ids in another set.
-        assertEquals(PictureStep.Keep, step(held, basis(saved.toList())))
-        assertEquals(PictureStep.Keep, step(basis(saved, hidden = setOf("b")), basis(saved, hidden = HashSet(listOf("b")))))
-        assertEquals(PictureStep.Keep, step(basis(emptyList()), basis(emptyList())))
+
+    @Test fun whether_the_page_lies_on_the_screen_whole() {
+        // A 1000 x 2000 page at half size, 20 px in: inside a 1080 x 1216 screen.
+        assertTrue(pageOnScreen(Transform(a = 0.5, d = 0.5, e = 20.0, f = 20.0), 1000.0, 2000.0, 1080, 1216))
+        // Touching the edges counts as on it; a pixel beyond does not, nor a page bigger than the screen.
+        assertTrue(pageOnScreen(Transform(a = 1.0, d = 1.0), 1080.0, 1216.0, 1080, 1216))
+        assertFalse(pageOnScreen(Transform(a = 1.0, d = 1.0, e = 1.0), 1080.0, 1216.0, 1080, 1216))
+        assertFalse(pageOnScreen(Transform(a = 3.0, d = 3.0), 1000.0, 2000.0, 1080, 1216))
+        // Turned a quarter: the page's corners are what count.
+        assertTrue(pageOnScreen(Transform(a = 0.0, b = 0.5, c = -0.5, d = 0.0, e = 1000.0, f = 10.0), 1000.0, 2000.0, 1080, 1216))
+        assertFalse(pageOnScreen(Transform(a = Double.NaN), 10.0, 10.0, 1080, 1216))
     }
-    @Test fun one_stroke_added_on_top_is_drawn_into_the_picture_and_nothing_else_is() {
-        assertEquals(PictureStep.Append(2), step(basis(saved), basis(saved + c)))
-        // The first stroke on an empty page, and the first in a layer above everything.
-        assertEquals(PictureStep.Append(0), step(basis(emptyList()), basis(listOf(a))))
-        assertEquals(PictureStep.Append(2), step(basis(saved), basis(saved + item("n", "fresh"))))
-        // Strokes saved faster than frames are drawn arrive together.
-        assertEquals(PictureStep.Append(2), step(basis(saved), basis(saved + c + item("d", "top") + item("e", "top"))))
-        // What is hidden above does not count as drawn above.
-        assertEquals(PictureStep.Append(2), step(basis(saved, hidden = setOf("b")), basis(saved + item("n", "notes"), hidden = setOf("b"))))
+
+    @Test fun a_picture_moved_is_exact_only_when_nothing_in_it_is_cut_by_the_screen_s_edge() {
+        val fitted = Transform(a = 0.5, d = 0.5, e = 20.0, f = 20.0)
+        val within = layerLists(listOf("notes"), listOf(item("a", "notes").copy(bounds = Rect(10.0, 10.0, 500.0, 500.0)))) { it }
+        assertEquals(Rect(10.0, 10.0, 500.0, 500.0), within.bounds)
+        assertTrue(contentOnScreen(fitted, 1000.0, 2000.0, within.bounds, 1080, 1216))
+        // A stroke out past the page and the screen's edge, or one whose box cannot be judged.
+        val out = layerLists(listOf("notes"), listOf(item("a", "notes"), item("b", "notes").copy(bounds = Rect(900.0, 10.0, 2_000.0, 10.0)))) { it }
+        assertFalse(contentOnScreen(fitted, 1000.0, 2000.0, out.bounds, 1080, 1216))
+        val unknown = layerLists(listOf("notes"), listOf(item("a", "notes").copy(bounds = Rect(Double.NaN, 0.0, 1.0, 1.0)))) { it }
+        assertNull(unknown.bounds)
+        assertFalse(contentOnScreen(fitted, 1000.0, 2000.0, unknown.bounds, 1080, 1216))
+        // An empty page: the page alone.
+        assertTrue(contentOnScreen(fitted, 1000.0, 2000.0, layerLists(listOf("notes"), emptyList<RenderItem>()) { it }.bounds, 1080, 1216))
     }
-    @Test fun a_stroke_that_is_not_plainly_on_top_is_drawn_again_where_it_lies() {
-        // Under another layer; in a multiply (highlighter) layer; in a translucent layer; in two layers.
-        patched(step(basis(saved), basis(saved + item("n", "notes"))))
-        val highlit = listOf(a, item("h", "top", blend = "multiply"))
-        patched(step(basis(highlit), basis(highlit + item("n", "top", blend = "multiply"))))
-        val faint = listOf(a, item("t", "top", opacity = 0.5))
-        patched(step(basis(faint), basis(faint + item("n", "top", opacity = 0.5))))
-        patched(step(basis(saved), basis(saved + c + item("n", "notes"))))
-        // Added, but hidden: nothing is drawn on top, and where it lies is drawn again.
-        patched(step(basis(saved, hidden = setOf("n")), basis(saved + item("n", "top"), hidden = setOf("n"))))
+
+    @Test fun the_page_s_soft_picture_is_no_larger_than_the_screen() {
+        assertEquals(0.5, requireNotNull(overviewScale(2000.0, 1000.0, 1000, 1200)), 1e-12)
+        assertEquals(1.2, requireNotNull(overviewScale(500.0, 1000.0, 1080, 1200)), 1e-12)
+        val scale = requireNotNull(overviewScale(4032.0, 3024.0, 1080, 1216))
+        assertTrue(4032 * scale <= 1080 + 1e-9 && 3024 * scale <= 1216 + 1e-9)
+        assertNull(overviewScale(0.0, 100.0, 1080, 1216)); assertNull(overviewScale(100.0, 100.0, 0, 1216))
+        assertNull(overviewScale(Double.NaN, 100.0, 1080, 1216))
     }
-    @Test fun a_change_that_cannot_be_drawn_by_parts_makes_the_picture_again() {
-        val again = PictureStep.Rebuild(PictureChange.Objects)
-        // An AI result and a numbered marker draw what their box does not tell.
-        assertEquals(again, step(basis(saved), basis(saved + item("n", "fresh", shape = Shape.Result("asset", "result")))))
-        assertEquals(again, step(basis(saved), basis(listOf(a) + item("m", "top", shape = Shape.Marker(1u, Point(0.0, 0.0), null)))))
-        // A stroke in a layer the document does not list.
-        assertEquals(again, step(basis(saved), basis(listOf(a, item("n", "unlisted"), b))))
-        // An object composited otherwise than the rest of its layer, put in beneath it.
-        assertEquals(again, step(basis(saved), basis(listOf(a, item("n", "top", opacity = 0.5), b))))
-        // A layer's opacity or blend is carried by its objects: all of them change together.
-        val held = basis(listOf(a, b, c))
-        assertEquals(again, step(held, basis(listOf(a, b.copy(layerOpacity = 0.5), c.copy(layerOpacity = 0.5)))))
-        // A picture of a layer whose objects are not composited alike is not drawn by parts.
-        val mixed = basis(listOf(a, b, item("x", "top", opacity = 0.5)))
-        assertEquals(again, step(mixed, basis(listOf(a, b))))
-        // More changed than is followed one by one.
-        assertEquals(again, pictureStep(basis(saved), DryLayers(layers, saved, emptySet()), basis(listOf(c)), { _, _ -> null }, { null }) { it })
+
+    @Test fun a_pan_moves_the_page_by_whole_pixels_and_carries_the_rest() {
+        var rest = Point(0.0, 0.0)
+        var moved = Point(0.0, 0.0)
+        // Three fifths of a pixel at a time: the page moves at the first, third and fifth step, never by a fraction.
+        repeat(5) {
+            val (step, carried) = wholePixelPan(rest, 0.6, -0.6)
+            assertEquals(step.x, kotlin.math.round(step.x), 0.0); assertEquals(step.y, kotlin.math.round(step.y), 0.0)
+            assertTrue(kotlin.math.abs(carried.x) <= 0.5 && kotlin.math.abs(carried.y) <= 0.5)
+            moved = Point(moved.x + step.x, moved.y + step.y); rest = carried
+        }
+        // Nothing is lost: moved and carried add up to what was asked.
+        assertEquals(3.0, moved.x + rest.x, 1e-9); assertEquals(-3.0, moved.y + rest.y, 1e-9)
+        assertEquals(Point(12.0, -4.0), wholePixelPan(Point(0.0, 0.0), 12.0, -4.0).first)
     }
-    @Test fun any_other_change_to_the_saved_objects_draws_again_only_the_part_it_touched() {
-        val held = basis(listOf(a, b, c))
-        // Undo or an erasure takes an object away; redo puts another object in its place.
-        patched(step(held, basis(listOf(a, b))))
-        patched(step(held, basis(listOf(a, b, item("c", "top")))))
-        // An edit, a move or a change from the paired computer arrives as another object.
-        patched(step(held, basis(listOf(a, b.copy(transform = Transform(e = 5.0)), c))))
-        patched(step(held, basis(listOf(a.copy(style = ObjectStyle(0xff0000ffu, 4.0)), b, c))))
-        // The same objects in another order, an object added anywhere but at the end, another set of objects.
-        patched(step(held, basis(listOf(a, c, b))))
-        patched(step(held, basis(listOf(item("n", "top"), a, b, c))))
-        patched(step(held, basis(listOf(a, item("n", "top"), b, c))))
-        patched(step(held, basis(listOf(item("x", "notes"), item("y", "top"), item("z", "top")))))
-        patched(step(held, basis(emptyList())))
-        // Objects hidden or shown again.
-        patched(step(basis(saved), basis(saved, hidden = setOf("a"))))
-        patched(step(basis(saved, hidden = setOf("a")), basis(saved)))
-        patched(step(basis(saved), basis(saved + c, hidden = setOf("a"))))
+
+    @Test fun pictures_are_drawn_at_the_view_when_the_gesture_ends_or_the_view_jumps_once() {
+        // Fingers lifted: at once.
+        assertTrue(viewSettlesNow(moving = false, wasMoving = true, sinceViewChangeMs = 0))
+        // A single change of view (fit, a jump): at once; part of a movement without a contact: once frames stop.
+        assertTrue(viewSettlesNow(moving = false, wasMoving = false, sinceViewChangeMs = -1))
+        assertTrue(viewSettlesNow(moving = false, wasMoving = false, sinceViewChangeMs = PICTURE_STREAK_MS))
+        assertFalse(viewSettlesNow(moving = false, wasMoving = false, sinceViewChangeMs = 8))
+        // Still moving: never.
+        assertFalse(viewSettlesNow(moving = true, wasMoving = true, sinceViewChangeMs = 5_000))
+        assertFalse(viewSettlesNow(moving = true, wasMoving = false, sinceViewChangeMs = -1))
     }
-    @Test fun a_change_that_covers_most_of_the_screen_makes_the_picture_again() {
-        val small = item("s", "top").copy(bounds = Rect(100.0, 100.0, 40.0, 30.0))
-        val big = item("g", "top").copy(bounds = Rect(0.0, 0.0, 700.0, 1300.0))
-        val held = basis(listOf(a, small, big))
-        assertEquals(PictureStep.Rebuild(PictureChange.Area), step(held, basis(listOf(a, small))))
-        val area = patched(step(held, basis(listOf(a, big))))
-        // The small object's box under the view (x 170..230, y 190..235), grown by the margin and out to whole pixels.
-        assertEquals(listOf(PixelBox(168, 188, 232, 237)), area.boxes)
-        // Off the screen: nothing to draw again, but the picture now stands for the new objects.
-        val away = item("w", "top").copy(bounds = Rect(-5_000.0, -5_000.0, 10.0, 10.0))
-        assertTrue(patched(step(basis(listOf(a, away)), basis(listOf(a)))).isEmpty)
-    }
-    @Test fun a_change_of_view_background_or_layers_makes_the_picture_again() {
-        val held = basis(saved)
-        // Pan, zoom and rotation all change how the document lies on the screen.
-        assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved, matrix = view.copy(e = 21.0))))
-        assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved, matrix = Transform(a = 3.0, d = 3.0, e = 20.0, f = 40.0), scale = 3.0)))
-        assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved, matrix = Transform(a = 0.0, b = 1.5, c = -1.5, d = 0.0, e = 20.0, f = 40.0))))
-        assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved, scale = 1.25)))
-        // Another size of the canvas, as after turning the device or showing a tool's controls.
-        assertEquals(PictureStep.Rebuild(PictureChange.Size), step(held, basis(saved, width = 2000, height = 1080)))
-        assertEquals(PictureStep.Rebuild(PictureChange.Size), step(held, basis(saved, height = 1800)))
-        // Another page picture, none at all, or the same one shown smoothed or not.
-        assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved, background = Any())))
-        assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved, background = null)))
-        assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved, smooth = false)))
-        // Layers put in another order, added or removed.
-        assertEquals(PictureStep.Rebuild(PictureChange.Layers), step(held, basis(saved, layerIds = listOf("top", "notes"))))
-        assertEquals(PictureStep.Rebuild(PictureChange.Layers), step(held, basis(saved, layerIds = layers + "fresh")))
-        // Together with a stroke added or another change.
-        assertEquals(PictureStep.Rebuild(PictureChange.View), step(held, basis(saved + c, matrix = view.copy(f = 0.0))))
-        assertEquals(PictureStep.Rebuild(PictureChange.Background), step(held, basis(saved + c, background = Any())))
-        assertEquals(PictureStep.Rebuild(PictureChange.Size), step(held, basis(saved + c, width = 900)))
-    }
-    /** Each stroke is drawn into the picture once: after it has been added the
-     * picture stands, however often the scene is shown again. */
-    @Test fun a_stroke_already_added_is_not_added_again() {
-        val first = basis(saved); val second = basis(saved + c); val third = basis(saved + c + item("d", "top"))
-        assertEquals(PictureStep.Append(2), step(first, second))
-        assertEquals(PictureStep.Keep, step(second, second))
-        assertEquals(PictureStep.Append(3), step(second, third))
-        assertEquals(PictureStep.Keep, step(third, basis(third.objects.toList())))
-    }
-    /** While the page is panned or zoomed every frame wants another picture.
-     * Making one for each would cost more than drawing the frame. */
+
+    /** While the paired computer moves an object every frame wants another
+     * picture. Making one for each would cost more than drawing the frame. */
     @Test fun a_picture_is_not_made_for_every_frame_of_a_movement() {
         val objects = PictureChange.Objects
         // A change after a quiet time, and the first there ever was: made at once.
@@ -297,25 +299,16 @@ class KeptPictureTest {
             assertTrue(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS, why = why))
         }
         assertTrue(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 5_000, why = objects))
-        // Another change right after the last: this frame is drawn over the picture, or whole.
+        // Another change right after the last: this frame is drawn over the pictures, or whole.
         assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 0, why = objects))
-        assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 8, why = objects))
         assertFalse(pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = PICTURE_STREAK_MS - 1, why = objects))
-        // A pan, zoom, turn or resize starts a movement: drawn whole however long the page rested.
+        // A resize starts a movement: drawn whole however long the page rested.
         for (why in listOf(PictureChange.View, PictureChange.Size)) {
-            assertFalse(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = -1, why = why))
             assertFalse(why.name, pictureMadeNow(sameAsLastFrame = false, sinceChangeMs = 5_000, why = why))
             assertTrue(why.name, pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 0, why = why))
         }
         // The movement has stopped: the next frame wants what the last one wanted, however soon it comes.
-        assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 0, why = objects))
         assertTrue(pictureMadeNow(sameAsLastFrame = true, sinceChangeMs = 8, why = objects))
-        // The same scene, by its objects and not by the list that holds them.
-        val diff = { old: List<RenderItem>, new: List<RenderItem> -> objectsDiff(old, new, 1_024) }
-        assertTrue(sameBasis(basis(saved), basis(saved.toList()), diff))
-        assertFalse(sameBasis(basis(saved), basis(saved + c), diff))
-        assertFalse(sameBasis(basis(saved), basis(saved, hidden = setOf("a")), diff))
-        assertFalse(sameBasis(basis(saved), basis(saved, scale = 2.0), diff))
     }
     // endregion
 

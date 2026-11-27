@@ -1578,6 +1578,8 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (active) cancelTool()
         captureNavigationGeneration++
         instructionInteractionChanged()
+        // The canvas draws its pictures moved while fingers move the view, and at the view once they lift.
+        if (!active) { panRest = Point(0.0, 0.0); publish() }
     }
     private fun receivedCaptureIdle(ownInstructions: Boolean = false, ownSemantics: Boolean = false): Boolean = !disposing && !captureStreamBlocksParent && !imageFrames.state.value.blocksInput && !navigationContactActive && pending == 0 && gesture == null && strokes.isEmpty() &&
         !ai.state.value.open && !instructionEditor.hasUnsaved() && (ownInstructions || !instructionEditor.state.value.busy) && (ownSemantics || !semanticEditor.state.value.busy) &&
@@ -2141,7 +2143,7 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
             provisional, allErased, allTransforms, selected, hoverPoint, preferences.brush(tool).width, density, preferences.darkTheme,
             connection?.peerViewport?.takeIf { it.documentId == doc.documentId }?.corners.orEmpty(),
             aiResults=resultFrame?.images.orEmpty(),resultDisplayReady=aiResultReady(),documentFrame=documentOwner.matchingFrame(doc,epoch),precision=precision.frame(),documentDraft=documentPress,giantMode=giantMode,giantFrame=giantFrame,rotationHandle=rotationHandle(),
-            wetSampleMs=inkSampleMs,wetStartMs=inkStartMs)
+            wetSampleMs=inkSampleMs,wetStartMs=inkStartMs,viewMoving=navigationContactActive)
         scene = next
         if(streamDraftOnly)streamSceneState.value=renderScene(next).also{check(it.background==null)}
         canvasSink?.invoke(renderScene(next))
@@ -2887,12 +2889,19 @@ internal class EditorController @JvmOverloads constructor(application: Applicati
         if (token == epoch && current === project) refresh(current, current.undoRedo(options, redo), token)
     }
 
+    /** What a pan moved by less than a whole pixel, carried to the next one. */
+    private var panRest = Point(0.0, 0.0)
     override fun pan(dx: Double, dy: Double) {
-        if (streamEditsSealed || captureStreamBlocksParent || gesture != null) return
+        if (streamEditsSealed || captureStreamBlocksParent || gesture != null || !dx.isFinite() || !dy.isFinite()) return
         followPeer = false
+        // The page moves by whole pixels, the rest carried to the next move:
+        // the canvas then shows its kept pictures moved, pixel for pixel.
+        val (step, rest) = wholePixelPan(panRest, dx, dy)
+        panRest = rest
+        if (step.x == 0.0 && step.y == 0.0) return
         invalidateViewCheck()
         val middle = Point(camera.viewportWidth / 2, camera.viewportHeight / 2)
-        val next = core.mapPoints(camera, true, listOf(Point(middle.x - dx, middle.y - dy))).single()
+        val next = core.mapPoints(camera, true, listOf(Point(middle.x - step.x, middle.y - step.y))).single()
         camera = camera.copy(center = next); publish()
     }
     override fun pinch(previousX: Double, previousY: Double, nextX: Double, nextY: Double, scale: Double, radians: Double) {

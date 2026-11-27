@@ -41,8 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *   render's commands can have been drawn in between: the renderer draws
  *   nothing unasked, and a frame it drew late draws the commands last given
  *   to it, which are this render's.
- * - The reader has room for every picture that may be held and one more, so
- *   taking the newest image never stops short at its limit.
+ * - The reader has room for every picture that may be held ([maxHeld]) and
+ *   one more, so taking the newest image never stops short at its limit.
  *
  * A picture is never drawn into again while it is held. Its buffer goes back
  * to be reused only at [Picture.release]; the caller releases a picture once
@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * every picture already made readable, so it is safe at any time.
  *
  * Used from one thread at a time. */
-internal class PictureSurface(val width: Int, val height: Int) {
+internal class PictureSurface(val width: Int, val height: Int, private val maxHeld: Int = MAX_HELD) {
     /** One finished picture. [bitmap] shows the buffer; premultiplied sRGB
      * with alpha, transparent wherever nothing was drawn. */
     class Picture internal constructor(val bitmap: Bitmap, private val image: Image, private val owner: Target) {
@@ -66,8 +66,8 @@ internal class PictureSurface(val width: Int, val height: Int) {
     }
 
     /** One platform renderer drawing into one reader. */
-    internal class Target(width: Int, height: Int) {
-        private val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, MAX_HELD + 1,
+    internal class Target(width: Int, height: Int, maxHeld: Int) {
+        private val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, maxHeld + 1,
             HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT)
         // Not `apply`: inside it, width and height would be the node's own, still zero.
         private val node = RenderNode("vw-kept-picture").also { it.setPosition(0, 0, width, height) }
@@ -123,17 +123,26 @@ internal class PictureSurface(val width: Int, val height: Int) {
         }
     }
 
-    private var target: Target? = Target(width, height)
+    private var target: Target? = Target(width, height, maxHeld)
 
     /** Whether drawing has ended for good. */
     val closed: Boolean get() = target == null
 
     /** Whether another picture can be held besides those not yet released. */
-    val room: Boolean get() = target?.let { it.out < MAX_HELD } == true
+    val room: Boolean get() = room(1)
+
+    /** Whether [count] more pictures can be held besides those not yet released. */
+    fun room(count: Int): Boolean = target?.let { it.out + count <= maxHeld } == true
 
     /** On-device tests only: renders made again on a new target. */
     var retried = 0
         private set
+
+    /** On-device tests only: so many of the coming renders are taken as not
+     * having come out on their first try, as when the platform renderer skips
+     * a frame, so that the way such a render is made again on a new target is
+     * run whatever the platform does. Zero everywhere else. */
+    @Volatile internal var notDrawnForTest = 0
 
     /** Draws one picture. Null when it could not be drawn; the surface is then
      * closed. Pictures made before stay good. */
@@ -142,12 +151,13 @@ internal class PictureSurface(val width: Int, val height: Int) {
         var used = target ?: return null
         try {
             var image = used.frame(draw)
+            if (image != null && notDrawnForTest > 0) { notDrawnForTest--; image.close(); image = null }
             if (image == null) {
                 // Put off or skipped: the renderer may still draw it later, so
                 // this target is done with. The pictures it made stay readable.
                 used.close()
                 retried++
-                used = Target(width, height).also { target = it }
+                used = Target(width, height, maxHeld).also { target = it }
                 image = used.frame(draw)
             }
             if (image == null) return failed("no picture came out of the renderer")
@@ -190,7 +200,7 @@ internal class PictureSurface(val width: Int, val height: Int) {
         internal val livePictures = AtomicInteger()
         internal val duplicates = AtomicInteger()
         private const val TAG = "VW_CANVAS"
-        /** Pictures held at once: the one shown, up to two waiting to be released, and the one being drawn. */
+        /** Pictures held at once unless the maker says otherwise: the one shown, up to two waiting to be released, and the one being drawn. */
         private const val MAX_HELD = 4
         private const val FENCE_WAIT_MS = 500L
         private const val NOT_DRAWN = HardwareRenderer.SYNC_LOST_SURFACE_REWARD_IF_FOUND or HardwareRenderer.SYNC_CONTEXT_IS_STOPPED or
